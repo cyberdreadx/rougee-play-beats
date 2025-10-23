@@ -5,6 +5,7 @@ import { base } from 'wagmi/chains';
 
 import { config, privyAppId } from '@/config/wallet';
 import { useChainChecker } from '@/hooks/useChainChecker';
+import { useSessionManager } from '@/hooks/useSessionManager';
 
 // Component to monitor and enforce Base network
 function ChainChecker({ children }: { children: React.ReactNode }) {
@@ -13,6 +14,18 @@ function ChainChecker({ children }: { children: React.ReactNode }) {
   // Extra logging for Phantom users
   if (isPhantom) {
     console.log('👻 Phantom wallet active, on correct chain:', isOnCorrectChain);
+  }
+  
+  return <>{children}</>;
+}
+
+// Component to manage session persistence
+function SessionManager({ children }: { children: React.ReactNode }) {
+  const { isSessionChecked, isAuthenticating } = useSessionManager();
+  
+  // Show a subtle loading state while checking session (optional)
+  if (isAuthenticating) {
+    console.log('🔄 Checking for existing session...');
   }
   
   return <>{children}</>;
@@ -58,9 +71,11 @@ export default function Web3Provider({ children }: { children: React.ReactNode }
     >
       <QueryClientProvider client={queryClient}>
         <WagmiProvider config={config}>
-          <ChainChecker>
-            {children}
-          </ChainChecker>
+          <SessionManager>
+            <ChainChecker>
+              {children}
+            </ChainChecker>
+          </SessionManager>
         </WagmiProvider>
       </QueryClientProvider>
     </PrivyProvider>

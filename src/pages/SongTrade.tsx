@@ -103,14 +103,20 @@ const SongTrade = ({ playSong, currentSong, isPlaying }: SongTradeProps) => {
   const ensureWagmiConnected = async () => {
     if (wagmiConnected) return;
     
-    // Prioritize injected connector for external wallets (like Base wallet)
-    const injected = connectors.find(c => c.id === 'injected');
+    // When logged in with Privy, always use Privy connector
+    // Only use injected connector if user is NOT authenticated with Privy
     const privyConn = connectors.find(c => /privy/i.test(c.id) || /privy/i.test(c.name));
-    const target = injected || privyConn || connectors[0];
+    const injected = connectors.find(c => c.id === 'injected');
+    
+    // Prioritize Privy if user is connected via Privy, otherwise use injected
+    const target = (isConnected && privyConn) ? privyConn : (injected || privyConn || connectors[0]);
     
     if (!target) {
       throw new Error('No wallet connector available');
     }
+    
+    console.log('🔌 Connecting wagmi with:', target.name, target.id, 'Privy authenticated:', isConnected);
+    
     try {
       await connectAsync({ connector: target });
     } catch (e) {

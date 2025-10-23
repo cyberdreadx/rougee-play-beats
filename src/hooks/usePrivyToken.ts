@@ -1,4 +1,5 @@
 import { usePrivy } from '@privy-io/react-auth';
+import { logAuthEvent, AuthEventType } from '@/lib/authLogger';
 
 /**
  * Hook to get Privy authentication token for edge function calls
@@ -19,6 +20,10 @@ export const usePrivyToken = () => {
       
       if (!token) {
         console.error('❌ No access token received from Privy');
+        logAuthEvent(AuthEventType.TOKEN_REFRESH_FAILED, {
+          error: 'No access token received',
+          userId: user?.id,
+        });
         throw new Error('Failed to get authentication token');
       }
       
@@ -34,6 +39,10 @@ export const usePrivyToken = () => {
         const payload = JSON.parse(jsonPayload);
         console.log('🔓 JWT Payload:', payload);
         console.log('🔓 JWT linked_accounts:', payload.linked_accounts);
+        
+        logAuthEvent(AuthEventType.TOKEN_REFRESH_SUCCESS, {
+          userId: user?.id,
+        });
       } catch (e) {
         console.error('Failed to decode JWT:', e);
       }
@@ -44,6 +53,10 @@ export const usePrivyToken = () => {
       };
     } catch (error) {
       console.error('❌ Error getting auth token:', error);
+      logAuthEvent(AuthEventType.TOKEN_REFRESH_FAILED, {
+        error,
+        userId: user?.id,
+      });
       throw error;
     }
   };

@@ -164,32 +164,13 @@ export async function requireWalletAddress(authHeader: string | null, req?: Requ
       return user.walletAddress;
     }
     
-    console.log('⚠️ No wallet address in JWT, trying fallback methods...');
+    // Security: Do NOT fall back to headers or body - this allows authentication bypass
+    // If wallet is not in JWT, the user needs to reconnect their wallet
+    console.error('❌ No wallet address in JWT token');
+    console.log('JWT user info:', { userId: user.userId, email: user.email });
+    console.log('⚠️ User needs to connect a wallet to their account');
     
-    // Fallback 1: Try to get from request headers
-    if (req) {
-      const headerWallet = req.headers.get('x-wallet-address');
-      if (headerWallet) {
-        console.log('✅ Wallet address found in x-wallet-address header:', headerWallet);
-        return headerWallet.toLowerCase();
-      }
-    }
-    
-    // Fallback 2: Try to get from request body
-    if (req && req.method === 'POST') {
-      try {
-        const body = await req.clone().json();
-        const bodyWallet = body.wallet_address || body.walletAddress;
-        if (bodyWallet) {
-          console.log('✅ Wallet address found in request body:', bodyWallet);
-          return bodyWallet.toLowerCase();
-        }
-      } catch (e) {
-        console.log('Could not parse request body for wallet address');
-      }
-    }
-    
-    throw new Error('No wallet address found in authentication token, headers, or body');
+    throw new Error('No wallet address found in authentication token. Please connect a wallet to your account.');
   } catch (error) {
     console.error('❌ Error extracting wallet address:', error);
     throw error;

@@ -83,7 +83,11 @@ For questions or support:
 ---
 
 <div align="center">
-  <strong>Built with 💚 using Lovable</strong>
+  <strong>Built with 💚 using Lovable and Cursor</strong>
+  
+  📚 [Documentation](https://rougee-web3.gitbook.io/rougee-web3-documentation/) | 
+  🌐 [Live App](https://rougee.app) | 
+  💻 [GitHub](https://github.com/cyberdreadx/rougee-play-beats)
   
   Stream music. Own music. Be music.
 </div>

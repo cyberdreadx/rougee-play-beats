@@ -123,7 +123,7 @@ const Footer = () => {
             © {currentYear} ROUGEE PLAY. All rights reserved.
           </p>
           <div className="flex items-center gap-3 text-[10px] text-muted-foreground font-mono">
-            <button onClick={() => navigate("/terms-of-service")} className="hover:text-neon-green transition-colors">
+            <button onClick={() => navigate("/privacy-policy")} className="hover:text-neon-green transition-colors">
               Privacy Policy
             </button>
             <span>|</span>
@@ -131,7 +131,7 @@ const Footer = () => {
               Terms of Service
             </button>
             <span>|</span>
-            <button onClick={() => navigate("/terms-of-service")} className="hover:text-neon-green transition-colors">
+            <button onClick={() => navigate("/cookie-policy")} className="hover:text-neon-green transition-colors">
               Cookie Policy
             </button>
           </div>

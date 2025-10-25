@@ -1,10 +1,26 @@
 import { Helmet } from "react-helmet-async";
+import { useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Shield, AlertTriangle, CheckCircle2, FileText } from "lucide-react";
 
 const TermsOfService = () => {
-  const lastUpdated = "January 14, 2025";
+  const lastUpdated = "October 24, 2025";
+  const location = useLocation();
+
+  useEffect(() => {
+    if (location.hash) {
+      const id = location.hash.replace('#', '');
+      // Defer scrolling until after render
+      setTimeout(() => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 0);
+    }
+  }, [location]);
 
   return (
     <>
@@ -140,7 +156,7 @@ const TermsOfService = () => {
           {/* 5. Artist Terms */}
           <Card className="mb-6 border-2">
             <CardHeader>
-              <CardTitle className="text-xl sm:text-2xl">5. Artist Terms</CardTitle>
+              <CardTitle id="artist-terms" className="text-xl sm:text-2xl">5. Artist Terms</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4 text-sm sm:text-base leading-relaxed">
               <div>
@@ -354,10 +370,68 @@ const TermsOfService = () => {
             </CardContent>
           </Card>
 
-          {/* 11. Termination */}
+          {/* 11. DMCA Policy & Takedown */}
           <Card className="mb-6 border-2">
             <CardHeader>
-              <CardTitle className="text-xl sm:text-2xl">11. Termination</CardTitle>
+              <CardTitle id="dmca-policy" className="text-xl sm:text-2xl">11. DMCA Policy & Takedown</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 text-sm sm:text-base leading-relaxed">
+              <p>
+                We respect intellectual property rights and comply with the Digital Millennium Copyright Act (DMCA). 
+                If you believe content on the Platform infringes your copyright, please submit a notice as described below.
+              </p>
+              <div>
+                <h4 className="font-semibold mb-2">11.1 Designated Agent</h4>
+                <p>DMCA notices should be sent to our Designated Agent:</p>
+                <ul className="space-y-1 ml-4">
+                  <li><strong>Email:</strong> legal@rougee.network</li>
+                </ul>
+              </div>
+              <div>
+                <h4 className="font-semibold mb-2">11.2 DMCA Notice Requirements</h4>
+                <p>Your DMCA notice must include the following per 17 U.S.C. § 512(c)(3):</p>
+                <ul className="list-disc list-inside space-y-1 ml-4 mt-2">
+                  <li>A physical or electronic signature of the copyright owner or a person authorized to act on their behalf</li>
+                  <li>Identification of the copyrighted work claimed to have been infringed</li>
+                  <li>Identification of the material that is claimed to be infringing and information reasonably sufficient to permit us to locate the material (e.g., song title, artist name, URL)</li>
+                  <li>Your contact information (name, address, telephone number, and email)</li>
+                  <li>A statement that you have a good-faith belief that the use of the material is not authorized by the copyright owner, its agent, or the law</li>
+                  <li>A statement that the information in the notice is accurate and, under penalty of perjury, that you are authorized to act on behalf of the owner</li>
+                </ul>
+              </div>
+              <div>
+                <h4 className="font-semibold mb-2">11.3 Counter-Notification</h4>
+                <p>
+                  If you believe your content was removed or disabled by mistake or misidentification, you may submit a counter-notice that includes:
+                </p>
+                <ul className="list-disc list-inside space-y-1 ml-4 mt-2">
+                  <li>Your physical or electronic signature</li>
+                  <li>Identification of the material removed or disabled and the location where it appeared before removal</li>
+                  <li>A statement under penalty of perjury that you have a good-faith belief the material was removed or disabled as a result of mistake or misidentification</li>
+                  <li>Your name, address, telephone number, and email address</li>
+                  <li>
+                    A statement that you consent to the jurisdiction of the Federal District Court for your judicial district (or, if outside the U.S., any judicial district in which ROUGEE PLAY may be found) 
+                    and that you will accept service of process from the person who provided the original DMCA notice
+                  </li>
+                </ul>
+              </div>
+              <div>
+                <h4 className="font-semibold mb-2">11.4 Repeat Infringer Policy</h4>
+                <p>In appropriate circumstances, we may disable or terminate accounts of users who are repeat infringers.</p>
+              </div>
+              <div>
+                <h4 className="font-semibold mb-2">11.5 Removal Process</h4>
+                <p>
+                  Upon receipt of a valid DMCA notice, we will expeditiously remove or disable access to the allegedly infringing material and notify the user who posted it.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* 12. Termination */}
+          <Card className="mb-6 border-2">
+            <CardHeader>
+              <CardTitle className="text-xl sm:text-2xl">12. Termination</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 text-sm sm:text-base leading-relaxed">
               <p>
@@ -377,10 +451,10 @@ const TermsOfService = () => {
             </CardContent>
           </Card>
 
-          {/* 12. Changes to Terms */}
+          {/* 13. Changes to Terms */}
           <Card className="mb-6 border-2">
             <CardHeader>
-              <CardTitle className="text-xl sm:text-2xl">12. Changes to Terms</CardTitle>
+              <CardTitle className="text-xl sm:text-2xl">13. Changes to Terms</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 text-sm sm:text-base leading-relaxed">
               <p>
@@ -394,27 +468,30 @@ const TermsOfService = () => {
             </CardContent>
           </Card>
 
-          {/* 13. Governing Law & Dispute Resolution */}
+          {/* 14. Governing Law & Dispute Resolution */}
           <Card className="mb-6 border-2">
             <CardHeader>
-              <CardTitle className="text-xl sm:text-2xl">13. Governing Law & Dispute Resolution</CardTitle>
+              <CardTitle className="text-xl sm:text-2xl">14. Governing Law & Dispute Resolution</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 text-sm sm:text-base leading-relaxed">
               <p>
-                These Terms shall be governed by and construed in accordance with the laws of [Your 
-                Jurisdiction], without regard to its conflict of law provisions.
+                These Terms shall be governed by and construed in accordance with the laws of the State of Delaware, United States, 
+                without regard to its conflict of law provisions.
               </p>
               <p>
-                Any disputes arising from these Terms or your use of the Platform shall be resolved through 
-                binding arbitration in accordance with [Arbitration Rules], except where prohibited by law.
+                Any disputes arising from these Terms or your use of the Platform shall be resolved through binding arbitration administered by 
+                the American Arbitration Association (AAA) under its Commercial Arbitration Rules. The seat of arbitration shall be Wilmington, Delaware, 
+                and the proceedings will be conducted in English. Nothing in this section prevents either party from seeking temporary or injunctive 
+                relief in a court of competent jurisdiction to prevent actual or threatened infringement, misappropriation of intellectual property, 
+                or breach of confidentiality obligations.
               </p>
             </CardContent>
           </Card>
 
-          {/* 14. Contact Information */}
+          {/* 15. Contact Information */}
           <Card className="mb-6 border-2 bg-gradient-to-br from-primary/5 to-transparent">
             <CardHeader>
-              <CardTitle className="text-xl sm:text-2xl">14. Contact Information</CardTitle>
+              <CardTitle className="text-xl sm:text-2xl">15. Contact Information</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 text-sm sm:text-base leading-relaxed">
               <p>For questions about these Terms, please contact us:</p>

@@ -28,6 +28,8 @@ import Playlists from "./pages/Playlists";
 import HowItWorks from "./pages/HowItWorks";
 import Tiers from "./pages/Tiers";
 import TermsOfService from "./pages/TermsOfService";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import CookiePolicy from "./pages/CookiePolicy";
 import Messages from "./pages/Messages";
 import Genre from "./pages/Genre";
 import NotFound from "./pages/NotFound";
@@ -97,6 +99,8 @@ const AppContent = () => {
           <Route path="/messages" element={<Messages />} />
           <Route path="/how-it-works" element={<HowItWorks />} />
           <Route path="/terms-of-service" element={<TermsOfService />} />
+          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+          <Route path="/cookie-policy" element={<CookiePolicy />} />
           <Route path="/feed" element={<Feed playSong={handlePlaySong} currentSong={activeSong} isPlaying={activeIsPlaying} />} />
           <Route path="/artist/:walletAddress" element={<Artist playSong={handlePlaySong} currentSong={activeSong} isPlaying={activeIsPlaying} />} />
           <Route path="/profile/edit" element={<ProfileEdit />} />

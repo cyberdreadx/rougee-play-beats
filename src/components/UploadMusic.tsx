@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Music, Upload, AlertTriangle, Loader2 } from "lucide-react";
@@ -238,6 +239,7 @@ export default function UploadMusic() {
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [aiUsage, setAiUsage] = useState<'none' | 'partial' | 'full'>('none');
+  const [confirmRights, setConfirmRights] = useState(false);
   const [copyrightWarning, setCopyrightWarning] = useState<{
     show: boolean;
     detectedInfo: any;
@@ -334,6 +336,10 @@ export default function UploadMusic() {
   };
 
   const proceedWithUpload = async () => {
+    if (!confirmRights) {
+      toast.error("Please confirm you own or are authorized to upload this content.");
+      return;
+    }
     setCopyrightWarning({ show: false, detectedInfo: null, violationCount: 0 });
     await performUpload();
   };
@@ -341,6 +347,11 @@ export default function UploadMusic() {
   const handleUpload = async () => {
     if (!audioFile || !address) {
       toast.error("Please connect wallet and select an audio file");
+      return;
+    }
+
+    if (!confirmRights) {
+      toast.error("Please confirm you own or are authorized to upload this content.");
       return;
     }
 
@@ -595,9 +606,29 @@ export default function UploadMusic() {
             </p>
           </div>
 
+          {/* Rights confirmation */}
+          <div className="flex items-start gap-3 rounded-md border border-border p-3 bg-muted/30">
+            <Checkbox id="confirm-rights" checked={confirmRights} onCheckedChange={(v) => setConfirmRights(Boolean(v))} />
+            <label htmlFor="confirm-rights" className="text-sm leading-6 text-foreground">
+              I confirm that I own the rights to this content or have obtained all necessary licenses and permissions to upload it to ROUGEE PLAY, and that the upload does not breach any contract to which I am a party. I agree to the
+              <button type="button" onClick={() => navigate('/terms-of-service')} className="ml-1 underline text-primary hover:text-primary/80">
+                Terms of Service
+              </button>
+              , including
+              <button type="button" onClick={() => navigate('/terms-of-service#artist-terms')} className="mx-1 underline text-primary hover:text-primary/80">
+                Section 5 (Artist Terms)
+              </button>
+              and
+              <button type="button" onClick={() => navigate('/terms-of-service#dmca-policy')} className="mx-1 underline text-primary hover:text-primary/80">
+                Section 11 (DMCA Policy)
+              </button>
+              .
+            </label>
+          </div>
+
           <Button
             onClick={handleUpload}
-            disabled={uploading || scanning || !audioFile || !address || slotsRemaining <= 0}
+            disabled={uploading || scanning || !audioFile || !address || slotsRemaining <= 0 || !confirmRights}
             className="w-full"
           >
             {uploading ? (

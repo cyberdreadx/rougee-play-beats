@@ -66,3 +66,4 @@ You should now see:
 - **Improved button sizes** for thumb navigation
 
 **The avatar cropping should now be much easier and more intuitive!** 🎉
+

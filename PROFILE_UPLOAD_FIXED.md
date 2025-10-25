@@ -51,3 +51,4 @@ Profile updated successfully
 ```
 
 **The profile upload should work perfectly now!** 🎉
+

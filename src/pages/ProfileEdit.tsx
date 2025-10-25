@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/card";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { AvatarCropModal } from "@/components/AvatarCropModal";
+import { CoverCropModal } from "@/components/CoverCropModal";
 import { useCurrentUserProfile } from "@/hooks/useCurrentUserProfile";
 import { useWallet } from "@/hooks/useWallet";
 import { usePrivyWagmi } from "@/hooks/usePrivyWagmi";
@@ -23,7 +24,7 @@ import { XRGETierBadge } from "@/components/XRGETierBadge";
 
 const ProfileEdit = () => {
   const navigate = useNavigate();
-  const { fullAddress, isConnected, isPrivyReady, createWallet, isCreatingWallet } = useWallet();
+  const { fullAddress, isConnected, isPrivyReady, createWallet, isCreatingWallet, authenticateWallet } = useWallet();
   const { profile, loading, updating, updateProfile } = useCurrentUserProfile();
   const { getAuthHeaders } = usePrivyToken();
   
@@ -43,14 +44,14 @@ const ProfileEdit = () => {
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
-  const [coverPosition, setCoverPosition] = useState<number>(50); // 0-100 percentage
-  const [isDragging, setIsDragging] = useState(false);
   const [isArtist, setIsArtist] = useState(false);
   const [verificationStatus, setVerificationStatus] = useState<'none' | 'pending' | 'approved' | 'rejected'>('none');
   const [verificationMessage, setVerificationMessage] = useState("");
   const [requestingVerification, setRequestingVerification] = useState(false);
   const [showAvatarCrop, setShowAvatarCrop] = useState(false);
   const [tempAvatarUrl, setTempAvatarUrl] = useState<string | null>(null);
+  const [showCoverCrop, setShowCoverCrop] = useState(false);
+  const [tempCoverUrl, setTempCoverUrl] = useState<string | null>(null);
   const [showDebugPanel, setShowDebugPanel] = useState(false);
 
   useEffect(() => {
@@ -83,9 +84,6 @@ const ProfileEdit = () => {
       if (profile.cover_cid) {
         setCoverPreview(getIPFSGatewayUrl(profile.cover_cid));
       }
-      // Load cover position from social_links if exists (default to center = 50%)
-      const savedPosition = profile.social_links?.coverPosition;
-      setCoverPosition(typeof savedPosition === 'number' ? savedPosition : 50);
       
       // Check verification status
       if (profile.verified) {
@@ -196,42 +194,34 @@ const ProfileEdit = () => {
         });
         return;
       }
-      setCoverFile(file);
-      setCoverPreview(URL.createObjectURL(file));
-      setCoverPosition(50); // Reset to center on new upload
+      
+      // Create preview and show crop modal
+      const url = URL.createObjectURL(file);
+      setTempCoverUrl(url);
+      setShowCoverCrop(true);
     }
   };
 
-  const handleCoverDrag = (e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
-    if (!isDragging) return;
-    
-    e.preventDefault();
-    const rect = e.currentTarget.getBoundingClientRect();
-    
-    let y: number;
-    if ('touches' in e) {
-      // Touch event
-      y = e.touches[0].clientY - rect.top;
-    } else {
-      // Mouse event
-      y = e.clientY - rect.top;
+  const handleCoverCropComplete = (croppedBlob: Blob) => {
+    // Convert blob to file
+    const croppedFile = new File([croppedBlob], 'cover.jpg', { type: 'image/jpeg' });
+    setCoverFile(croppedFile);
+    setCoverPreview(URL.createObjectURL(croppedBlob));
+    setShowCoverCrop(false);
+    if (tempCoverUrl) {
+      URL.revokeObjectURL(tempCoverUrl);
+      setTempCoverUrl(null);
     }
-    
-    const percentage = Math.max(0, Math.min(100, (y / rect.height) * 100));
-    setCoverPosition(percentage);
   };
 
-  const handleCoverDragStart = (e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(true);
-    handleCoverDrag(e);
+  const handleCoverCropCancel = () => {
+    setShowCoverCrop(false);
+    if (tempCoverUrl) {
+      URL.revokeObjectURL(tempCoverUrl);
+      setTempCoverUrl(null);
+    }
   };
 
-  const handleCoverDragEnd = (e?: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
-    e?.preventDefault();
-    setIsDragging(false);
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -320,7 +310,7 @@ const ProfileEdit = () => {
     formData.append("bio", bio.trim());
     formData.append("email", email.trim());
     formData.append("email_notifications", emailNotifications.toString());
-    formData.append("social_links", JSON.stringify({ twitter, instagram, website, coverPosition }));
+    formData.append("social_links", JSON.stringify({ twitter, instagram, website }));
 
     if (avatarFile) {
       formData.append("avatar", avatarFile);
@@ -392,15 +382,25 @@ const ProfileEdit = () => {
                 Hide Debug
               </Button>
               {!fullAddress && (
-                <Button
-                  variant="neon"
-                  size="sm"
-                  onClick={() => createWallet()}
-                  disabled={isCreatingWallet}
-                  className="font-mono text-xs"
-                >
-                  {isCreatingWallet ? 'Creating...' : 'Create Wallet'}
-                </Button>
+                <>
+                  <Button
+                    variant="neon"
+                    size="sm"
+                    onClick={() => createWallet()}
+                    disabled={isCreatingWallet}
+                    className="font-mono text-xs"
+                  >
+                    {isCreatingWallet ? 'Creating...' : 'Create Wallet'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => authenticateWallet()}
+                    className="font-mono text-xs"
+                  >
+                    Authenticate Wallet
+                  </Button>
+                </>
               )}
               <Button
                 variant="outline"
@@ -430,6 +430,14 @@ const ProfileEdit = () => {
             imageUrl={tempAvatarUrl}
             onComplete={handleAvatarCropComplete}
             onCancel={handleAvatarCropCancel}
+          />
+        )}
+
+        {showCoverCrop && tempCoverUrl && (
+          <CoverCropModal
+            imageUrl={tempCoverUrl}
+            onComplete={handleCoverCropComplete}
+            onCancel={handleCoverCropCancel}
           />
         )}
 
@@ -482,22 +490,15 @@ const ProfileEdit = () => {
             </div>
             {/* Cover Photo */}
             <div className="space-y-2">
-              <Label htmlFor="cover" className="font-mono">Cover Photo (1920x480, max 20MB)</Label>
+              <Label htmlFor="cover" className="font-mono">Cover Photo (1920x480, max 5MB)</Label>
               <div className="relative">
                 <div 
-                  className={`relative h-48 w-full rounded tech-border overflow-hidden bg-gradient-to-br from-primary/20 to-background ${coverPreview ? 'cursor-move select-none' : 'cursor-pointer'} group`}
+                  className="relative h-48 w-full rounded tech-border overflow-hidden bg-gradient-to-br from-primary/20 to-background group"
                   style={coverPreview ? {
                     backgroundImage: `url(${coverPreview})`,
                     backgroundSize: 'cover',
-                    backgroundPosition: `center ${coverPosition}%`
+                    backgroundPosition: 'center'
                   } : undefined}
-                  onMouseDown={coverPreview ? handleCoverDragStart : undefined}
-                  onMouseMove={coverPreview ? handleCoverDrag : undefined}
-                  onMouseUp={coverPreview ? handleCoverDragEnd : undefined}
-                  onMouseLeave={coverPreview ? handleCoverDragEnd : undefined}
-                  onTouchStart={coverPreview ? handleCoverDragStart : undefined}
-                  onTouchMove={coverPreview ? handleCoverDrag : undefined}
-                  onTouchEnd={coverPreview ? handleCoverDragEnd : undefined}
                 >
                   {!coverPreview && (
                     <>
@@ -509,7 +510,10 @@ const ProfileEdit = () => {
                         className="absolute inset-0 opacity-0 cursor-pointer z-10"
                       />
                       <div className="absolute inset-0 bg-black/50 group-hover:bg-black/70 transition-colors flex items-center justify-center pointer-events-none">
-                        <Upload className="h-8 w-8 text-neon-green" />
+                        <div className="text-center">
+                          <Upload className="h-8 w-8 text-neon-green mx-auto mb-2" />
+                          <p className="text-sm font-mono text-neon-green">Click to upload cover photo</p>
+                        </div>
                       </div>
                     </>
                   )}
@@ -517,8 +521,8 @@ const ProfileEdit = () => {
                   {coverPreview && (
                     <>
                       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center pointer-events-none">
-                        <div className={`text-white font-mono text-sm bg-black/60 px-3 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity ${isDragging ? '!opacity-100' : ''}`}>
-                          {isDragging ? 'Release to set' : 'Drag to adjust position'}
+                        <div className="text-white font-mono text-sm bg-black/60 px-3 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
+                          Click to change cover photo
                         </div>
                       </div>
                       <input
@@ -526,14 +530,14 @@ const ProfileEdit = () => {
                         type="file"
                         accept="image/*"
                         onChange={handleCoverChange}
-                        className="hidden"
+                        className="absolute inset-0 opacity-0 cursor-pointer z-10"
                       />
                       <Button
                         type="button"
                         variant="outline"
                         size="sm"
                         onClick={() => document.getElementById('cover')?.click()}
-                        className="absolute top-2 right-2 z-10 text-xs"
+                        className="absolute top-2 right-2 z-20 text-xs"
                       >
                         <Upload className="h-3 w-3 mr-1" />
                         Change
@@ -541,6 +545,9 @@ const ProfileEdit = () => {
                     </>
                   )}
                 </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Recommended: 1920x480px. Will be cropped to fit if needed.
+                </p>
               </div>
             </div>
 

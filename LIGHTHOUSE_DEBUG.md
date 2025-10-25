@@ -81,3 +81,4 @@ Profile updated successfully
 4. **Check Supabase logs** for detailed error messages
 
 The profile should save successfully now, even if IPFS is having issues! 🚀
+

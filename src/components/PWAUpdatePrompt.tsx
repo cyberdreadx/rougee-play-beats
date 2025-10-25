@@ -8,39 +8,63 @@ export const PWAUpdatePrompt = () => {
   const [isUpdating, setIsUpdating] = useState(false);
 
   useEffect(() => {
-    if ('serviceWorker' in navigator && import.meta.env.PROD) {
+    if ('serviceWorker' in navigator) {
+      console.log('📱 PWAUpdatePrompt: Initializing...', import.meta.env.PROD ? 'PROD' : 'DEV');
+      
+      // In dev mode, show test prompt after 5 seconds (for testing)
+      if (!import.meta.env.PROD) {
+        console.log('🔧 Dev mode: Test prompt available');
+        return;
+      }
+
+      // PRODUCTION MODE
       // Check for updates every 60 seconds
       const checkInterval = setInterval(() => {
         navigator.serviceWorker.ready.then((reg) => {
+          console.log('🔍 Checking for updates...');
           reg.update();
         });
       }, 60000); // Check every minute
 
       // Listen for updates
       navigator.serviceWorker.ready.then((reg) => {
+        console.log('✅ Service worker ready:', reg);
         setRegistration(reg);
 
-        // Check if there's an update waiting
+        // Check if there's an update waiting immediately
         if (reg.waiting) {
+          console.log('🎉 Update waiting on mount!');
           setShowPrompt(true);
+        }
+
+        if (reg.installing) {
+          console.log('🔧 Service worker installing...');
         }
 
         // Listen for new updates
         reg.addEventListener('updatefound', () => {
+          console.log('🆕 Update found!');
           const newWorker = reg.installing;
           if (newWorker) {
             newWorker.addEventListener('statechange', () => {
+              console.log('📊 Worker state changed:', newWorker.state);
               if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
                 // New version available!
+                console.log('✨ New version installed and ready!');
                 setShowPrompt(true);
+                // Update registration reference
+                setRegistration(reg);
               }
             });
           }
         });
+      }).catch(err => {
+        console.error('❌ Service worker ready failed:', err);
       });
 
       // Listen for messages from service worker
       navigator.serviceWorker.addEventListener('message', (event) => {
+        console.log('📨 Message from service worker:', event.data);
         if (event.data && event.data.type === 'UPDATE_AVAILABLE') {
           setShowPrompt(true);
         }
@@ -51,17 +75,51 @@ export const PWAUpdatePrompt = () => {
   }, []);
 
   const handleUpdate = () => {
-    if (!registration || !registration.waiting) return;
-
     setIsUpdating(true);
 
-    // Tell the waiting service worker to activate
-    registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+    console.log('🔄 Update button clicked, registration:', registration);
+    console.log('🔄 Waiting worker:', registration?.waiting);
 
-    // Listen for controller change, then reload
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!registration) {
+      console.error('❌ No registration found');
+      // Force reload anyway
       window.location.reload();
-    });
+      return;
+    }
+
+    const waitingWorker = registration.waiting || registration.installing;
+    
+    if (!waitingWorker) {
+      console.warn('⚠️ No waiting/installing worker, forcing reload...');
+      // Force reload anyway
+      window.location.reload();
+      return;
+    }
+
+    console.log('✅ Sending SKIP_WAITING to service worker...');
+    
+    // Tell the waiting service worker to activate
+    waitingWorker.postMessage({ type: 'SKIP_WAITING' });
+
+    // Set up controller change listener BEFORE sending message
+    let controllerChanged = false;
+    const handleControllerChange = () => {
+      if (!controllerChanged) {
+        controllerChanged = true;
+        console.log('✅ Controller changed, reloading...');
+        window.location.reload();
+      }
+    };
+
+    navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange);
+
+    // Fallback: If controller doesn't change within 2 seconds, force reload
+    setTimeout(() => {
+      if (!controllerChanged) {
+        console.log('⏰ Timeout reached, forcing reload...');
+        window.location.reload();
+      }
+    }, 2000);
   };
 
   const handleDismiss = () => {

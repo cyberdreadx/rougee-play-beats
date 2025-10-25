@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { usePrivy } from '@privy-io/react-auth';
 
 export const useWallet = () => {
@@ -48,6 +49,25 @@ export const useWallet = () => {
     linkedAccounts: user?.linkedAccounts?.length || 0,
     walletAccount: walletAccount ? { type: walletAccount.type, address: walletAccount.address } : null
   });
+
+  // Additional fallback for mobile/PWA issues
+  useEffect(() => {
+    if (authenticated && !address && user?.linkedAccounts?.length > 0) {
+      console.log('🔄 No address found, checking all linked accounts...');
+      const allAccounts = user.linkedAccounts;
+      console.log('All linked accounts:', allAccounts.map((acc: any) => ({
+        type: acc.type,
+        address: acc.address,
+        hasAddress: !!acc.address
+      })));
+      
+      // Try to find any account with an address
+      const accountWithAddress = allAccounts.find((acc: any) => acc.address);
+      if (accountWithAddress) {
+        console.log('✅ Found account with address:', accountWithAddress);
+      }
+    }
+  }, [authenticated, address, user]);
 
   // Format address for display (e.g., 0x1234...5678)
   const formattedAddress = address 

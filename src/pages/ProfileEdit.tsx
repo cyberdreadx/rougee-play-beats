@@ -28,7 +28,7 @@ const ProfileEdit = () => {
   const { getAuthHeaders } = usePrivyToken();
   
   // Ensure Privy wallet is synced with wagmi (fixes mobile/PWA issues)
-  const { isConnected: wagmiConnected } = usePrivyWagmi();
+  const { isConnected: wagmiConnected, forceRetry } = usePrivyWagmi();
 
   const [displayName, setDisplayName] = useState("");
   const [artistName, setArtistName] = useState("");
@@ -378,6 +378,14 @@ const ProfileEdit = () => {
                 className="font-mono text-xs"
               >
                 Hide Debug
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => forceRetry()}
+                className="font-mono text-xs"
+              >
+                Retry Connection
               </Button>
               <Button
                 variant="outline"

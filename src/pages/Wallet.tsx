@@ -118,7 +118,9 @@ interface SongTokenItemProps {
   const handleSendClick = (e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent navigation to song page
     if (onSendClick) {
-      onSendClick(song, balance.toString());
+      // Pass the raw wei balance (not converted to tokens)
+      const rawBalance = balanceData ? balanceData.toString() : '0';
+      onSendClick(song, rawBalance);
     }
   };
   

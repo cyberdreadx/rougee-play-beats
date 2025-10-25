@@ -54,6 +54,15 @@ export const SendTokenDialog = ({
   // Sync Privy's embedded wallet with wagmi
   const { wallet: privyWallet } = usePrivyWagmi();
   const { address: accountAddress, chain } = useAccount();
+
+  // Debug logging for balance issues
+  console.log('🔍 SendTokenDialog received:', {
+    tokenAddress,
+    tokenSymbol,
+    tokenDecimals,
+    maxBalance,
+    maxBalanceInTokens: parseFloat(maxBalance) / Math.pow(10, tokenDecimals)
+  });
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
   const [searchResults, setSearchResults] = useState<UserProfile[]>([]);

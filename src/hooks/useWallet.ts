@@ -1,35 +1,59 @@
 import { useEffect } from 'react';
-import { usePrivy } from '@privy-io/react-auth';
+import { usePrivy, useWallets } from '@privy-io/react-auth';
 
 export const useWallet = () => {
   const { ready, authenticated, user, login, logout } = usePrivy();
+  const { wallets } = useWallets();
 
-  // Get wallet address from Privy (supports smart/embedded)
-  // First try specific wallet types
-  let walletAccount = user?.linkedAccounts?.find((account: any) =>
-    ['wallet', 'smart_wallet', 'embedded_wallet'].includes(account.type)
-  ) as any;
+  // PRIORITY 1: Try to get address from Privy's useWallets hook (most reliable)
+  let address: string | undefined = undefined;
   
-  // Fallback: If no specific wallet type found, try to find ANY account with an address
-  if (!walletAccount && user?.linkedAccounts) {
-    console.log('🔍 No standard wallet found, checking all accounts:', 
-      user.linkedAccounts.map((acc: any) => ({ type: acc.type, hasAddress: !!acc.address }))
-    );
-    
-    // Try to find any account with an address field that looks like an Ethereum address
-    walletAccount = user.linkedAccounts.find((account: any) => 
-      account.address && 
-      typeof account.address === 'string' && 
-      account.address.startsWith('0x') &&
-      account.address.length === 42
-    ) as any;
-    
-    if (walletAccount) {
-      console.log('✅ Found wallet address from account type:', walletAccount.type);
-    }
+  console.log('🔍 Checking Privy wallets:', {
+    walletsCount: wallets.length,
+    wallets: wallets.map(w => ({
+      type: w.walletClientType,
+      address: w.address,
+      chainId: w.chainId
+    }))
+  });
+  
+  // Try useWallets first (this is the proper way)
+  if (wallets.length > 0) {
+    const primaryWallet = wallets[0]; // Get first wallet
+    address = primaryWallet.address;
+    console.log('✅ Got address from useWallets:', address);
   }
   
-  const address = walletAccount?.address as string | undefined;
+  // FALLBACK: Try user.linkedAccounts
+  if (!address && user?.linkedAccounts) {
+    console.log('🔄 Trying user.linkedAccounts as fallback...');
+    console.log('All linked accounts:', user.linkedAccounts.map((acc: any) => ({
+      type: acc.type,
+      address: acc.address,
+      hasAddress: !!acc.address,
+      keys: Object.keys(acc)
+    })));
+    
+    // First try specific wallet types
+    let walletAccount = user.linkedAccounts.find((account: any) =>
+      ['wallet', 'smart_wallet', 'embedded_wallet'].includes(account.type)
+    ) as any;
+    
+    // If not found, try to find ANY account with an address
+    if (!walletAccount) {
+      walletAccount = user.linkedAccounts.find((account: any) => 
+        account.address && 
+        typeof account.address === 'string' && 
+        account.address.startsWith('0x') &&
+        account.address.length === 42
+      ) as any;
+    }
+    
+    if (walletAccount) {
+      address = walletAccount.address as string;
+      console.log('✅ Got address from linkedAccounts:', address);
+    }
+  }
   
   // Additional logging for debugging
   if (authenticated && !address) {
@@ -40,14 +64,15 @@ export const useWallet = () => {
   }
 
   // Debug logging for ProfileEdit issues
-  console.log('🔍 useWallet debug:', {
+  console.log('🔍 useWallet FINAL STATE:', {
     ready,
     authenticated,
     hasUser: !!user,
     address,
     fullAddress: address,
-    linkedAccounts: user?.linkedAccounts?.length || 0,
-    walletAccount: walletAccount ? { type: walletAccount.type, address: walletAccount.address } : null
+    walletsCount: wallets.length,
+    linkedAccountsCount: user?.linkedAccounts?.length || 0,
+    SOURCE: address ? (wallets.length > 0 ? 'useWallets' : 'linkedAccounts') : 'NONE'
   });
 
   // Additional fallback for mobile/PWA issues

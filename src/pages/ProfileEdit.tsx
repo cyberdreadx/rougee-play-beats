@@ -23,7 +23,7 @@ import { XRGETierBadge } from "@/components/XRGETierBadge";
 
 const ProfileEdit = () => {
   const navigate = useNavigate();
-  const { fullAddress, isConnected, isPrivyReady } = useWallet();
+  const { fullAddress, isConnected, isPrivyReady, createWallet, isCreatingWallet } = useWallet();
   const { profile, loading, updating, updateProfile } = useCurrentUserProfile();
   const { getAuthHeaders } = usePrivyToken();
   
@@ -366,11 +366,23 @@ const ProfileEdit = () => {
               <div>Has PrivyWagmi: <span className="text-blue-400">true</span></div>
             </div>
             {!fullAddress && (
-              <div className="text-xs text-yellow-400 font-mono">
-                ⚠️ No wallet address detected. Try refreshing the page.
+              <div className="space-y-2">
+                <div className="text-xs text-yellow-400 font-mono">
+                  ⚠️ No wallet address detected.
+                </div>
+                {isCreatingWallet && (
+                  <div className="text-xs text-blue-400 font-mono">
+                    🔧 Creating embedded wallet...
+                  </div>
+                )}
+                {!isCreatingWallet && (
+                  <div className="text-xs text-muted-foreground font-mono">
+                    Embedded wallets should be created automatically. If not, try the button below.
+                  </div>
+                )}
               </div>
             )}
-            <div className="flex gap-2 mt-2">
+            <div className="flex flex-wrap gap-2 mt-2">
               <Button
                 variant="outline"
                 size="sm"
@@ -379,6 +391,17 @@ const ProfileEdit = () => {
               >
                 Hide Debug
               </Button>
+              {!fullAddress && (
+                <Button
+                  variant="neon"
+                  size="sm"
+                  onClick={() => createWallet()}
+                  disabled={isCreatingWallet}
+                  className="font-mono text-xs"
+                >
+                  {isCreatingWallet ? 'Creating...' : 'Create Wallet'}
+                </Button>
+              )}
               <Button
                 variant="outline"
                 size="sm"

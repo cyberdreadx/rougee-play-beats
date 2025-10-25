@@ -10,6 +10,7 @@ import { AlertTriangle, Loader2 } from 'lucide-react';
 import { config, privyAppId } from '@/config/wallet';
 import { useChainChecker } from '@/hooks/useChainChecker';
 import { useSessionManager } from '@/hooks/useSessionManager';
+import { useAutoCreateProfile } from '@/hooks/useAutoCreateProfile';
 
 // Component to ENFORCE Base network - blocks all other networks
 function StrictChainEnforcer({ children }: { children: React.ReactNode }) {
@@ -101,6 +102,9 @@ function ChainChecker({ children }: { children: React.ReactNode }) {
 // Component to manage session persistence
 function SessionManager({ children }: { children: React.ReactNode }) {
   const { isSessionChecked, isAuthenticating } = useSessionManager();
+  
+  // Auto-create profile for new users who connect with Privy
+  useAutoCreateProfile();
   
   // Show a subtle loading state while checking session (optional)
   if (isAuthenticating) {

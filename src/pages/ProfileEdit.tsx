@@ -28,7 +28,7 @@ const ProfileEdit = () => {
   const { getAuthHeaders } = usePrivyToken();
   
   // Ensure Privy wallet is synced with wagmi (fixes mobile/PWA issues)
-  usePrivyWagmi();
+  const { isConnected: wagmiConnected } = usePrivyWagmi();
 
   const [displayName, setDisplayName] = useState("");
   const [artistName, setArtistName] = useState("");
@@ -51,6 +51,7 @@ const ProfileEdit = () => {
   const [requestingVerification, setRequestingVerification] = useState(false);
   const [showAvatarCrop, setShowAvatarCrop] = useState(false);
   const [tempAvatarUrl, setTempAvatarUrl] = useState<string | null>(null);
+  const [showDebugPanel, setShowDebugPanel] = useState(false);
 
   useEffect(() => {
     // Only redirect if Privy is ready and user is not connected
@@ -235,13 +236,47 @@ const ProfileEdit = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    const debugInfo = {
+      fullAddress,
+      isConnected,
+      isPrivyReady,
+      wagmiConnected,
+      hasPrivyWagmi: !!usePrivyWagmi
+    };
+    
+    console.log('🔍 ProfileEdit handleSubmit debug:', debugInfo);
+    
+    // Show debug info in UI for mobile/PWA users
     if (!fullAddress) {
-      toast({
-        title: "Wallet not connected",
-        description: "Please connect your wallet",
-        variant: "destructive",
-      });
-      return;
+      setShowDebugPanel(true);
+    }
+
+    if (!fullAddress) {
+      console.error('❌ Wallet not connected - fullAddress is:', fullAddress);
+      
+      // Try to wait a bit and check again (in case of timing issues)
+      if (isConnected && isPrivyReady) {
+        console.log('⏳ Wallet appears connected but address not available, waiting...');
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Re-check after delay
+        if (!fullAddress) {
+          console.error('❌ Still no address after delay');
+          toast({
+            title: "Wallet connection issue",
+            description: "Please try refreshing the page and connecting again",
+            variant: "destructive",
+          });
+          return;
+        }
+      } else {
+        toast({
+          title: "Wallet not connected",
+          description: "Please connect your wallet",
+          variant: "destructive",
+        });
+        return;
+      }
     }
 
     if (isArtist && !artistName.trim()) {
@@ -319,6 +354,43 @@ const ProfileEdit = () => {
       <NetworkInfo />
 
       <div className="max-w-4xl mx-auto px-6 py-8 space-y-6">
+        {/* Debug Panel for Mobile/PWA */}
+        {showDebugPanel && (
+          <div className="console-bg tech-border rounded-lg p-4 space-y-2">
+            <h3 className="font-mono font-bold text-sm text-neon-green">🔍 Wallet Debug Info</h3>
+            <div className="space-y-1 text-xs font-mono">
+              <div>Full Address: <span className={fullAddress ? 'text-green-400' : 'text-red-400'}>{fullAddress || 'undefined'}</span></div>
+              <div>Privy Connected: <span className={isConnected ? 'text-green-400' : 'text-red-400'}>{isConnected ? 'true' : 'false'}</span></div>
+              <div>Privy Ready: <span className={isPrivyReady ? 'text-green-400' : 'text-red-400'}>{isPrivyReady ? 'true' : 'false'}</span></div>
+              <div>Wagmi Connected: <span className={wagmiConnected ? 'text-green-400' : 'text-red-400'}>{wagmiConnected ? 'true' : 'false'}</span></div>
+              <div>Has PrivyWagmi: <span className="text-blue-400">true</span></div>
+            </div>
+            {!fullAddress && (
+              <div className="text-xs text-yellow-400 font-mono">
+                ⚠️ No wallet address detected. Try refreshing the page.
+              </div>
+            )}
+            <div className="flex gap-2 mt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowDebugPanel(false)}
+                className="font-mono text-xs"
+              >
+                Hide Debug
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.location.reload()}
+                className="font-mono text-xs"
+              >
+                Refresh Page
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Upload Slots - Show for artists */}
         {isArtist && <UploadSlotsCard />}
 
@@ -335,7 +407,16 @@ const ProfileEdit = () => {
             <h1 className="text-3xl font-mono font-bold neon-text">
               {profile ? "EDIT PROFILE" : "CREATE PROFILE"}
             </h1>
-            <XRGETierBadge walletAddress={fullAddress} showBalance size="lg" />
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setShowDebugPanel(!showDebugPanel)}
+                className="font-mono text-xs"
+              >
+                {showDebugPanel ? 'Hide' : 'Debug'}
+              </Button>
+              <XRGETierBadge walletAddress={fullAddress} showBalance size="lg" />
+            </div>
           </div>
         </div>
 

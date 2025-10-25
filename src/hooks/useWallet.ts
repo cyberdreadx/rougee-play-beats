@@ -38,6 +38,17 @@ export const useWallet = () => {
     ));
   }
 
+  // Debug logging for ProfileEdit issues
+  console.log('🔍 useWallet debug:', {
+    ready,
+    authenticated,
+    hasUser: !!user,
+    address,
+    fullAddress: address,
+    linkedAccounts: user?.linkedAccounts?.length || 0,
+    walletAccount: walletAccount ? { type: walletAccount.type, address: walletAccount.address } : null
+  });
+
   // Format address for display (e.g., 0x1234...5678)
   const formattedAddress = address 
     ? `${address.slice(0, 6)}...${address.slice(-4)}`

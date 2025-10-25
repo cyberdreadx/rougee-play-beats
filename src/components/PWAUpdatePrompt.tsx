@@ -135,7 +135,7 @@ export const PWAUpdatePrompt = () => {
   if (!showPrompt) return null;
 
   return (
-    <div className="fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-96 z-50 animate-in slide-in-from-bottom-5">
+    <div className="fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-96 z-[9999] animate-in slide-in-from-bottom-5">
       <div className="console-bg tech-border rounded-lg p-4 shadow-2xl border-neon-green/50">
         <div className="flex items-start gap-3">
           <div className="flex-shrink-0">

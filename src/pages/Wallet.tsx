@@ -22,6 +22,7 @@ import ktaLogo from "@/assets/tokens/kta.png";
 import ethLogo from "@/assets/tokens/ethereum-eth.svg";
 import usdcLogo from "@/assets/tokens/usdc.jpg";
 import { getIPFSGatewayUrl } from "@/lib/ipfs";
+import { SendTokenDialog } from "@/components/SendTokenDialog";
 
 const XRGE_TOKEN_ADDRESS = "0x147120faEC9277ec02d957584CFCD92B56A24317" as const;
 const KTA_TOKEN_ADDRESS = "0xc0634090F2Fe6c6d75e61Be2b949464aBB498973" as const;
@@ -52,9 +53,10 @@ interface SongTokenItemProps {
   xrgeUsdPrice: number;
   onClick: () => void;
   onBalanceLoaded?: (songId: string, hasBalance: boolean) => void;
+  onSendClick?: (song: any, balance: string) => void;
 }
 
-  const SongTokenItem = ({ song, userAddress, xrgeUsdPrice, onClick, onBalanceLoaded }: SongTokenItemProps) => {
+  const SongTokenItem = ({ song, userAddress, xrgeUsdPrice, onClick, onBalanceLoaded, onSendClick }: SongTokenItemProps) => {
   const navigate = useNavigate();
   
   // Log when component mounts
@@ -113,6 +115,13 @@ interface SongTokenItemProps {
   // Only render if user has a balance
   if (balance === 0) return null;
   
+  const handleSendClick = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent navigation to song page
+    if (onSendClick) {
+      onSendClick(song, balance.toString());
+    }
+  };
+  
   return (
     <div
       className="group flex items-center justify-between p-4 rounded-xl bg-white/5 backdrop-blur-xl border border-white/10 shadow-[0_4px_16px_0_rgba(0,255,159,0.1)] hover:bg-white/8 active:bg-white/10 transition-all duration-300 cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
@@ -140,26 +149,37 @@ interface SongTokenItemProps {
           <p className="text-xs text-muted-foreground font-mono mt-0.5">{song.ticker || 'Unknown'}</p>
         </div>
       </div>
-      <div className="text-right">
-        <p className="text-base font-bold font-mono text-neon-green">
-          {formatCompactNumber(balance)}
-        </p>
-        {valueUSD > 0 ? (
-          <>
-            <p className="text-xs text-muted-foreground font-mono mt-0.5">
-              ${valueUSD.toLocaleString(undefined, {maximumFractionDigits: 2})}
-            </p>
-            {priceUSD > 0 && (
-              <p className="text-[10px] text-muted-foreground/70 font-mono">
-                ${priceUSD < 0.01 ? priceUSD.toFixed(6) : priceUSD.toFixed(4)}/token
-              </p>
-            )}
-          </>
-        ) : (
-          <p className="text-xs text-muted-foreground/60 font-mono italic">
-            Loading price...
+      <div className="flex items-center gap-3">
+        <div className="text-right">
+          <p className="text-base font-bold font-mono text-neon-green">
+            {formatCompactNumber(balance)}
           </p>
-        )}
+          {valueUSD > 0 ? (
+            <>
+              <p className="text-xs text-muted-foreground font-mono mt-0.5">
+                ${valueUSD.toLocaleString(undefined, {maximumFractionDigits: 2})}
+              </p>
+              {priceUSD > 0 && (
+                <p className="text-[10px] text-muted-foreground/70 font-mono">
+                  ${priceUSD < 0.01 ? priceUSD.toFixed(6) : priceUSD.toFixed(4)}/token
+                </p>
+              )}
+            </>
+          ) : (
+            <p className="text-xs text-muted-foreground/60 font-mono italic">
+              Loading price...
+            </p>
+          )}
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleSendClick}
+          className="font-mono text-xs hover:bg-neon-green/10 hover:text-neon-green hover:border-neon-green/50"
+        >
+          <Send className="h-3 w-3 mr-1" />
+          Send
+        </Button>
       </div>
     </div>
   );
@@ -211,6 +231,11 @@ const Wallet = () => {
   const [loadingSongs, setLoadingSongs] = useState(false);
   const [ownedSongsMap, setOwnedSongsMap] = useState<Map<string, boolean>>(new Map());
   const [activeTab, setActiveTab] = useState<'balances' | 'music'>('balances');
+  
+  // Song token send dialog state
+  const [sendSongDialog, setSendSongDialog] = useState(false);
+  const [selectedSongForSend, setSelectedSongForSend] = useState<any>(null);
+  const [selectedSongBalance, setSelectedSongBalance] = useState('0');
 
   const { data: balance, isLoading: balanceLoading, refetch: refetchBalance } = useBalance({
     address: fullAddress as `0x${string}`,
@@ -326,6 +351,12 @@ const Wallet = () => {
       return newMap;
     });
   }, [allSongs.length]);
+
+  const handleSongSendClick = useCallback((song: any, balance: string) => {
+    setSelectedSongForSend(song);
+    setSelectedSongBalance(balance);
+    setSendSongDialog(true);
+  }, []);
 
   // Calculate owned songs count from map
   const ownedSongsCount = Array.from(ownedSongsMap.values()).filter(Boolean).length;
@@ -776,6 +807,7 @@ const Wallet = () => {
                     xrgeUsdPrice={prices.xrge}
                     onClick={() => navigate(`/song/${song.id}`)}
                     onBalanceLoaded={handleBalanceLoaded}
+                    onSendClick={handleSongSendClick}
                   />
                 ))}
               </div>
@@ -938,6 +970,22 @@ const Wallet = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Send Song Token Dialog */}
+      {selectedSongForSend && (
+        <SendTokenDialog
+          open={sendSongDialog}
+          onOpenChange={setSendSongDialog}
+          tokenAddress={selectedSongForSend.token_address as Address}
+          tokenSymbol={selectedSongForSend.ticker || 'SONG'}
+          tokenDecimals={18}
+          maxBalance={selectedSongBalance}
+          onSuccess={() => {
+            // Refresh songs list after successful send
+            fetchAllSongs();
+          }}
+        />
+      )}
     </div>
   );
 };

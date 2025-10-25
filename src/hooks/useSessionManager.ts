@@ -25,9 +25,24 @@ export const useSessionManager = () => {
       // If authenticated, session was restored
       if (authenticated && user) {
         console.log('✅ Session restored for user:', user.id);
-        const walletAccount = user.linkedAccounts?.find((account: any) =>
+        // First try specific wallet types
+        let walletAccount = user.linkedAccounts?.find((account: any) =>
           ['wallet', 'smart_wallet', 'embedded_wallet'].includes(account.type)
         ) as any;
+        
+        // Fallback: Try to find ANY account with an Ethereum address
+        if (!walletAccount && user.linkedAccounts) {
+          walletAccount = user.linkedAccounts.find((account: any) => 
+            account.address && 
+            typeof account.address === 'string' && 
+            account.address.startsWith('0x') &&
+            account.address.length === 42
+          ) as any;
+          
+          if (walletAccount) {
+            console.log('👛 Wallet restored via fallback, type:', walletAccount.type);
+          }
+        }
         
         if (walletAccount?.address) {
           console.log('👛 Wallet restored:', walletAccount.address);

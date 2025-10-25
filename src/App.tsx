@@ -9,6 +9,7 @@ import ScrollToTop from "@/components/ScrollToTop";
 import { useRadioPlayer } from "@/hooks/useRadioPlayer";
 import { useAudioPlayer } from "@/hooks/useAudioPlayer";
 import { AdDisplay } from "@/components/AdDisplay";
+import { PWAUpdatePrompt } from "@/components/PWAUpdatePrompt";
 import { useState } from "react";
 import AudioPlayer from "@/components/AudioPlayer";
 import Layout from "@/components/Layout";
@@ -144,6 +145,7 @@ const App = () => (
         <TooltipProvider>
           <Toaster />
           <Sonner />
+          <PWAUpdatePrompt />
           <BrowserRouter>
             <ScrollToTop />
             <AppContent />

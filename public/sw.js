@@ -1,11 +1,15 @@
 // ROUGEE PLAY PWA Service Worker
 // Optimized for XMTP messaging and blockchain music platform
 
-const CACHE_NAME = 'rougee-play-v6';
-const STATIC_CACHE = 'rougee-play-static-v6';
-const DYNAMIC_CACHE = 'rougee-play-dynamic-v6';
-const IPFS_CACHE = 'rougee-play-ipfs-v6'; // Immutable IPFS content
-const API_CACHE = 'rougee-play-api-v6'; // API responses
+// 🔄 UPDATE VERSION NUMBER HERE TO TRIGGER PWA UPDATE
+// Increment the version (v6 -> v7) when you want users to get the update prompt
+const VERSION = 'v7'; // <-- Change this number to force update
+
+const CACHE_NAME = `rougee-play-${VERSION}`;
+const STATIC_CACHE = `rougee-play-static-${VERSION}`;
+const DYNAMIC_CACHE = `rougee-play-dynamic-${VERSION}`;
+const IPFS_CACHE = `rougee-play-ipfs-${VERSION}`; // Immutable IPFS content
+const API_CACHE = `rougee-play-api-${VERSION}`; // API responses
 
 // Files to cache for offline functionality
 const STATIC_FILES = [

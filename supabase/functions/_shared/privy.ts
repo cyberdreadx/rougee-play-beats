@@ -52,9 +52,24 @@ function extractWalletAddress(payload: any): string | undefined {
     const linkedAccounts = payload?.linked_accounts ?? [];
     console.log('Linked accounts in JWT:', JSON.stringify(linkedAccounts, null, 2));
     
-    const walletAccount = Array.isArray(linkedAccounts)
+    // First try specific wallet types
+    let walletAccount = Array.isArray(linkedAccounts)
       ? linkedAccounts.find((acc: any) => ['wallet', 'smart_wallet', 'embedded_wallet'].includes(acc?.type))
       : undefined;
+    
+    // Fallback: Try to find ANY account with an address that looks like an Ethereum address
+    if (!walletAccount && Array.isArray(linkedAccounts)) {
+      console.log('🔍 No standard wallet found, trying fallback...');
+      walletAccount = linkedAccounts.find((acc: any) => 
+        acc?.address && 
+        typeof acc.address === 'string' && 
+        acc.address.startsWith('0x') &&
+        acc.address.length === 42
+      );
+      if (walletAccount) {
+        console.log('✅ Found wallet via fallback, account type:', walletAccount.type);
+      }
+    }
     
     console.log('Found wallet account:', walletAccount);
 

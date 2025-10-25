@@ -10,29 +10,27 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
       .then((registration) => {
         console.log('✅ Service Worker registered:', registration.scope);
         
-        // Force check for updates immediately
+        // Check for updates every 5 minutes
+        setInterval(() => {
+          registration.update().catch(() => {});
+        }, 5 * 60 * 1000);
+        
+        // Initial update check
         registration.update().catch(() => {});
         
         // Handle service worker updates
         registration.addEventListener('updatefound', () => {
           const newWorker = registration.installing;
           if (newWorker) {
+            console.log('🔄 New service worker found, waiting for install...');
             newWorker.addEventListener('statechange', () => {
               if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                // New service worker available, skip waiting and activate immediately
-                console.log('🔄 New service worker available, activating...');
-                newWorker.postMessage({ type: 'SKIP_WAITING' });
-                // Reload to use new service worker
-                setTimeout(() => window.location.reload(), 100);
+                // New service worker available! 
+                // Don't auto-reload - let the PWAUpdatePrompt component handle it
+                console.log('✨ New version available! Showing update prompt...');
               }
             });
           }
-        });
-        
-        // Listen for controller change (new SW activated)
-        navigator.serviceWorker.addEventListener('controllerchange', () => {
-          console.log('🔄 Service worker updated, reloading...');
-          window.location.reload();
         });
       })
       .catch((error) => {

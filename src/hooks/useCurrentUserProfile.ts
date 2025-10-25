@@ -12,7 +12,10 @@ export const useCurrentUserProfile = () => {
   const { getAccessToken } = usePrivy();
 
   const updateProfile = async (formData: FormData) => {
+    console.log('🔍 updateProfile called with wallet:', fullAddress);
+    
     if (!fullAddress) {
+      console.error('❌ No wallet address in updateProfile');
       toast({
         title: "Wallet not connected",
         description: "Please connect your wallet first",
@@ -23,19 +26,65 @@ export const useCurrentUserProfile = () => {
 
     try {
       setUpdating(true);
+      console.log('📤 Starting profile update...');
       
       const token = await getAccessToken();
+      console.log('✅ Got access token');
       
-      const response = await supabase.functions.invoke('update-artist-profile', {
+      // Log what we're sending
+      console.log('📦 Sending to update-artist-profile:', {
+        walletAddress: fullAddress,
+        hasToken: !!token,
+        formDataKeys: Array.from(formData.keys())
+      });
+      
+      // Add timeout to prevent hanging
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Profile update timed out after 60 seconds')), 60000);
+      });
+
+      // Add wallet address to formData as fallback
+      formData.append('walletAddress', fullAddress);
+      
+      const updatePromise = supabase.functions.invoke('update-artist-profile', {
         headers: {
-          Authorization: `Bearer ${token}`,
+          'authorization': `Bearer ${token}`,  // lowercase
+          'x-privy-token': token,  // Also send as x-privy-token
           'x-wallet-address': fullAddress,
         },
         body: formData,
       });
 
-      if (response.error) throw response.error;
+      const response = await Promise.race([updatePromise, timeoutPromise]) as any;
 
+      console.log('📬 Response from update-artist-profile:', {
+        status: response?.status,
+        statusText: response?.statusText,
+        data: response?.data,
+        error: response?.error
+      });
+
+      if (response.error) {
+        console.error('❌ Edge function error:', {
+          message: response.error.message,
+          status: response.error.status,
+          details: response.error
+        });
+        
+        // Try to get more details from the response
+        if (response.error.message) {
+          throw new Error(`Profile update failed: ${response.error.message}`);
+        } else {
+          throw response.error;
+        }
+      }
+
+      // Check if we got a proper response
+      if (!response.data) {
+        console.warn('⚠️ No data in response, but no error either');
+      }
+
+      console.log('✅ Profile update successful');
       toast({
         title: "Profile updated!",
         description: "Your artist profile has been saved to IPFS",
@@ -44,7 +93,13 @@ export const useCurrentUserProfile = () => {
       await refresh();
       return true;
     } catch (error) {
-      console.error('Error updating profile:', error);
+      console.error('❌ Error updating profile:', error);
+      console.error('Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        fullError: error
+      });
+      
       toast({
         title: "Update failed",
         description: error instanceof Error ? error.message : "Failed to update profile",

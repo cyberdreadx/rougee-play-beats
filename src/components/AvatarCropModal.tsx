@@ -94,13 +94,17 @@ export const AvatarCropModal = ({ imageUrl, onComplete, onCancel }: AvatarCropMo
 
   return (
     <Dialog open={true} onOpenChange={() => !processing && onCancel()}>
-      <DialogContent className="max-w-full md:max-w-2xl h-[90vh] md:h-auto flex flex-col p-0">
-        <DialogHeader className="p-4 md:p-6 pb-0">
-          <DialogTitle className="font-mono text-base md:text-lg">Crop Image</DialogTitle>
-          <p className="text-xs text-muted-foreground mt-1">Pinch to zoom, drag to reposition</p>
+      <DialogContent className="max-w-full md:max-w-3xl h-[95vh] md:h-[80vh] flex flex-col p-0">
+        <DialogHeader className="p-4 md:p-6 pb-2">
+          <DialogTitle className="font-mono text-lg md:text-xl">Crop Your Avatar</DialogTitle>
+          <p className="text-sm text-muted-foreground mt-1">
+            Drag to move • Pinch to zoom • Tap buttons for quick adjustments
+          </p>
         </DialogHeader>
         
-        <div className="relative flex-1 w-full bg-background rounded overflow-hidden min-h-[300px] md:min-h-[400px] touch-none">
+        {/* Fixed size container for better control */}
+        <div className="relative w-full bg-black/5 rounded-lg overflow-hidden mx-4 md:mx-6" 
+             style={{ height: '400px' }}>
           <Cropper
             image={imageUrl}
             crop={crop}
@@ -115,14 +119,17 @@ export const AvatarCropModal = ({ imageUrl, onComplete, onCancel }: AvatarCropMo
               containerStyle: {
                 height: '100%',
                 width: '100%',
+                position: 'relative',
               },
               mediaStyle: {
-                height: '100%',
-                width: '100%',
+                maxHeight: '100%',
+                maxWidth: '100%',
+                objectFit: 'contain',
               },
               cropAreaStyle: {
-                border: '2px solid hsl(var(--primary))',
-                boxShadow: '0 0 20px hsl(var(--primary) / 0.5)',
+                border: '3px solid hsl(var(--primary))',
+                boxShadow: '0 0 25px hsl(var(--primary) / 0.6)',
+                borderRadius: '50%',
               }
             }}
           />
@@ -130,85 +137,87 @@ export const AvatarCropModal = ({ imageUrl, onComplete, onCancel }: AvatarCropMo
 
         <div className="space-y-4 p-4 md:p-6 pt-4">
           {/* Zoom Controls */}
-          <div className="space-y-3">
+          <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <label className="text-sm font-mono text-muted-foreground flex items-center gap-2">
+              <label className="text-sm font-medium flex items-center gap-2">
                 <Maximize2 className="h-4 w-4" />
                 Zoom
               </label>
-              <span className="text-xs font-mono text-muted-foreground">
+              <span className="text-sm font-mono bg-muted px-2 py-1 rounded">
                 {Math.round(zoom * 100)}%
               </span>
             </div>
             
-            {/* Mobile: Larger touch targets */}
-            <div className="flex items-center gap-3">
+            {/* Mobile-optimized zoom controls */}
+            <div className="flex items-center gap-4">
               <Button
                 variant="outline"
                 size="icon"
-                className="h-10 w-10 md:h-8 md:w-8 flex-shrink-0"
-                onClick={() => setZoom(Math.max(1, zoom - 0.2))}
+                className="h-12 w-12 md:h-10 md:w-10 flex-shrink-0 touch-manipulation"
+                onClick={() => setZoom(Math.max(1, zoom - 0.3))}
                 disabled={zoom <= 1}
               >
-                <ZoomOut className="h-5 w-5 md:h-4 md:w-4" />
+                <ZoomOut className="h-6 w-6 md:h-5 md:w-5" />
               </Button>
               
-              <Slider
-                value={[zoom]}
-                min={1}
-                max={3}
-                step={0.1}
-                onValueChange={(values) => setZoom(values[0])}
-                className="flex-1 cursor-pointer touch-none"
-              />
+              <div className="flex-1">
+                <Slider
+                  value={[zoom]}
+                  min={1}
+                  max={3}
+                  step={0.1}
+                  onValueChange={(values) => setZoom(values[0])}
+                  className="w-full cursor-pointer touch-none"
+                />
+              </div>
               
               <Button
                 variant="outline"
                 size="icon"
-                className="h-10 w-10 md:h-8 md:w-8 flex-shrink-0"
-                onClick={() => setZoom(Math.min(3, zoom + 0.2))}
+                className="h-12 w-12 md:h-10 md:w-10 flex-shrink-0 touch-manipulation"
+                onClick={() => setZoom(Math.min(3, zoom + 0.3))}
                 disabled={zoom >= 3}
               >
-                <ZoomIn className="h-5 w-5 md:h-4 md:w-4" />
+                <ZoomIn className="h-6 w-6 md:h-5 md:w-5" />
               </Button>
             </div>
           </div>
 
-          {/* Quick Zoom Presets */}
-          <div className="flex gap-2">
+          {/* Quick Zoom Presets - Mobile optimized */}
+          <div className="grid grid-cols-3 gap-3">
             <Button
               variant="outline"
               size="sm"
-              className="flex-1 h-10 md:h-9 text-xs"
+              className="h-12 md:h-10 text-sm font-medium"
               onClick={() => setZoom(1)}
             >
-              Fit
+              Fit Image
             </Button>
             <Button
               variant="outline"
               size="sm"
-              className="flex-1 h-10 md:h-9 text-xs"
+              className="h-12 md:h-10 text-sm font-medium"
               onClick={() => setZoom(1.5)}
             >
-              1.5x
+              1.5x Zoom
             </Button>
             <Button
               variant="outline"
               size="sm"
-              className="flex-1 h-10 md:h-9 text-xs"
+              className="h-12 md:h-10 text-sm font-medium"
               onClick={() => setZoom(2)}
             >
-              2x
+              2x Zoom
             </Button>
           </div>
         </div>
 
-        <DialogFooter className="p-4 md:p-6 pt-0 flex-row gap-2 sm:gap-2">
+        <DialogFooter className="p-4 md:p-6 pt-0 flex-row gap-3">
           <Button
             variant="outline"
             onClick={onCancel}
             disabled={processing}
-            className="flex-1 h-11 md:h-10 font-mono"
+            className="flex-1 h-12 md:h-10 text-base font-medium"
           >
             Cancel
           </Button>
@@ -216,11 +225,11 @@ export const AvatarCropModal = ({ imageUrl, onComplete, onCancel }: AvatarCropMo
             variant="neon"
             onClick={handleCrop}
             disabled={processing}
-            className="flex-1 h-11 md:h-10 font-mono"
+            className="flex-1 h-12 md:h-10 text-base font-medium"
           >
             {processing ? (
               <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                <Loader2 className="h-5 w-5 mr-2 animate-spin" />
                 Processing...
               </>
             ) : (

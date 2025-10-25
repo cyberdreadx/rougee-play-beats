@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Edge Function</title>
+</head>
+<body>
+    <h1>🧪 Test Edge Function</h1>
+    <button onclick="testFunction()">Test Edge Function</button>
+    <div id="result"></div>
+
+    <script>
+        async function testFunction() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '🔄 Testing...';
+            
+            try {
+                console.log('🧪 Testing Edge Function...');
+                
+                const response = await fetch('https://phybdsfwycygroebrsdx.supabase.co/functions/v1/test-profile', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBoeWJkc2Z3eWN5Z3JvZWJyc2R4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY2NzM5NjksImV4cCI6MjA3MjI0OTk2OX0.wQY7tt0gN1fvRjgHiPJK7I1M9ZhmgTbLNffGvcbWJko',
+                        'x-wallet-address': '0xAf6F648E136228673C5ad6A5bcbE105350b40207'
+                    }
+                });
+
+                console.log('📊 Response Status:', response.status);
+                console.log('📊 Response Headers:', Object.fromEntries(response.headers.entries()));
+                
+                const data = await response.text();
+                console.log('📊 Response Body:', data);
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = '✅ Test passed!<br><pre>' + data + '</pre>';
+                } else {
+                    resultDiv.innerHTML = '❌ Test failed with status: ' + response.status + '<br><pre>' + data + '</pre>';
+                }
+            } catch (error) {
+                console.error('❌ Test error:', error);
+                resultDiv.innerHTML = '❌ Test error: ' + error.message;
+            }
+        }
+    </script>
+</body>
+</html>

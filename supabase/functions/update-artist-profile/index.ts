@@ -13,18 +13,28 @@ Deno.serve(async (req) => {
   }
 
   try {
+    console.log('🚀 Edge Function Started');
+    console.log('📋 Request Headers:', Object.fromEntries(req.headers.entries()));
     console.log('🔐 Validating Privy token...');
-    const authHeader = req.headers.get('x-privy-token') || req.headers.get('authorization');
-    if (!authHeader) {
+    const privyToken = req.headers.get('x-privy-token');
+    const authHeader = req.headers.get('authorization');
+    
+    // Use x-privy-token if available, otherwise use authorization header
+    const tokenToValidate = privyToken || authHeader;
+    if (!tokenToValidate) {
       throw new Error('Missing authentication token');
     }
+    
+    // Ensure the token has Bearer prefix for validation
+    const normalizedToken = tokenToValidate.startsWith('Bearer ') ? tokenToValidate : `Bearer ${tokenToValidate}`;
+    console.log('🔑 Using token for validation:', normalizedToken.substring(0, 20) + '...');
 
     // Parse form data early to allow wallet fallback
     const formData = await req.formData();
     const providedWalletAddress = (formData.get('walletAddress') as string | null) || req.headers.get('x-wallet-address');
 
     const { validatePrivyToken } = await import('../_shared/privy.ts');
-    const user = await validatePrivyToken(authHeader);
+    const user = await validatePrivyToken(normalizedToken);
 
     let walletAddress: string;
     if (providedWalletAddress && typeof providedWalletAddress === 'string' && providedWalletAddress.toLowerCase().startsWith('0x')) {
@@ -123,6 +133,23 @@ Deno.serve(async (req) => {
     // Use the existing wallet address casing if profile exists
     if (existingProfile?.wallet_address) {
       walletAddress = existingProfile.wallet_address;
+    } else {
+      // Auto-create profile if it doesn't exist
+      console.log('🔄 Profile not found, auto-creating for wallet:', walletAddress);
+      const { error: createError } = await supabase
+        .from('profiles')
+        .insert({
+          wallet_address: walletAddress,
+          display_name: `0x${walletAddress.slice(2, 8)}...${walletAddress.slice(-4)}`,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+      
+      if (createError) {
+        console.error('❌ Failed to auto-create profile:', createError);
+        throw new Error(`Failed to create profile: ${createError.message}`);
+      }
+      console.log('✅ Auto-created profile for wallet:', walletAddress);
     }
 
     // Validate ticker if provided AND if it's different from existing ticker
@@ -152,49 +179,95 @@ Deno.serve(async (req) => {
 
     // Helper function to upload file to Lighthouse
     const uploadToLighthouse = async (file: File, name: string) => {
+      console.log(`🔄 Uploading ${name} to Lighthouse (${file.size} bytes)...`);
+      
+      if (!LIGHTHOUSE_API_KEY) {
+        throw new Error('LIGHTHOUSE_API_KEY environment variable is missing');
+      }
+      
       const uploadFormData = new FormData();
       uploadFormData.append('file', file, name);
 
-      const uploadResponse = await fetch('https://node.lighthouse.storage/api/v0/add', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${LIGHTHOUSE_API_KEY}`,
-        },
-        body: uploadFormData,
-      });
+      // Add timeout to prevent hanging
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
-      if (!uploadResponse.ok) {
-        const errorText = await uploadResponse.text();
-        throw new Error(`Lighthouse upload failed: ${errorText}`);
+      try {
+        const uploadResponse = await fetch('https://upload.lighthouse.storage/api/v0/add', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${LIGHTHOUSE_API_KEY}`,
+          },
+          body: uploadFormData,
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!uploadResponse.ok) {
+          const errorText = await uploadResponse.text();
+          console.error(`❌ Lighthouse upload failed: ${uploadResponse.status} ${uploadResponse.statusText}`);
+          console.error(`Error details: ${errorText}`);
+          throw new Error(`Lighthouse upload failed: ${uploadResponse.status} ${uploadResponse.statusText} - ${errorText}`);
+        }
+
+        const uploadResult = await uploadResponse.json();
+        console.log(`✅ Uploaded ${name} to Lighthouse:`, uploadResult.Hash);
+        return uploadResult.Hash;
+      } catch (error) {
+        clearTimeout(timeoutId);
+        if (error.name === 'AbortError') {
+          throw new Error(`Lighthouse upload timed out after 30 seconds for ${name}`);
+        }
+        throw error;
       }
-
-      const uploadResult = await uploadResponse.json();
-      console.log('Uploaded to Lighthouse:', uploadResult.Hash);
-      return uploadResult.Hash;
     };
 
     // Helper function to upload buffer to Lighthouse
     const uploadBufferToLighthouse = async (jsonString: string, fileName: string) => {
+      console.log(`🔄 Uploading JSON metadata to Lighthouse (${jsonString.length} chars)...`);
+      
+      if (!LIGHTHOUSE_API_KEY) {
+        throw new Error('LIGHTHOUSE_API_KEY environment variable is missing');
+      }
+      
       const blob = new Blob([jsonString], { type: 'application/json' });
       const formData = new FormData();
       formData.append('file', blob, fileName);
 
-      const uploadResponse = await fetch('https://node.lighthouse.storage/api/v0/add', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${LIGHTHOUSE_API_KEY}`,
-        },
-        body: formData,
-      });
+      // Add timeout to prevent hanging
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
-      if (!uploadResponse.ok) {
-        const errorText = await uploadResponse.text();
-        throw new Error(`Lighthouse buffer upload failed: ${errorText}`);
+      try {
+        const uploadResponse = await fetch('https://upload.lighthouse.storage/api/v0/add', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${LIGHTHOUSE_API_KEY}`,
+          },
+          body: formData,
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!uploadResponse.ok) {
+          const errorText = await uploadResponse.text();
+          console.error(`❌ Lighthouse JSON upload failed: ${uploadResponse.status} ${uploadResponse.statusText}`);
+          console.error(`Error details: ${errorText}`);
+          throw new Error(`Lighthouse JSON upload failed: ${uploadResponse.status} ${uploadResponse.statusText} - ${errorText}`);
+        }
+
+        const uploadResult = await uploadResponse.json();
+        console.log(`✅ Uploaded JSON metadata to Lighthouse:`, uploadResult.Hash);
+        return uploadResult.Hash;
+      } catch (error) {
+        clearTimeout(timeoutId);
+        if (error.name === 'AbortError') {
+          throw new Error(`Lighthouse JSON upload timed out after 30 seconds for ${fileName}`);
+        }
+        throw error;
       }
-
-      const uploadResult = await uploadResponse.json();
-      console.log('Uploaded JSON to Lighthouse:', uploadResult.Hash);
-      return uploadResult.Hash;
     };
 
     // Start with existing CIDs or null
@@ -203,14 +276,24 @@ Deno.serve(async (req) => {
 
     // Upload avatar if provided
     if (avatarFile) {
-      console.log('Uploading avatar...');
-      avatarCid = await uploadToLighthouse(avatarFile, `avatar-${walletAddress}.${avatarFile.name.split('.').pop()}`);
+      try {
+        console.log('🔄 Uploading avatar...');
+        avatarCid = await uploadToLighthouse(avatarFile, `avatar-${walletAddress}.${avatarFile.name.split('.').pop()}`);
+      } catch (error) {
+        console.error('❌ Avatar upload failed, continuing without avatar:', error);
+        // Continue without avatar - don't fail the entire operation
+      }
     }
 
     // Upload cover if provided
     if (coverFile) {
-      console.log('Uploading cover photo...');
-      coverCid = await uploadToLighthouse(coverFile, `cover-${walletAddress}.${coverFile.name.split('.').pop()}`);
+      try {
+        console.log('🔄 Uploading cover photo...');
+        coverCid = await uploadToLighthouse(coverFile, `cover-${walletAddress}.${coverFile.name.split('.').pop()}`);
+      } catch (error) {
+        console.error('❌ Cover upload failed, continuing without cover:', error);
+        // Continue without cover - don't fail the entire operation
+      }
     }
 
     // Create metadata JSON (no verification status - that's managed in Supabase only)
@@ -228,8 +311,14 @@ Deno.serve(async (req) => {
     };
 
     // Upload metadata JSON to IPFS
-    console.log('Uploading metadata JSON...');
-    const metadataCid = await uploadBufferToLighthouse(JSON.stringify(metadata), `profile-${walletAddress}.json`);
+    let metadataCid = null;
+    try {
+      console.log('🔄 Uploading metadata JSON...');
+      metadataCid = await uploadBufferToLighthouse(JSON.stringify(metadata), `profile-${walletAddress}.json`);
+    } catch (error) {
+      console.error('❌ Metadata upload failed, continuing without IPFS metadata:', error);
+      // Continue without IPFS metadata - don't fail the entire operation
+    }
 
     // Update Supabase profiles table
     const profileData: any = {
@@ -300,11 +389,18 @@ Deno.serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
-    console.error('Error:', error);
+    console.error('❌ Edge Function Error:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      name: error instanceof Error ? error.name : 'Unknown',
+      error: error
+    });
+    
     return new Response(
       JSON.stringify({ 
         success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : 'Unknown error',
+        details: error instanceof Error ? error.stack : undefined
       }),
       { 
         status: 400,

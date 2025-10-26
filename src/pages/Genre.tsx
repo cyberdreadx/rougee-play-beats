@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Music, Play, Pause, TrendingUp, ArrowLeft, Loader2 } from "lucide-react";
+import { Music, Play, Pause, TrendingUp, ArrowLeft, Loader2, Shuffle } from "lucide-react";
 import { getIPFSGatewayUrl } from "@/lib/ipfs";
 import { useTokenPrices } from "@/hooks/useTokenPrices";
 import { useSongPrice } from "@/hooks/useSongBondingCurve";
@@ -92,7 +92,7 @@ const Genre = ({ playSong, currentSong, isPlaying }: GenreProps) => {
             <div className="w-16 h-16 md:w-20 md:h-20 rounded-lg bg-gradient-to-br from-neon-green/20 to-purple-500/20 flex items-center justify-center">
               <Music className="w-8 h-8 md:w-10 md:h-10 text-neon-green" />
             </div>
-            <div>
+            <div className="flex-1">
               <h1 className="text-3xl md:text-4xl font-bold font-mono text-neon-green capitalize">
                 {decodedGenre}
               </h1>
@@ -100,6 +100,37 @@ const Genre = ({ playSong, currentSong, isPlaying }: GenreProps) => {
                 {songs.length} {songs.length === 1 ? 'song' : 'songs'} available
               </p>
             </div>
+            {songs.length > 0 && (
+              <div className="flex gap-2">
+                <Button
+                  variant="neon"
+                  onClick={() => {
+                    console.log('🎵 Playing all songs in genre:', decodedGenre, 'Count:', songs.length);
+                    // Play the first song and pass all songs as playlist
+                    playSong(songs[0], songs);
+                  }}
+                  className="font-mono"
+                >
+                  <Play className="w-4 h-4 mr-2" />
+                  Play All
+                </Button>
+                {songs.length > 1 && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      console.log('🎵 Shuffle playing all songs in genre:', decodedGenre, 'Count:', songs.length);
+                      // Shuffle the songs array and play the first one
+                      const shuffledSongs = [...songs].sort(() => Math.random() - 0.5);
+                      playSong(shuffledSongs[0], shuffledSongs);
+                    }}
+                    className="font-mono border-neon-green/50 text-neon-green hover:bg-neon-green/10"
+                  >
+                    <Shuffle className="w-4 h-4 mr-2" />
+                    Shuffle
+                  </Button>
+                )}
+              </div>
+            )}
           </div>
         </div>
 

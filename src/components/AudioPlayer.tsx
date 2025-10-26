@@ -13,6 +13,7 @@ import { usePrivy } from "@privy-io/react-auth";
 import LoginModal from "@/components/LoginModal";
 import { usePlayTracking } from "@/hooks/usePlayTracking";
 import { updateAudioState } from "@/hooks/useAudioState";
+import { useConnectionAwareLoading } from "@/hooks/useConnectionAwareLoading";
 interface Song {
   id: string;
   title: string;
@@ -86,6 +87,7 @@ const AudioPlayer = ({
   const { isConnected } = useWallet();
   const { authenticated } = usePrivy();
   const { playStatus, recordPlay, checkPlayStatus } = usePlayTracking(currentSong?.id);
+  const { getPreloadStrategy, getGatewayCount, shouldPreloadNext } = useConnectionAwareLoading();
 
   // Track mobile nav visibility on scroll
   useEffect(() => {
@@ -160,7 +162,7 @@ const AudioPlayer = ({
   // Get multiple fallback URLs for the cover image
   const coverFallbackUrls = coverCid ? (() => {
     try {
-      return getIPFSGatewayUrls(coverCid, 3, false);
+      return getIPFSGatewayUrls(coverCid, getGatewayCount(), false);
     } catch (error) {
       console.warn('Failed to get IPFS gateway URLs:', error);
       return [];
@@ -297,11 +299,9 @@ const AudioPlayer = ({
   // Check play limits for authenticated users
   useEffect(() => {
     if (authenticated && isPlaying && currentSong && playStatus) {
-      console.log('🔍 Play status check:', playStatus);
       // Only enforce limits if the database functions are working properly
       if (playStatus.playCount > 0 && !playStatus.canPlay && playStatus.playCount >= playStatus.maxFreePlays) {
         // User has exceeded play limit and doesn't own the song
-        console.log('❌ Play limit exceeded, pausing audio');
         const audio = audioRef.current;
         if (audio) {
           audio.pause();
@@ -314,10 +314,8 @@ const AudioPlayer = ({
   // Record play when song starts playing (for authenticated users)
   useEffect(() => {
     if (authenticated && isPlaying && currentSong && playStatus?.canPlay) {
-      console.log('🎵 Starting play recording timer for:', currentSong.title);
       // Record the play after a short delay to ensure it's a real play
       const timer = setTimeout(() => {
-        console.log('🎵 Recording play for song:', currentSong.title);
         recordPlay(currentSong.id, 0); // Duration will be updated when song ends
       }, 2000); // Record after 2 seconds of playing
 
@@ -452,8 +450,8 @@ const AudioPlayer = ({
     ? getIPFSGatewayUrl(currentAd.audio_cid, preferredGateway, false)
     : (currentSong ? getIPFSGatewayUrl(currentSong.audio_cid, preferredGateway, false) : '');
   const baseFallbacks = isAd 
-    ? getIPFSGatewayUrls(currentAd.audio_cid, 4, false) // Direct IPFS gateways
-    : (currentSong ? getIPFSGatewayUrls(currentSong.audio_cid, 4, false) : []);
+    ? getIPFSGatewayUrls(currentAd.audio_cid, getGatewayCount(), false) // Direct IPFS gateways
+    : (currentSong ? getIPFSGatewayUrls(currentSong.audio_cid, getGatewayCount(), false) : []);
   // Build ordered sources: proxy first, then direct Lighthouse, then other gateways
   const sourceUrls = [proxyUrl, directPrimaryUrl, ...baseFallbacks]
     .filter((u): u is string => Boolean(u))
@@ -462,7 +460,6 @@ const AudioPlayer = ({
   const handleAudioError = () => {
     if (currentAudioUrlIndex < sourceUrls.length - 1) {
       const nextIndex = currentAudioUrlIndex + 1;
-      console.log(`🔄 Audio failed, trying fallback ${nextIndex + 1}/${sourceUrls.length}...`);
       setCurrentAudioUrlIndex(nextIndex);
       
       // Update the audio source
@@ -470,6 +467,7 @@ const AudioPlayer = ({
       if (audio) {
         try { audio.pause(); } catch {}
         audio.src = sourceUrls[nextIndex];
+        audio.volume = isMuted ? 0 : volume; // Ensure volume is maintained
         audio.load();
         if (isPlaying) {
           const p = audio.play();
@@ -497,6 +495,7 @@ const AudioPlayer = ({
 
   return (
     <>
+      
       {/* Minimized tab view */}
       {isMinimized && (
         <div className="fixed right-0 top-1/2 -translate-y-1/2 z-50 md:right-0">
@@ -699,7 +698,9 @@ const AudioPlayer = ({
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={onNext}
+                onClick={() => {
+                  onNext();
+                }}
                 className="h-8 w-8 text-muted-foreground"
               >
                 <SkipForward className="w-4 h-4" />
@@ -870,7 +871,9 @@ const AudioPlayer = ({
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={onNext}
+                onClick={() => {
+                  onNext();
+                }}
                 className="h-9 w-9 text-muted-foreground hover:text-foreground transition-colors"
               >
                 <SkipForward className="w-5 h-5" />
@@ -976,10 +979,11 @@ const AudioPlayer = ({
         key={(currentSong?.id || currentAd?.id) ?? 'no-media'}
         ref={audioRef}
         src={sourceUrls[currentAudioUrlIndex] || ''}
-        preload="metadata"
+        preload={getPreloadStrategy()}
         playsInline
         controlsList="nodownload"
         x-webkit-airplay="allow"
+        crossOrigin="anonymous"
         
         onError={(e) => {
           console.error('Audio error:', e);
@@ -987,28 +991,41 @@ const AudioPlayer = ({
         }}
         onCanPlay={() => {
           const audio = audioRef.current;
-          if (isPlaying && audio && audio.paused) {
-            // Use the same audio.play() method as regular browser
-            const playPromise = isPWA ? handlePWAAudioPlay(audio) : audio.play();
-            if (playPromise && typeof playPromise.catch === 'function') {
-              playPromise.catch((error) => {
-                console.error('Audio autoplay blocked:', error);
-                if (error.name === 'NotAllowedError') {
-                  toast({
-                    title: '🔒 Autoplay blocked',
-                    description: isPWA ? 'Tap play to start audio in PWA mode' : 'Tap play to start audio',
-                    variant: 'destructive'
-                  });
-                }
-              });
+          if (audio) {
+            // Ensure volume is set correctly when audio loads
+            audio.volume = isMuted ? 0 : volume;
+            
+            if (isPlaying && audio.paused) {
+              // Use the same audio.play() method as regular browser
+              const playPromise = isPWA ? handlePWAAudioPlay(audio) : audio.play();
+              if (playPromise && typeof playPromise.catch === 'function') {
+                playPromise.catch((error) => {
+                  console.error('Audio autoplay blocked:', error);
+                  if (error.name === 'NotAllowedError') {
+                    toast({
+                      title: '🔒 Autoplay blocked',
+                      description: isPWA ? 'Tap play to start audio in PWA mode' : 'Tap play to start audio',
+                      variant: 'destructive'
+                    });
+                  }
+                });
+              }
             }
           }
         }}
         onLoadStart={() => {
-          console.log('Audio loading started in PWA mode');
+          // Ensure volume is set when audio starts loading
+          const audio = audioRef.current;
+          if (audio) {
+            audio.volume = isMuted ? 0 : volume;
+          }
         }}
         onLoadedData={() => {
-          console.log('Audio data loaded in PWA mode');
+          // Ensure volume is set when audio data is loaded
+          const audio = audioRef.current;
+          if (audio) {
+            audio.volume = isMuted ? 0 : volume;
+          }
         }}
       />
 

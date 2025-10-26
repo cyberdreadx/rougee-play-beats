@@ -52,7 +52,6 @@ const ProfileEdit = () => {
   const [tempAvatarUrl, setTempAvatarUrl] = useState<string | null>(null);
   const [showCoverCrop, setShowCoverCrop] = useState(false);
   const [tempCoverUrl, setTempCoverUrl] = useState<string | null>(null);
-  const [showDebugPanel, setShowDebugPanel] = useState(false);
 
   useEffect(() => {
     // Only redirect if Privy is ready and user is not connected
@@ -234,19 +233,13 @@ const ProfileEdit = () => {
       hasPrivyWagmi: !!usePrivyWagmi
     };
     
-    console.log('🔍 ProfileEdit handleSubmit debug:', debugInfo);
     
-    // Show debug info in UI for mobile/PWA users
-    if (!fullAddress) {
-      setShowDebugPanel(true);
-    }
 
     if (!fullAddress) {
       console.error('❌ Wallet not connected - fullAddress is:', fullAddress);
       
       // Try to wait a bit and check again (in case of timing issues)
       if (isConnected && isPrivyReady) {
-        console.log('⏳ Wallet appears connected but address not available, waiting...');
         await new Promise(resolve => setTimeout(resolve, 1000));
         
         // Re-check after delay
@@ -362,83 +355,6 @@ const ProfileEdit = () => {
       <NetworkInfo />
 
       <div className="max-w-4xl mx-auto px-6 py-8 space-y-6">
-        {/* Debug Panel for Mobile/PWA */}
-        {showDebugPanel && (
-          <div className="console-bg tech-border rounded-lg p-4 space-y-2">
-            <h3 className="font-mono font-bold text-sm text-neon-green">🔍 Wallet Debug Info</h3>
-            <div className="space-y-1 text-xs font-mono">
-              <div>Full Address: <span className={fullAddress ? 'text-green-400' : 'text-red-400'}>{fullAddress || 'undefined'}</span></div>
-              <div>Privy Connected: <span className={isConnected ? 'text-green-400' : 'text-red-400'}>{isConnected ? 'true' : 'false'}</span></div>
-              <div>Privy Ready: <span className={isPrivyReady ? 'text-green-400' : 'text-red-400'}>{isPrivyReady ? 'true' : 'false'}</span></div>
-              <div>Wagmi Connected: <span className={wagmiConnected ? 'text-green-400' : 'text-red-400'}>{wagmiConnected ? 'true' : 'false'}</span></div>
-              <div>Has PrivyWagmi: <span className="text-blue-400">true</span></div>
-            </div>
-            {!fullAddress && (
-              <div className="space-y-2">
-                <div className="text-xs text-yellow-400 font-mono">
-                  ⚠️ No wallet address detected.
-                </div>
-                {isCreatingWallet && (
-                  <div className="text-xs text-blue-400 font-mono">
-                    🔧 Creating embedded wallet...
-                  </div>
-                )}
-                {!isCreatingWallet && (
-                  <div className="text-xs text-muted-foreground font-mono">
-                    Embedded wallets should be created automatically. If not, try the button below.
-                  </div>
-                )}
-              </div>
-            )}
-            <div className="flex flex-wrap gap-2 mt-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowDebugPanel(false)}
-                className="font-mono text-xs"
-              >
-                Hide Debug
-              </Button>
-              {!fullAddress && (
-                <>
-                  <Button
-                    variant="neon"
-                    size="sm"
-                    onClick={() => createWallet()}
-                    disabled={isCreatingWallet}
-                    className="font-mono text-xs"
-                  >
-                    {isCreatingWallet ? 'Creating...' : 'Create Wallet'}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => authenticateWallet()}
-                    className="font-mono text-xs"
-                  >
-                    Authenticate Wallet
-                  </Button>
-                </>
-              )}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => forceRetry()}
-                className="font-mono text-xs"
-              >
-                Retry Connection
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => window.location.reload()}
-                className="font-mono text-xs"
-              >
-                Refresh Page
-              </Button>
-            </div>
-          </div>
-        )}
 
         {/* Upload Slots - Show for artists */}
         {isArtist && <UploadSlotsCard />}
@@ -465,13 +381,6 @@ const ProfileEdit = () => {
               {profile ? "EDIT PROFILE" : "CREATE PROFILE"}
             </h1>
             <div className="flex items-center gap-3">
-              <Button
-                variant="outline"
-                onClick={() => setShowDebugPanel(!showDebugPanel)}
-                className="font-mono text-xs"
-              >
-                {showDebugPanel ? 'Hide' : 'Debug'}
-              </Button>
               <XRGETierBadge walletAddress={fullAddress} showBalance size="lg" />
             </div>
           </div>

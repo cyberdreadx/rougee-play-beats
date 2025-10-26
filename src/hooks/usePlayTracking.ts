@@ -44,7 +44,6 @@ export const usePlayTracking = (songId?: string): UsePlayTrackingReturn => {
         console.error('RPC Error:', rpcError);
         // If the function doesn't exist yet, allow unlimited plays
         if (rpcError.message.includes('function') && rpcError.message.includes('does not exist')) {
-          console.log('🔧 Play tracking functions not available, allowing unlimited plays');
           setPlayStatus({
             canPlay: true,
             isOwner: true,
@@ -57,7 +56,6 @@ export const usePlayTracking = (songId?: string): UsePlayTrackingReturn => {
         throw new Error(`Failed to check play status: ${rpcError.message}`);
       }
 
-      console.log('✅ Play status retrieved:', data);
       setPlayStatus(data);
     } catch (err) {
       console.error('Error checking play status:', err);
@@ -77,11 +75,9 @@ export const usePlayTracking = (songId?: string): UsePlayTrackingReturn => {
 
   const recordPlay = useCallback(async (targetSongId: string, durationSeconds: number = 0): Promise<boolean> => {
     if (!fullAddress || !targetSongId) {
-      console.log('❌ Cannot record play: missing wallet address or song ID');
       return false;
     }
 
-    console.log('🎵 Recording play for:', { wallet: fullAddress, songId: targetSongId, duration: durationSeconds });
 
     try {
       const { data, error: rpcError } = await supabase.rpc('record_play', {
@@ -94,7 +90,6 @@ export const usePlayTracking = (songId?: string): UsePlayTrackingReturn => {
         console.error('Record play RPC Error:', rpcError);
         // If the function doesn't exist yet, try direct insert
         if (rpcError.message.includes('function') && rpcError.message.includes('does not exist')) {
-          console.log('🔧 Record play function not available, trying direct insert');
           
           const { data: insertData, error: insertError } = await supabase
             .from('user_plays')
@@ -110,13 +105,11 @@ export const usePlayTracking = (songId?: string): UsePlayTrackingReturn => {
             return false;
           }
 
-          console.log('✅ Play recorded via direct insert:', insertData);
           return true;
         }
         throw new Error(`Failed to record play: ${rpcError.message}`);
       }
 
-      console.log('✅ Play recorded successfully via RPC:', data);
       // Refresh play status after recording
       await checkPlayStatus(targetSongId);
       return true;

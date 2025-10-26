@@ -148,7 +148,7 @@ const Index = ({ playSong, currentSong, isPlaying, isRadioMode, onToggleRadio }:
           </TabsContent>
 
           <TabsContent value="genres" className="px-2 md:px-0 mt-0">
-            <GenresList />
+            <GenresList playSong={playSong} />
           </TabsContent>
         </Tabs>
       </div>

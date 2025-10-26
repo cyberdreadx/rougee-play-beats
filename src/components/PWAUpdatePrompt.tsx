@@ -9,11 +9,9 @@ export const PWAUpdatePrompt = () => {
 
   useEffect(() => {
     if ('serviceWorker' in navigator) {
-      console.log('📱 PWAUpdatePrompt: Initializing...', import.meta.env.PROD ? 'PROD' : 'DEV');
       
       // In dev mode, show test prompt after 5 seconds (for testing)
       if (!import.meta.env.PROD) {
-        console.log('🔧 Dev mode: Test prompt available');
         return;
       }
 
@@ -21,36 +19,29 @@ export const PWAUpdatePrompt = () => {
       // Check for updates every 60 seconds
       const checkInterval = setInterval(() => {
         navigator.serviceWorker.ready.then((reg) => {
-          console.log('🔍 Checking for updates...');
           reg.update();
         });
       }, 60000); // Check every minute
 
       // Listen for updates
       navigator.serviceWorker.ready.then((reg) => {
-        console.log('✅ Service worker ready:', reg);
         setRegistration(reg);
 
         // Check if there's an update waiting immediately
         if (reg.waiting) {
-          console.log('🎉 Update waiting on mount!');
           setShowPrompt(true);
         }
 
         if (reg.installing) {
-          console.log('🔧 Service worker installing...');
         }
 
         // Listen for new updates
         reg.addEventListener('updatefound', () => {
-          console.log('🆕 Update found!');
           const newWorker = reg.installing;
           if (newWorker) {
             newWorker.addEventListener('statechange', () => {
-              console.log('📊 Worker state changed:', newWorker.state);
               if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
                 // New version available!
-                console.log('✨ New version installed and ready!');
                 setShowPrompt(true);
                 // Update registration reference
                 setRegistration(reg);
@@ -64,7 +55,6 @@ export const PWAUpdatePrompt = () => {
 
       // Listen for messages from service worker
       navigator.serviceWorker.addEventListener('message', (event) => {
-        console.log('📨 Message from service worker:', event.data);
         if (event.data && event.data.type === 'UPDATE_AVAILABLE') {
           setShowPrompt(true);
         }
@@ -77,8 +67,6 @@ export const PWAUpdatePrompt = () => {
   const handleUpdate = () => {
     setIsUpdating(true);
 
-    console.log('🔄 Update button clicked, registration:', registration);
-    console.log('🔄 Waiting worker:', registration?.waiting);
 
     if (!registration) {
       console.error('❌ No registration found');
@@ -96,7 +84,6 @@ export const PWAUpdatePrompt = () => {
       return;
     }
 
-    console.log('✅ Sending SKIP_WAITING to service worker...');
     
     // Tell the waiting service worker to activate
     waitingWorker.postMessage({ type: 'SKIP_WAITING' });
@@ -106,7 +93,6 @@ export const PWAUpdatePrompt = () => {
     const handleControllerChange = () => {
       if (!controllerChanged) {
         controllerChanged = true;
-        console.log('✅ Controller changed, reloading...');
         window.location.reload();
       }
     };
@@ -116,7 +102,6 @@ export const PWAUpdatePrompt = () => {
     // Fallback: If controller doesn't change within 2 seconds, force reload
     setTimeout(() => {
       if (!controllerChanged) {
-        console.log('⏰ Timeout reached, forcing reload...');
         window.location.reload();
       }
     }, 2000);

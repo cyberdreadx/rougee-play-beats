@@ -1,13 +1,13 @@
 // IPFS utilities for fetching and validating data
 
 // Multiple IPFS gateways for redundancy and to avoid security blocks
-// Lighthouse is FIRST and PRIMARY - most reliable for this app
+// Ordered by actual working status and speed based on debug results
 const IPFS_GATEWAYS = [
-  'https://gateway.lighthouse.storage/ipfs', // Lighthouse (PRIMARY - your gateway)
-  'https://cloudflare-ipfs.com/ipfs',        // Cloudflare IPFS gateway (fast and reliable)
-  'https://ipfs.io/ipfs',                    // Public IPFS gateway
-  'https://gateway.pinata.cloud/ipfs',       // Pinata gateway
-  'https://dweb.link/ipfs',                  // Protocol Labs gateway
+  'https://gateway.lighthouse.storage/ipfs', // Lighthouse (PRIMARY - your gateway, fastest working)
+  'https://dweb.link/ipfs',                  // Protocol Labs gateway (fast and reliable)
+  'https://ipfs.io/ipfs',                    // Public IPFS gateway (reliable but slower)
+  'https://cloudflare-ipfs.com/ipfs',        // Cloudflare IPFS gateway (CORS issues, moved to fallback)
+  'https://gateway.pinata.cloud/ipfs',       // Pinata gateway (timeout issues, moved to fallback)
   'https://ipfs.fleek.co/ipfs',              // Fleek gateway
   'https://gateway.ipfs.io/ipfs',            // Alternative IPFS.io
   'https://ipfs.infura.io/ipfs',             // Infura gateway
@@ -160,6 +160,7 @@ export const testGateway = async (gateway: string, testCid: string = 'QmYwAPJzv5
     return false;
   }
 };
+
 
 export const fetchProfileFromIPFS = async (metadataCid: string) => {
   const metadata = await fetchFromIPFS(metadataCid);

@@ -60,10 +60,25 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Audio too large (max 50MB)' }), 
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 });
     }
-    const validAudioTypes = ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/ogg', 'audio/m4a', 'audio/mp4'];
-    if (!validAudioTypes.includes(file.type)) {
-      console.error('Invalid audio type:', file.type, 'Valid types:', validAudioTypes);
-      return new Response(JSON.stringify({ error: `Invalid audio type: ${file.type}. Allowed: ${validAudioTypes.join(', ')}` }), 
+    // More comprehensive audio type validation
+    const validAudioTypes = [
+      'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/ogg', 'audio/m4a', 'audio/mp4',
+      'audio/x-wav', 'audio/wave', 'audio/x-m4a', 'audio/x-mp4', 'audio/x-ogg',
+      'audio/vnd.wave', 'audio/x-pn-wav', 'audio/x-pn-wave'
+    ];
+    
+    // Check if file type is valid or if it's a WAV file with different MIME type
+    const isValidAudioType = validAudioTypes.includes(file.type) || 
+      (file.name.toLowerCase().endsWith('.wav') && file.type.startsWith('audio/')) ||
+      (file.name.toLowerCase().endsWith('.mp3') && file.type.startsWith('audio/')) ||
+      (file.name.toLowerCase().endsWith('.m4a') && file.type.startsWith('audio/')) ||
+      (file.name.toLowerCase().endsWith('.ogg') && file.type.startsWith('audio/'));
+    
+    if (!isValidAudioType) {
+      console.error('Invalid audio type:', file.type, 'File name:', file.name, 'Valid types:', validAudioTypes);
+      return new Response(JSON.stringify({ 
+        error: `Invalid audio type: ${file.type}. File: ${file.name}. Allowed: ${validAudioTypes.join(', ')}` 
+      }), 
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 });
     }
 
@@ -106,26 +121,47 @@ serve(async (req) => {
 
     console.log('Validation passed. Uploading file to Lighthouse:', file.name);
 
-    // Helper function to upload to Lighthouse
+    // Helper function to upload to Lighthouse with timeout
     const uploadToLighthouse = async (fileToUpload: File, fileName?: string) => {
       const lighthouseFormData = new FormData();
       lighthouseFormData.append('file', fileToUpload, fileName);
 
-      const uploadResponse = await fetch('https://upload.lighthouse.storage/api/v0/add', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${lighthouseApiKey}`,
-        },
-        body: lighthouseFormData,
-      });
+      console.log(`🚀 Uploading to Lighthouse: ${fileName || fileToUpload.name} (${fileToUpload.size} bytes)`);
 
-      if (!uploadResponse.ok) {
-        const errorText = await uploadResponse.text();
-        console.error('Lighthouse upload error:', errorText);
-        throw new Error(`Lighthouse upload failed: ${errorText}`);
+      // Create AbortController for timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+
+      try {
+        const uploadResponse = await fetch('https://upload.lighthouse.storage/api/v0/add', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${lighthouseApiKey}`,
+          },
+          body: lighthouseFormData,
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!uploadResponse.ok) {
+          const errorText = await uploadResponse.text();
+          console.error('❌ Lighthouse upload error:', errorText);
+          throw new Error(`Lighthouse upload failed: ${errorText}`);
+        }
+
+        const result = await uploadResponse.json();
+        console.log('✅ Lighthouse upload successful:', result.Hash);
+        return result;
+      } catch (error) {
+        clearTimeout(timeoutId);
+        if (error.name === 'AbortError') {
+          console.error('❌ Lighthouse upload timeout (60s)');
+          throw new Error('Upload timeout - file too large or network issue');
+        }
+        console.error('❌ Lighthouse upload error:', error);
+        throw error;
       }
-
-      return await uploadResponse.json();
     };
 
     let coverCid = null;
@@ -148,10 +184,15 @@ serve(async (req) => {
     }
 
     // 2. Upload main audio file
-    console.log('Uploading audio file to Lighthouse');
-    const audioData = await uploadToLighthouse(file);
-    audioCid = audioData.Hash;
-    console.log('Audio file uploaded:', audioCid);
+    console.log('🎵 Uploading audio file to Lighthouse');
+    try {
+      const audioData = await uploadToLighthouse(file);
+      audioCid = audioData.Hash;
+      console.log('✅ Audio file uploaded successfully:', audioCid);
+    } catch (error) {
+      console.error('❌ Audio upload failed:', error);
+      throw new Error(`Audio upload failed: ${error.message}`);
+    }
 
     // 3. Create and upload metadata JSON
     const metadataJson = {
@@ -169,46 +210,57 @@ serve(async (req) => {
       fileType: file.type
     };
 
-    console.log('Creating metadata JSON and uploading to Lighthouse');
-    const metadataBlob = new Blob([JSON.stringify(metadataJson, null, 2)], { 
-      type: 'application/json' 
-    });
-    const metadataFile = new File([metadataBlob], `${audioCid}_metadata.json`, { 
-      type: 'application/json' 
-    });
-    
-    const metadataUploadData = await uploadToLighthouse(metadataFile);
-    metadataCid = metadataUploadData.Hash;
-    console.log('Metadata JSON uploaded:', metadataCid);
+    console.log('📄 Creating metadata JSON and uploading to Lighthouse');
+    try {
+      const metadataBlob = new Blob([JSON.stringify(metadataJson, null, 2)], { 
+        type: 'application/json' 
+      });
+      const metadataFile = new File([metadataBlob], `${audioCid}_metadata.json`, { 
+        type: 'application/json' 
+      });
+      
+      const metadataUploadData = await uploadToLighthouse(metadataFile);
+      metadataCid = metadataUploadData.Hash;
+      console.log('✅ Metadata JSON uploaded successfully:', metadataCid);
+    } catch (error) {
+      console.error('❌ Metadata upload failed:', error);
+      throw new Error(`Metadata upload failed: ${error.message}`);
+    }
 
     // 4. Save minimal data to Supabase for fast querying
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
     
-    const { data, error } = await supabase
-      .from('songs')
-      .insert({
-        wallet_address: walletAddress,
-        title: metadataJson.title,
-        artist: metadataJson.artist,
-        audio_cid: audioCid,
-        cover_cid: coverCid,
-        duration: parsedMetadata.duration,
-        genre: metadataJson.genre,
-        description: metadataJson.description,
-        ticker: metadataJson.ticker,
-        ai_usage: parsedMetadata.aiUsage || 'none',
-      })
-      .select()
-      .single();
+    console.log('💾 Saving song metadata to database...');
+    try {
+      const { data, error } = await supabase
+        .from('songs')
+        .insert({
+          wallet_address: walletAddress,
+          title: metadataJson.title,
+          artist: metadataJson.artist,
+          audio_cid: audioCid,
+          cover_cid: coverCid,
+          duration: parsedMetadata.duration,
+          genre: metadataJson.genre,
+          description: metadataJson.description,
+          ticker: metadataJson.ticker,
+          ai_usage: parsedMetadata.aiUsage || 'none',
+        })
+        .select()
+        .single();
 
-    if (error) {
-      console.error('Database insert error:', error);
-      throw error;
+      if (error) {
+        console.error('❌ Database insert error:', error);
+        throw new Error(`Database error: ${error.message}`);
+      }
+
+      console.log('✅ Song metadata saved to database:', data);
+    } catch (error) {
+      console.error('❌ Database save failed:', error);
+      throw new Error(`Database save failed: ${error.message}`);
     }
-
-    console.log('Song metadata saved to database:', data);
 
     return new Response(
       JSON.stringify({ 

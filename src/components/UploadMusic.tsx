@@ -366,6 +366,17 @@ export default function UploadMusic() {
   const performUpload = async () => {
     if (!audioFile || !address) return;
 
+    // Validate required fields
+    if (!ticker.trim()) {
+      toast.error("Ticker symbol is required");
+      return;
+    }
+
+    if (ticker.length < 2) {
+      toast.error("Ticker symbol must be at least 2 characters");
+      return;
+    }
+
     // Check upload slots before uploading
     if (slotsRemaining <= 0) {
       const message = xrgeBalance > 0 
@@ -581,7 +592,7 @@ export default function UploadMusic() {
           </div>
 
           <div>
-            <Label htmlFor="ticker">Ticker Symbol</Label>
+            <Label htmlFor="ticker">Ticker Symbol *</Label>
             <Input
               id="ticker"
               value={ticker}
@@ -589,7 +600,11 @@ export default function UploadMusic() {
               placeholder="e.g., BEAT, MUSIC"
               maxLength={10}
               disabled={uploading || scanning}
+              required
             />
+            <p className="text-xs text-muted-foreground mt-1">
+              Required: 2-10 characters, will be used as your song's token symbol
+            </p>
           </div>
 
           <div>

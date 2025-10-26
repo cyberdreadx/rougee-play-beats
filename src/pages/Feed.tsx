@@ -22,6 +22,8 @@ import { useSongPrice } from '@/hooks/useSongBondingCurve';
 import { useTokenPrices } from '@/hooks/useTokenPrices';
 import { Address } from 'viem';
 import { useReadContract } from 'wagmi';
+import { AudioWaveform } from '@/components/AudioWaveform';
+import { useAudioStateForSong } from '@/hooks/useAudioState';
 
 const XRGE_TOKEN_ADDRESS = "0x147120faEC9277ec02d957584CFCD92B56A24317" as const;
 
@@ -539,6 +541,27 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
     return `${Math.floor(seconds / 86400)}d ago`;
   };
 
+  // Waveform component for feed page
+  const FeedWaveform = ({ songId, audioCid }: { songId: string; audioCid: string }) => {
+    const audioState = useAudioStateForSong(songId);
+    
+    return (
+      <AudioWaveform
+        audioCid={audioCid}
+        height={25}
+        color="#00ff9f"
+        backgroundColor="rgba(0, 0, 0, 0.1)"
+        className="rounded border border-neon-green/10"
+        showProgress={audioState.isCurrentSong && audioState.isPlaying}
+        currentTime={audioState.currentTime}
+        duration={audioState.duration}
+        onSeek={(time) => {
+          console.log('Seek to:', time);
+        }}
+      />
+    );
+  };
+
   // Song Card Component with Price
   const SongCard = ({ song }: { song: SongPost }) => {
     const { prices } = useTokenPrices();
@@ -659,6 +682,13 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
             )}
           </div>
         </div>
+
+        {/* Audio Waveform */}
+        {song.audio_cid && (
+          <div className="mb-3">
+            <FeedWaveform songId={song.id} audioCid={song.audio_cid} />
+          </div>
+        )}
 
         {/* Song Actions */}
         <div className="flex items-center gap-4 pt-3 border-t border-border">

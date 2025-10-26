@@ -278,6 +278,24 @@ const ProfileEdit = () => {
       return;
     }
 
+    if (isArtist && !profile?.artist_ticker && !artistTicker.trim()) {
+      toast({
+        title: "Artist ticker required",
+        description: "Please enter your artist ticker symbol",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (isArtist && !profile?.artist_ticker && artistTicker.trim().length < 3) {
+      toast({
+        title: "Invalid ticker",
+        description: "Artist ticker must be at least 3 characters",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!isArtist && !displayName.trim()) {
       toast({
         title: "Display name required",
@@ -609,7 +627,7 @@ const ProfileEdit = () => {
                 {/* Artist Ticker */}
                 <div className="space-y-2">
                   <Label htmlFor="artist-ticker" className="font-mono">
-                    Artist Ticker (3-10 chars, A-Z 0-9 only)
+                    Artist Ticker * (3-10 chars, A-Z 0-9 only)
                   </Label>
                   <div className="flex gap-2">
                     <span className="text-neon-green font-mono text-lg">$</span>
@@ -622,11 +640,16 @@ const ProfileEdit = () => {
                       pattern="[A-Z0-9]{3,10}"
                       disabled={!!profile?.artist_ticker}
                       readOnly={!!profile?.artist_ticker}
+                      required={!profile?.artist_ticker}
                     />
                   </div>
-                  {profile?.artist_ticker && (
+                  {profile?.artist_ticker ? (
                     <p className="text-xs text-yellow-500 font-mono">
                       ⚠️ Ticker cannot be changed once claimed
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground font-mono">
+                      Required: 3-10 characters, will be used as your artist token symbol
                     </p>
                   )}
                 </div>

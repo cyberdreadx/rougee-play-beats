@@ -12,6 +12,7 @@ import { useWallet } from "@/hooks/useWallet";
 import { usePrivy } from "@privy-io/react-auth";
 import LoginModal from "@/components/LoginModal";
 import { usePlayTracking } from "@/hooks/usePlayTracking";
+import { updateAudioState } from "@/hooks/useAudioState";
 interface Song {
   id: string;
   title: string;
@@ -203,12 +204,23 @@ const AudioPlayer = ({
     if (!audio) return;
 
     const updateTime = () => {
-      setCurrentTime(audio.currentTime || 0);
+      const newTime = audio.currentTime || 0;
+      setCurrentTime(newTime);
+      updateAudioState({ 
+        currentTime: newTime,
+        currentSongId: currentSong?.id || null,
+        isPlaying 
+      });
     };
     
     const updateDuration = () => {
       if (audio.duration && !isNaN(audio.duration) && isFinite(audio.duration)) {
         setDuration(audio.duration);
+        updateAudioState({ 
+          duration: audio.duration,
+          currentSongId: currentSong?.id || null,
+          isPlaying 
+        });
       }
     };
     
@@ -242,8 +254,14 @@ const AudioPlayer = ({
       setCurrentAudioUrlIndex(0); // Reset to first URL
       setPreviewTimeRemaining(20); // Reset preview timer
       setShowLoginPrompt(false); // Hide login prompt
+      updateAudioState({ 
+        currentTime: 0,
+        duration: 0,
+        currentSongId: currentSong.id,
+        isPlaying 
+      });
     }
-  }, [currentSong?.id]);
+  }, [currentSong?.id, isPlaying]);
 
   // Preview timer for non-logged-in users
   useEffect(() => {

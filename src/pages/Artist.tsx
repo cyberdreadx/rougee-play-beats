@@ -25,6 +25,8 @@ import { AiBadge } from "@/components/AiBadge";
 import { SongComments } from "@/components/SongComments";
 import { useTokenPrices } from "@/hooks/useTokenPrices";
 import { useSongPrice } from "@/hooks/useSongBondingCurve";
+import { AudioWaveform } from "@/components/AudioWaveform";
+import { useAudioStateForSong } from "@/hooks/useAudioState";
 
 interface Song {
   id: string;
@@ -69,6 +71,27 @@ interface ArtistProps {
 }
 
 // Song Card Component with Price
+// Waveform component for artist page
+const ArtistWaveform = ({ songId, audioCid }: { songId: string; audioCid: string }) => {
+  const audioState = useAudioStateForSong(songId);
+  
+  return (
+    <AudioWaveform
+      audioCid={audioCid}
+      height={25}
+      color="#00ff9f"
+      backgroundColor="rgba(0, 0, 0, 0.1)"
+      className="rounded border border-neon-green/10"
+      showProgress={audioState.isCurrentSong && audioState.isPlaying}
+      currentTime={audioState.currentTime}
+      duration={audioState.duration}
+      onSeek={(time) => {
+        console.log('Seek to:', time);
+      }}
+    />
+  );
+};
+
 const ArtistSongCard = ({ song, coverUrl, isThisSongPlaying, navigate, playSong, toggleSongComments, expandedSongComments }: {
   song: Song;
   coverUrl: string | null;
@@ -145,6 +168,13 @@ const ArtistSongCard = ({ song, coverUrl, isThisSongPlaying, navigate, playSong,
             )}
           </div>
         </div>
+
+        {/* Audio Waveform */}
+        {song.audio_cid && (
+          <div className="w-full mb-3">
+            <ArtistWaveform songId={song.id} audioCid={song.audio_cid} />
+          </div>
+        )}
 
         {/* Action Buttons */}
         <div className="flex items-center justify-center md:justify-start gap-2 md:gap-3 flex-shrink-0">

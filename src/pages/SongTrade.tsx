@@ -24,6 +24,8 @@ import { useWallet } from "@/hooks/useWallet";
 import { AiBadge } from "@/components/AiBadge";
 import { useArtistProfile } from "@/hooks/useArtistProfile";
 import { SongComments } from "@/components/SongComments";
+import { AudioWaveform } from "@/components/AudioWaveform";
+import { useAudioStateForSong } from "@/hooks/useAudioState";
 import { useBuySongTokens, useSellSongTokens, useSongPrice, useSongMetadata, useCreateSong, SONG_FACTORY_ADDRESS, useApproveToken, useBuyQuote, useSellQuote, useBondingCurveSupply, useSongTokenBalance, BONDING_CURVE_ADDRESS } from "@/hooks/useSongBondingCurve";
 import { useBalance, useConnect, useWaitForTransactionReceipt, usePublicClient } from "wagmi";
 import { useXRGESwap, KTA_TOKEN_ADDRESS, USDC_TOKEN_ADDRESS, useXRGEQuote, useXRGEQuoteFromKTA, useXRGEQuoteFromUSDC, XRGE_TOKEN_ADDRESS as XRGE_TOKEN } from "@/hooks/useXRGESwap";
@@ -45,6 +47,7 @@ interface Song {
   created_at: string;
   token_address?: string | null;
   ticker?: string | null;
+  description?: string | null;
 }
 
 
@@ -53,6 +56,28 @@ interface SongTradeProps {
   currentSong: Song | null;
   isPlaying: boolean;
 }
+
+// Component that connects waveform to audio state
+const AudioWaveformWithState = ({ songId, audioCid }: { songId: string; audioCid: string }) => {
+  const audioState = useAudioStateForSong(songId);
+  
+  return (
+    <AudioWaveform
+      audioCid={audioCid}
+      height={40}
+      color="#00ff9f"
+      backgroundColor="rgba(0, 0, 0, 0.2)"
+      className="rounded border border-neon-green/20"
+      showProgress={audioState.isCurrentSong && audioState.isPlaying}
+      currentTime={audioState.currentTime}
+      duration={audioState.duration}
+      onSeek={(time) => {
+        // Handle seeking - this would need to be connected to the audio player
+        console.log('Seek to:', time);
+      }}
+    />
+  );
+};
 
 const SongTrade = ({ playSong, currentSong, isPlaying }: SongTradeProps) => {
   const { songId } = useParams<{ songId: string }>();
@@ -1292,9 +1317,25 @@ const SongTrade = ({ playSong, currentSong, isPlaying }: SongTradeProps) => {
                   <span className="truncate">{song.title}</span>
                   <AiBadge aiUsage={(song as any).ai_usage} size="md" />
                 </h1>
-                <p className="text-sm sm:text-base md:text-lg text-muted-foreground font-mono mb-3 md:mb-4 truncate">
+                <button 
+                  onClick={() => navigate(`/artist/${song.wallet_address}`)}
+                  className="text-sm sm:text-base md:text-lg text-white font-mono mb-2 truncate hover:text-neon-green transition-colors duration-200 underline-offset-4 hover:underline"
+                >
                   By {song.artist || "Unknown Artist"}
-                </p>
+                </button>
+                {song.description && (
+                  <p className="text-xs sm:text-sm text-white/90 font-mono mb-3 md:mb-4 line-clamp-2 bg-black/20 px-2 py-1 rounded backdrop-blur-sm">
+                    {song.description}
+                  </p>
+                )}
+                
+                {/* Audio Waveform */}
+                {song.audio_cid && (
+                  <div className="mb-3 md:mb-4">
+                    <AudioWaveformWithState songId={song.id} audioCid={song.audio_cid} />
+                  </div>
+                )}
+                
                 <div className="flex flex-wrap items-center gap-2">
                   <LikeButton songId={song.id} size="sm" />
                   <ReportButton songId={song.id} />

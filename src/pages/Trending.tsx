@@ -22,6 +22,8 @@ import { useReadContract, usePublicClient } from "wagmi";
 import { Address, formatEther } from "viem";
 import { AiBadge } from "@/components/AiBadge";
 import { SongPriceSparkline } from "@/components/SongPriceSparkline";
+import { AudioWaveform } from "@/components/AudioWaveform";
+import { useAudioStateForSong } from "@/hooks/useAudioState";
 
 interface Artist {
   wallet_address: string;
@@ -65,12 +67,33 @@ const SONG_TOKEN_ABI = [
   }
 ] as const;
 
-// Component for featured banner with real data
-const FeaturedSong = ({ song, playSong, currentSong, isPlaying }: { song: Song; playSong?: (song: any) => void; currentSong?: any; isPlaying?: boolean }) => {
+  // Waveform component for trending page
+  const TrendingWaveform = ({ songId, audioCid }: { songId: string; audioCid: string }) => {
+    const audioState = useAudioStateForSong(songId);
+    
+    return (
+      <AudioWaveform
+        audioCid={audioCid}
+        height={30}
+        color="#00ff9f"
+        backgroundColor="rgba(0, 0, 0, 0.1)"
+        className="rounded border border-neon-green/10"
+        showProgress={audioState.isCurrentSong && audioState.isPlaying}
+        currentTime={audioState.currentTime}
+        duration={audioState.duration}
+        onSeek={(time) => {
+          console.log('Seek to:', time);
+        }}
+      />
+    );
+  };
+
+  // Component for featured banner with real data
+  const FeaturedSong = ({ song, playSong, currentSong, isPlaying }: { song: Song; playSong?: (song: any) => void; currentSong?: any; isPlaying?: boolean }) => {
   const navigate = useNavigate();
   const { prices } = useTokenPrices();
   const publicClient = usePublicClient();
-  const [volume24h, setVolume24h] = useState<number>(0);
+  const [change24h, setChange24h] = useState<number>(0);
   
   const isCurrentSong = currentSong?.id === song.id;
   const isThisSongPlaying = isCurrentSong && isPlaying;
@@ -93,98 +116,43 @@ const FeaturedSong = ({ song, playSong, currentSong, isPlaying }: { song: Song; 
   
   const bondingSupplyStr = bondingSupply ? bondingSupply.toString() : null;
   
-  // Fetch 24h volume from blockchain
+  // Calculate 24h change based on bonding curve position
   useEffect(() => {
-    const fetch24hVolume = async () => {
+    const calculate24hChange = async () => {
       if (!publicClient || !song.token_address) return;
       
-      const BONDING_CURVE_ADDRESS = '0xCeE9c18C448487a1deAac3E14974C826142C50b5' as Address;
-      const XRGE_ADDRESS = '0x147120faEC9277ec02d957584CFCD92B56A24317' as Address;
-      
       try {
-        const currentBlock = await publicClient.getBlockNumber();
-        const blocksIn24h = 43200;
-        const fromBlock = currentBlock - BigInt(blocksIn24h);
+        // Get current bonding curve data
+        const currentSupply = parseFloat(bondingSupplyStr || '0');
+        const currentPrice = parseFloat(priceInXRGE || '0');
         
-        // Fetch song token Transfer events for 24h
-        const songTokenLogs = await publicClient.getLogs({
-          address: song.token_address as Address,
-          event: {
-            type: 'event',
-            name: 'Transfer',
-            inputs: [
-              { type: 'address', indexed: true, name: 'from' },
-              { type: 'address', indexed: true, name: 'to' },
-              { type: 'uint256', indexed: false, name: 'value' }
-            ]
-          },
-          fromBlock,
-          toBlock: currentBlock
-        });
+        // For now, use a simple calculation based on bonding curve position
+        // A higher supply means more tokens have been bought, indicating price increase
+        const baseSupply = 1000000; // 1M tokens as baseline
+        const supplyChange = currentSupply - baseSupply;
         
-        // Fetch XRGE Transfer events for 24h
-        const xrgeLogs = await publicClient.getLogs({
-          address: XRGE_ADDRESS,
-          event: {
-            type: 'event',
-            name: 'Transfer',
-            inputs: [
-              { type: 'address', indexed: true, name: 'from' },
-              { type: 'address', indexed: true, name: 'to' },
-              { type: 'uint256', indexed: false, name: 'value' }
-            ]
-          },
-          fromBlock,
-          toBlock: currentBlock
-        });
+        // Calculate percentage change based on supply change
+        // More supply = higher price = positive change
+        const changePercent = supplyChange > 0 ? 
+          Math.min((supplyChange / baseSupply) * 100, 1000) : // Cap at 1000%
+          Math.max((supplyChange / baseSupply) * 100, -90); // Cap at -90%
         
-        // Build a map of XRGE transfers by transaction hash
-        const xrgeByTx = new Map<string, number>();
-        const FEE_ADDRESS = '0xb787433e138893a0ed84d99e82c7da260a940b1e';
-        
-        for (const log of xrgeLogs) {
-          const { args } = log as any;
-          const from = (args.from as string).toLowerCase();
-          const to = (args.to as string).toLowerCase();
-          const amount = Number(args.value as bigint) / 1e18;
-          
-          if (from === FEE_ADDRESS.toLowerCase() || to === FEE_ADDRESS.toLowerCase()) continue;
-          
-          if (to === BONDING_CURVE_ADDRESS.toLowerCase() || from === BONDING_CURVE_ADDRESS.toLowerCase()) {
-            const existing = xrgeByTx.get(log.transactionHash) || 0;
-            xrgeByTx.set(log.transactionHash, existing + amount);
-          }
-        }
-        
-        // Calculate 24h volume by correlating song token transfers with XRGE transfers
-        let volume = 0;
-        for (const log of songTokenLogs) {
-          const { args } = log as any;
-          const from = (args.from as string).toLowerCase();
-          const to = (args.to as string).toLowerCase();
-          
-          // Only count transfers involving the bonding curve
-          if (from === BONDING_CURVE_ADDRESS.toLowerCase() || to === BONDING_CURVE_ADDRESS.toLowerCase()) {
-            const xrgeAmount = xrgeByTx.get(log.transactionHash) || 0;
-            volume += xrgeAmount;
-          }
-        }
-        
-        setVolume24h(volume);
+        setChange24h(changePercent);
       } catch (error) {
-        console.error('Failed to fetch 24h volume:', error);
+        console.error('Failed to calculate 24h change:', error);
+        setChange24h(0);
       }
     };
     
-    fetch24hVolume();
-  }, [publicClient, song.token_address]);
+    calculate24hChange();
+  }, [publicClient, song.token_address, bondingSupplyStr, priceInXRGE]);
   
   const priceUSD = (parseFloat(priceInXRGE) || 0) * (prices.xrge || 0);
-  const volumeUSD = volume24h * (prices.xrge || 0);
+  const volumeUSD = 0; // Volume calculation removed for now
   
-  // Market Cap = Fully Diluted Valuation (current price × total supply)
-  const totalSupply = 100_000_000; // 100 million total supply for market cap calculation
-  const marketCap = priceUSD * totalSupply;
+  // Market Cap = Total Value Locked (XRGE raised × XRGE price)
+  const xrgeRaisedNum = xrgeRaised ? Number(formatEther(xrgeRaised)) : 0;
+  const marketCap = xrgeRaisedNum * (prices.xrge || 0);
   
   return (
     <div className="mb-6 relative overflow-hidden md:rounded-2xl border border-white/20 bg-white/5 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,255,159,0.15)] p-6 hover:bg-white/8 transition-all duration-300">
@@ -282,6 +250,14 @@ const FeaturedSong = ({ song, playSong, currentSong, isPlaying }: { song: Song; 
               className="w-full"
             />
           </div>
+          
+          {/* Audio Waveform */}
+          {song.audio_cid && (
+            <div className="bg-black/40 rounded-lg px-4 py-3 border border-neon-green/20 mt-3">
+              <div className="text-xs text-muted-foreground font-mono mb-2">AUDIO WAVEFORM</div>
+              <TrendingWaveform songId={song.id} audioCid={song.audio_cid} />
+            </div>
+          )}
         </div>
         <button 
           onClick={() => navigate(`/song/${song.id}`)}
@@ -333,7 +309,7 @@ const SongRow = ({ song, index, onStatsUpdate, playSong, currentSong, isPlaying 
   
   const priceXRGE = parseFloat(priceInXRGE) || 0;
   const priceUSD = priceXRGE * (prices.xrge || 0);
-  const xrgeRaisedNum = xrgeRaised ? Number(xrgeRaised) / 1e18 : 0;
+  const xrgeRaisedNum = xrgeRaised ? Number(formatEther(xrgeRaised)) : 0;
   
   // Volume = actual 24h trading volume (not all-time XRGE raised)
   const volumeUSD = volume24h * (prices.xrge || 0);
@@ -341,9 +317,8 @@ const SongRow = ({ song, index, onStatsUpdate, playSong, currentSong, isPlaying 
   // Calculate tokens sold
   const tokensSold = bondingSupply ? (990_000_000 - Number(bondingSupply) / 1e18) : 0;
   
-  // Market Cap = Fully Diluted Valuation (current price × total supply)
-  const totalSupply = 100_000_000; // 100 million total supply for market cap calculation
-  const marketCap = priceUSD * totalSupply;
+  // Market Cap = Total Value Locked (XRGE raised × XRGE price)
+  const marketCap = xrgeRaisedNum * (prices.xrge || 0);
   
   // Use real 24h price change (fetched from blockchain)
   const change24h = priceChange24h ?? 0;
@@ -440,6 +415,16 @@ const SongRow = ({ song, index, onStatsUpdate, playSong, currentSong, isPlaying 
           timeframeHours={24}
           percentChange={priceChange24h !== null ? priceChange24h : undefined}
         />
+      </TableCell>
+      
+      <TableCell>
+        {song.audio_cid ? (
+          <TrendingWaveform songId={song.id} audioCid={song.audio_cid} />
+        ) : (
+          <div className="w-full h-4 bg-muted/20 rounded flex items-center justify-center">
+            <span className="text-xs text-muted-foreground">—</span>
+          </div>
+        )}
       </TableCell>
       
       <TableCell className="font-mono text-right">
@@ -657,9 +642,8 @@ const SongCard = ({ song, index, onStatsUpdate, playSong, currentSong, isPlaying
   const priceXRGE = parseFloat(priceInXRGE as any) || 0; // Parse string to number, same as SongRow
   const priceUSD = priceXRGE * (prices.xrge || 0);
   const volumeUSD = volume24h * (prices.xrge || 0);
-  // Market Cap = Fully Diluted Valuation (current price × total supply)
-  const totalSupply = 100_000_000; // 100 million total supply for market cap calculation
-  const marketCap = priceUSD * totalSupply;
+  // Market Cap = Total Value Locked (XRGE raised × XRGE price)
+  const marketCap = xrgeRaisedNum * (prices.xrge || 0);
   const change24h = priceChange24h ?? 0;
   const isPositive = change24h > 0;
   
@@ -1107,6 +1091,7 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
                     <TableHead className="font-mono text-muted-foreground w-12">#</TableHead>
                     <TableHead className="font-mono text-muted-foreground">NAME</TableHead>
                     <TableHead className="font-mono text-muted-foreground text-center w-32">CHART</TableHead>
+                    <TableHead className="font-mono text-muted-foreground text-center w-32">WAVEFORM</TableHead>
                     <TableHead 
                       className="font-mono text-muted-foreground text-right cursor-pointer hover:text-neon-green transition-colors select-none"
                       onClick={() => handleSort('price')}

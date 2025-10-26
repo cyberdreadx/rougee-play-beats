@@ -105,10 +105,17 @@ export const useAudioPlayer = () => {
 
   const onSongEnd = useCallback(() => {
     if (repeatMode === 'one') {
-      setIsPlaying(true);
-    } else if (repeatMode === 'all' || (playlist.length > 0 && currentIndex < playlist.length - 1)) {
+      // For repeat one, the AudioPlayer component handles restarting the song
+      // We don't need to do anything here
+      return;
+    } else if (repeatMode === 'all') {
+      // For repeat all, go to next song or loop back to first
+      playNext();
+    } else if (playlist.length > 0 && currentIndex < playlist.length - 1) {
+      // Normal progression to next song
       playNext();
     } else {
+      // End of playlist, stop playing
       setIsPlaying(false);
     }
   }, [repeatMode, playlist.length, currentIndex, playNext]);

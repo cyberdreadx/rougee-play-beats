@@ -224,7 +224,16 @@ const AudioPlayer = ({
       }
     };
     
-    const handleEnd = () => onSongEnd();
+    const handleEnd = () => {
+      if (repeatMode === 'one') {
+        // For repeat one, restart the current song immediately
+        audio.currentTime = 0;
+        audio.play().catch(console.error);
+      } else {
+        // For other modes, use the normal onSongEnd logic
+        onSongEnd();
+      }
+    };
 
     audio.addEventListener('timeupdate', updateTime);
     audio.addEventListener('loadedmetadata', updateDuration);
@@ -244,7 +253,7 @@ const AudioPlayer = ({
       audio.removeEventListener('durationchange', updateDuration);
       audio.removeEventListener('canplay', updateDuration);
     };
-  }, [onSongEnd, currentSong?.id]);
+  }, [onSongEnd, currentSong?.id, repeatMode]);
 
   // Reset time when song changes
   useEffect(() => {

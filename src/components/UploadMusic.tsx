@@ -481,12 +481,16 @@ export default function UploadMusic() {
             <Input
               id="audio-file"
               type="file"
-              accept="audio/*"
+              accept=".mp3,.wav,.m4a,.ogg,.aac,.flac,.wma,.aiff,.alac,audio/*"
               onChange={handleAudioChange}
               disabled={uploading || scanning}
+              className="file:bg-primary file:text-primary-foreground file:border-0 file:rounded-md file:px-4 file:py-2 file:mr-4 file:text-sm file:font-medium hover:file:bg-primary/90"
             />
             <p className="text-xs text-muted-foreground mt-1">
               MP3, WAV, M4A, OGG up to <span className="font-semibold text-yellow-500">50MB</span>
+            </p>
+            <p className="text-xs text-blue-500 mt-1">
+              💡 iOS users: If files appear greyed out, try using Safari browser or update to latest iOS version
             </p>
             {scanning && (
               <p className="text-sm text-yellow-500 mt-1 flex items-center gap-2">

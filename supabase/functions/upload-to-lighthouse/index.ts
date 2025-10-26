@@ -233,6 +233,7 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
     
     console.log('💾 Saving song metadata to database...');
+    let songData = null;
     try {
       const { data, error } = await supabase
         .from('songs')
@@ -256,7 +257,8 @@ serve(async (req) => {
         throw new Error(`Database error: ${error.message}`);
       }
 
-      console.log('✅ Song metadata saved to database:', data);
+      songData = data; // Store data in outer scope
+      console.log('✅ Song metadata saved to database:', songData);
     } catch (error) {
       console.error('❌ Database save failed:', error);
       throw new Error(`Database save failed: ${error.message}`);
@@ -268,7 +270,7 @@ serve(async (req) => {
         audioCid: audioCid,
         coverCid: coverCid,
         metadataCid: metadataCid,
-        song: data,
+        song: songData, // Use songData instead of data
         lighthouse: {
           audio: `https://ipfs.io/ipfs/${audioCid}`,
           cover: coverCid ? `https://ipfs.io/ipfs/${coverCid}` : null,

@@ -8,6 +8,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { getIPFSGatewayUrl, getIPFSGatewayUrls } from "@/lib/ipfs";
 import { useToast } from "@/hooks/use-toast";
 import { usePWAAudio } from "@/hooks/usePWAAudio";
+import { useWallet } from "@/hooks/useWallet";
+import { usePrivy } from "@privy-io/react-auth";
+import LoginModal from "@/components/LoginModal";
+import { usePlayTracking } from "@/hooks/usePlayTracking";
 interface Song {
   id: string;
   title: string;
@@ -72,8 +76,15 @@ const AudioPlayer = ({
   const [currentCoverUrlIndex, setCurrentCoverUrlIndex] = useState(0);
   const [isMinimized, setIsMinimized] = useState(false);
   const [isMobileNavVisible, setIsMobileNavVisible] = useState(true);
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [showOwnershipPrompt, setShowOwnershipPrompt] = useState(false);
+  const [previewTimeRemaining, setPreviewTimeRemaining] = useState(20);
   const { toast } = useToast();
   const { isPWA, audioSupported, handlePWAAudioPlay } = usePWAAudio();
+  const { isConnected } = useWallet();
+  const { authenticated } = usePrivy();
+  const { playStatus, recordPlay, checkPlayStatus } = usePlayTracking(currentSong?.id);
 
   // Track mobile nav visibility on scroll
   useEffect(() => {
@@ -229,8 +240,63 @@ const AudioPlayer = ({
       setCurrentTime(0);
       setDuration(0);
       setCurrentAudioUrlIndex(0); // Reset to first URL
+      setPreviewTimeRemaining(20); // Reset preview timer
+      setShowLoginPrompt(false); // Hide login prompt
     }
   }, [currentSong?.id]);
+
+  // Preview timer for non-logged-in users
+  useEffect(() => {
+    if (!authenticated && isPlaying && currentSong) {
+      const timer = setInterval(() => {
+        setPreviewTimeRemaining(prev => {
+          if (prev <= 1) {
+            // Preview time is up, pause and show login prompt
+            const audio = audioRef.current;
+            if (audio) {
+              audio.pause();
+            }
+            setShowLoginPrompt(true);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+      return () => clearInterval(timer);
+    }
+  }, [authenticated, isPlaying, currentSong]);
+
+  // Check play limits for authenticated users
+  useEffect(() => {
+    if (authenticated && isPlaying && currentSong && playStatus) {
+      console.log('🔍 Play status check:', playStatus);
+      // Only enforce limits if the database functions are working properly
+      if (playStatus.playCount > 0 && !playStatus.canPlay && playStatus.playCount >= playStatus.maxFreePlays) {
+        // User has exceeded play limit and doesn't own the song
+        console.log('❌ Play limit exceeded, pausing audio');
+        const audio = audioRef.current;
+        if (audio) {
+          audio.pause();
+        }
+        setShowOwnershipPrompt(true);
+      }
+    }
+  }, [authenticated, isPlaying, currentSong, playStatus]);
+
+  // Record play when song starts playing (for authenticated users)
+  useEffect(() => {
+    if (authenticated && isPlaying && currentSong && playStatus?.canPlay) {
+      console.log('🎵 Starting play recording timer for:', currentSong.title);
+      // Record the play after a short delay to ensure it's a real play
+      const timer = setTimeout(() => {
+        console.log('🎵 Recording play for song:', currentSong.title);
+        recordPlay(currentSong.id, 0); // Duration will be updated when song ends
+      }, 2000); // Record after 2 seconds of playing
+
+      return () => clearTimeout(timer);
+    }
+  }, [authenticated, isPlaying, currentSong, playStatus, recordPlay]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -668,6 +734,31 @@ const AudioPlayer = ({
               {formatTime(duration)}
             </span>
           </div>
+          
+          {/* Preview indicator for mobile */}
+          {!authenticated && isPlaying && currentSong && (
+            <div className="flex items-center justify-center gap-2 text-xs text-yellow-500 mt-2">
+              <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" />
+              <span>Preview: {previewTimeRemaining}s remaining</span>
+            </div>
+          )}
+
+          {/* Play limit indicator for mobile */}
+          {authenticated && isPlaying && currentSong && playStatus && (
+            <div className="flex items-center justify-center gap-2 text-xs mt-2">
+              {playStatus.isOwner ? (
+                <div className="flex items-center gap-2 text-green-500">
+                  <div className="w-2 h-2 bg-green-500 rounded-full" />
+                  <span>Owned - Unlimited plays</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-blue-500">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+                  <span>Free plays: {playStatus.remainingPlays}/{playStatus.maxFreePlays}</span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
         
         {/* Mobile volume slider */}
@@ -801,6 +892,31 @@ const AudioPlayer = ({
               {formatTime(duration)}
             </span>
           </div>
+
+          {/* Preview indicator for non-authenticated users */}
+          {!authenticated && isPlaying && currentSong && (
+            <div className="flex items-center gap-2 text-xs text-yellow-500">
+              <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" />
+              <span>Preview: {previewTimeRemaining}s remaining</span>
+            </div>
+          )}
+
+          {/* Play limit indicator for authenticated users */}
+          {authenticated && isPlaying && currentSong && playStatus && (
+            <div className="flex items-center gap-2 text-xs">
+              {playStatus.isOwner ? (
+                <div className="flex items-center gap-2 text-green-500">
+                  <div className="w-2 h-2 bg-green-500 rounded-full" />
+                  <span>Owned - Unlimited plays</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-blue-500">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+                  <span>Free plays: {playStatus.remainingPlays}/{playStatus.maxFreePlays}</span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Volume */}
@@ -868,6 +984,105 @@ const AudioPlayer = ({
           console.log('Audio data loaded in PWA mode');
         }}
       />
+
+      {/* Login Prompt Modal for Non-Authenticated Users */}
+      {showLoginPrompt && !authenticated && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-md bg-card border border-border">
+            <div className="p-6 text-center">
+              <Music className="w-16 h-16 mx-auto mb-4 text-primary" />
+              <h3 className="text-xl font-semibold mb-2">Preview Time Up!</h3>
+              <p className="text-muted-foreground mb-6">
+                You've heard 20 seconds of this song. Login to listen to the full track and discover more music!
+              </p>
+              <div className="space-y-3">
+                <Button 
+                  onClick={() => {
+                    setShowLoginPrompt(false);
+                    setShowLoginModal(true);
+                  }}
+                  className="w-full"
+                >
+                  Login to Continue
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setShowLoginPrompt(false);
+                    // Stop the audio
+                    const audio = audioRef.current;
+                    if (audio) {
+                      audio.pause();
+                    }
+                  }}
+                  className="w-full"
+                >
+                  Close
+                </Button>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Login Modal */}
+      <LoginModal
+        open={showLoginModal}
+        onOpenChange={setShowLoginModal}
+        onLogin={() => {
+          setShowLoginModal(false);
+          setShowLoginPrompt(false);
+          // Resume playback after successful login
+          if (currentSong) {
+            const audio = audioRef.current;
+            if (audio) {
+              audio.play();
+            }
+          }
+        }}
+      />
+
+      {/* Ownership Prompt Modal */}
+      {showOwnershipPrompt && authenticated && currentSong && playStatus && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-md bg-card border border-border">
+            <div className="p-6 text-center">
+              <Music className="w-16 h-16 mx-auto mb-4 text-primary" />
+              <h3 className="text-xl font-semibold mb-2">Play Limit Reached!</h3>
+              <p className="text-muted-foreground mb-4">
+                You've played this song {playStatus.playCount} times. 
+                {playStatus.remainingPlays > 0 ? ` You have ${playStatus.remainingPlays} free plays remaining.` : ' Purchase this song to play it unlimited times!'}
+              </p>
+              <div className="space-y-3">
+                <Button 
+                  onClick={() => {
+                    setShowOwnershipPrompt(false);
+                    // Navigate to song page for purchase
+                    navigate(`/song/${currentSong.id}`);
+                  }}
+                  className="w-full"
+                >
+                  {playStatus.remainingPlays > 0 ? 'Continue Playing' : 'Purchase Song'}
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setShowOwnershipPrompt(false);
+                    // Stop the audio
+                    const audio = audioRef.current;
+                    if (audio) {
+                      audio.pause();
+                    }
+                  }}
+                  className="w-full"
+                >
+                  Close
+                </Button>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
     </>
   );
 };

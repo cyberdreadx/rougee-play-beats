@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Play Insert</title>
+</head>
+<body>
+    <h1>Test Play Insert</h1>
+    <button onclick="testInsert()">Test Insert Play</button>
+    <div id="result"></div>
+
+    <script type="module">
+        import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.58.0';
+
+        const supabaseUrl = 'https://phybdsfwycygroebrsdx.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBoeWJkc2Z3eWN5Z3JvZWJyc2R4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY2NzM5NjksImV4cCI6MjA3MjI0OTk2OX0.wQY7tt0gN1fvRjgHiPJK7I1M9ZhmgTbLNffGvcbWJko';
+        const supabase = createClient(supabaseUrl, supabaseKey);
+
+        window.testInsert = async function() {
+            try {
+                console.log('Testing play insert...');
+                
+                const { data, error } = await supabase
+                    .from('user_plays')
+                    .insert({
+                        user_wallet_address: '0xec2F9eFd0A5118bB7F5C3C768249F5bD96ecDDEc',
+                        song_id: 'test-song-id',
+                        play_duration_seconds: 30
+                    })
+                    .select();
+
+                if (error) {
+                    console.error('Insert error:', error);
+                    document.getElementById('result').innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+                } else {
+                    console.log('Insert success:', data);
+                    document.getElementById('result').innerHTML = `<p style="color: green;">Success: ${JSON.stringify(data)}</p>`;
+                }
+            } catch (err) {
+                console.error('Test error:', err);
+                document.getElementById('result').innerHTML = `<p style="color: red;">Test error: ${err.message}</p>`;
+            }
+        };
+    </script>
+</body>
+</html>

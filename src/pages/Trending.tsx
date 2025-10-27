@@ -6,6 +6,7 @@ import { Loader2, TrendingUp, TrendingDown, Flame, Music, Play, Pause } from "lu
 import { getIPFSGatewayUrl } from "@/lib/ipfs";
 import logo from "@/assets/logo.png";
 import MusicBars from "@/components/MusicBars";
+import { AppTutorial } from "@/components/AppTutorial";
 import {
   Table,
   TableBody,
@@ -213,6 +214,7 @@ interface Song {
                 playSong(song);
               }}
               className="absolute bottom-2 right-2 w-12 h-12 md:w-14 md:h-14 rounded-full bg-neon-green hover:bg-neon-green/80 active:bg-neon-green/70 flex items-center justify-center transition-all hover:scale-110 active:scale-95 shadow-2xl shadow-neon-green/50 z-20"
+              data-tour="play-button"
             >
               {isThisSongPlaying ? (
                 <Pause className="w-6 h-6 md:w-7 md:h-7 text-black fill-black" />
@@ -262,7 +264,7 @@ interface Song {
           </div>
           
           {/* Price Chart - Same as SongTrade */}
-          <div className="bg-black/40 rounded-lg px-4 py-3 border border-neon-green/20">
+          <div className="bg-black/40 rounded-lg px-4 py-3 border border-neon-green/20" data-tour="featured-chart">
             <div className="text-xs text-muted-foreground font-mono mb-2">PRICE CHART</div>
             {song.token_address && (
               <>
@@ -1015,6 +1017,7 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
 
   return (
     <div className="min-h-screen bg-background pb-24 md:pb-20">
+      <AppTutorial />
       <NetworkInfo />
       
       {/* Compact hero header with logo */}
@@ -1032,7 +1035,7 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
         </p>
       </div>
       
-      <main className="w-full px-0 md:container md:mx-auto md:px-4 py-6 md:py-8">
+      <main className="w-full px-0 md:container md:mx-auto md:px-4 py-6 md:py-8" data-tour="trending">
         {/* Live Stats Ticker */}
         <div className="mb-6 grid grid-cols-2 md:grid-cols-4 gap-3 px-4 md:px-0">
           <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-4 shadow-[0_4px_16px_0_rgba(0,255,159,0.1)] hover:bg-white/8 transition-all duration-300">

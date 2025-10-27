@@ -40,6 +40,36 @@ export const SongPriceSparkline = ({
         return;
       }
       
+      // If timeframeHours is very large (e.g., 999999), show bonding curve progression instead of trades
+      if (timeframeHours > 1000 && bondingSupply && priceInXRGE) {
+        console.log('📈 Showing full bonding curve progression (ALL time view)');
+        
+        const BONDING_CURVE_TOTAL = 990_000_000;
+        const INITIAL_PRICE = 0.001; // XRGE
+        const PRICE_INCREMENT = 0.000001; // XRGE per token
+        
+        // Calculate current tokens bought
+        const currentTokensBought = parseFloat(bondingSupply) > 0
+          ? BONDING_CURVE_TOTAL - parseFloat(bondingSupply)
+          : 0;
+        
+        // Generate price points from 0 to current supply
+        const points = [];
+        const numPoints = 20; // 20 data points for sparkline
+        
+        for (let i = 0; i <= numPoints; i++) {
+          const tokensBought = (currentTokensBought / numPoints) * i;
+          const priceXRGE = INITIAL_PRICE + (tokensBought * PRICE_INCREMENT);
+          const priceUSD = priceXRGE * (prices.xrge || 0);
+          
+          points.push({ value: priceUSD });
+        }
+        
+        setTradeData(points);
+        setLoading(false);
+        return;
+      }
+      
       try {
         const BONDING_CURVE_ADDRESS = '0xCeE9c18C448487a1deAac3E14974C826142C50b5' as Address;
         const XRGE_ADDRESS = '0x147120faEC9277ec02d957584CFCD92B56A24317' as Address;
@@ -148,8 +178,17 @@ export const SongPriceSparkline = ({
 
         const priceData = sampledTrades.map(t => ({ value: t.priceUSD }));
         
-        // If no trades in timeframe but we have bonding curve data, generate fallback
-        if (priceData.length < 2 && bondingSupply && priceInXRGE) {
+        // If no trades in timeframe but we have price data, generate fallback
+        if (priceData.length < 2 && priceInXRGE !== undefined && prices.xrge) {
+          console.log('⚠️ No trades in timeframe, showing flat line (no 24h change)');
+          
+          // No trades in 24h = flat price (0% change)
+          // Show current price as a flat line
+          const currentPriceUSD = priceInXRGE * prices.xrge;
+          const fallbackPoints = Array(20).fill({ value: currentPriceUSD });
+          
+          setTradeData(fallbackPoints);
+        } else if (priceData.length < 2 && bondingSupply && priceInXRGE !== undefined) {
           console.log('⚠️ No trades in timeframe, showing flat line (no 24h change)');
           
           // No trades in 24h = flat price (0% change)

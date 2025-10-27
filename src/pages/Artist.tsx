@@ -235,69 +235,81 @@ const Artist = ({ playSong, currentSong, isPlaying }: ArtistProps) => {
 
   const fetchArtistSongs = async (loadMore = false) => {
     if (!walletAddress) return;
-
-    try {
-      setLoadingSongs(true);
-      const page = loadMore ? songsPage + 1 : 1;
-      const from = (page - 1) * SONGS_PER_PAGE;
-      const to = from + SONGS_PER_PAGE - 1;
-
-      const { data, error, count } = await supabase
-        .from("songs")
-        .select("id, title, artist, wallet_address, audio_cid, cover_cid, play_count, ticker, created_at, ai_usage", { count: 'exact' })
-        .ilike("wallet_address", walletAddress)
-        .order("created_at", { ascending: false })
-        .range(from, to);
-
-      if (error) throw error;
-      
-      // Set total count from the database
-      setTotalSongsCount(count || 0);
-      
-      if (loadMore) {
-        setSongs(prev => [...prev, ...(data || [])]);
-        setSongsPage(page);
-      } else {
-        setSongs(data || []);
-        setSongsPage(1);
+      try {
+        setLoadingSongs(true);
+        const page = loadMore ? songsPage + 1 : 1;
+        const from = (page - 1) * SONGS_PER_PAGE;
+        const to = from + SONGS_PER_PAGE - 1;
+        const { data, error, count } = await supabase
+          .from("songs")
+          .select("id, title, artist, wallet_address, audio_cid, cover_cid, play_count, ticker, created_at, ai_usage", { count: 'exact' })
+          .ilike("wallet_address", walletAddress)
+          .order("created_at", { ascending: false })
+          .range(from, to);
+        if (error) throw error;
+        setTotalSongsCount(count || 0);
+        if (loadMore) {
+          setSongs(prev => [...prev, ...(data || [])]);
+          setSongsPage(page);
+        } else {
+          setSongs(data || []);
+          setSongsPage(1);
+        }
+        setHasMoreSongs((data?.length || 0) === SONGS_PER_PAGE && (songs.length + (data?.length || 0)) < (count || 0));
+      } catch (err) {
+        console.error("Error fetching artist songs:", err);
+        toast({ title: "Error loading songs", description: "Failed to load artist's music", variant: "destructive" });
+      } finally {
+        setLoadingSongs(false);
       }
-      
-      // Check if there are more songs to load
-      setHasMoreSongs((data?.length || 0) === SONGS_PER_PAGE && (songs.length + (data?.length || 0)) < (count || 0));
-    } catch (err) {
-      console.error("Error fetching artist songs:", err);
-      toast({
-        title: "Error loading songs",
-        description: "Failed to load artist's music",
-        variant: "destructive",
-      });
-    } finally {
-      setLoadingSongs(false);
-    }
-  };
+    };
 
+    // Toggle song comments (used in music tab)
+    const toggleSongComments = (songId: string) => {
+      const isExpanded = expandedSongComments.has(songId);
+      if (isExpanded) {
+        setExpandedSongComments(prev => {
+          const next = new Set(prev);
+          next.delete(songId);
+          return next;
+        });
+      } else {
+        setExpandedSongComments(prev => new Set(prev).add(songId));
+      }
+    };
+
+    // Toggle post comments (used in posts tab)
+    const toggleComments = async (postId: string) => {
+      const isExpanded = expandedComments.has(postId);
+      if (isExpanded) {
+        setExpandedComments(prev => {
+          const next = new Set(prev);
+          next.delete(postId);
+          return next;
+        });
+      } else {
+        setExpandedComments(prev => new Set(prev).add(postId));
+        await loadComments(postId);
+      }
+    };
+
+  // Fetch artist songs on mount
   useEffect(() => {
     fetchArtistSongs();
   }, [walletAddress]);
 
+  // Fetch artist posts
   useEffect(() => {
     const fetchArtistPosts = async () => {
       if (!walletAddress) return;
-
       try {
         setLoadingPosts(true);
-        console.log('Fetching posts for wallet:', walletAddress);
-        
         const { data, error } = await supabase
           .from("feed_posts")
           .select("*")
           .ilike("wallet_address", walletAddress)
           .order("created_at", { ascending: false });
-
         if (error) throw error;
-        
-        console.log('Found posts:', data?.length || 0, 'posts for wallet:', walletAddress);
-        console.log('Posts data:', data);
         setPosts(data || []);
       } catch (err) {
         console.error("Error fetching artist posts:", err);
@@ -305,17 +317,16 @@ const Artist = ({ playSong, currentSong, isPlaying }: ArtistProps) => {
         setLoadingPosts(false);
       }
     };
-
     fetchArtistPosts();
   }, [walletAddress, refreshKey]);
 
+  // Fetch holders and holdings from blockchain
   useEffect(() => {
-    const fetchHoldersFromBlockchain = async () => {
+    const fetchBlockchainStats = async () => {
       if (!walletAddress || !publicClient) return;
 
       try {
         setLoadingStats(true);
-        console.log('🔗 Fetching holders from blockchain for artist:', walletAddress);
         
         // Get all artist's songs with token addresses
         const { data: artistSongs, error: songsError } = await supabase
@@ -327,14 +338,11 @@ const Artist = ({ playSong, currentSong, isPlaying }: ArtistProps) => {
         if (songsError) throw songsError;
 
         if (!artistSongs || artistSongs.length === 0) {
-          console.log('No songs with token addresses found');
           setHoldersCount(0);
           setHoldingsCount(0);
           setLoadingStats(false);
           return;
         }
-
-        console.log(`Found ${artistSongs.length} songs with tokens`);
 
         // ERC20 Transfer event ABI
         const ERC20_TRANSFER_ABI = [
@@ -352,19 +360,16 @@ const Artist = ({ playSong, currentSong, isPlaying }: ArtistProps) => {
         const allHolders = new Set<string>();
         const currentBlock = await publicClient.getBlockNumber();
 
-        // Fetch holders for each song token
+        // Fetch holders for each of this artist's song tokens
         for (const song of artistSongs) {
           if (!song.token_address) continue;
 
           try {
-            // Calculate blocks since creation
             const blocksSinceCreation = song.created_at 
               ? Math.min(Math.floor((Date.now() - new Date(song.created_at).getTime()) / 2000), 100000)
               : 50000;
             
             const fromBlock = currentBlock - BigInt(blocksSinceCreation);
-
-            console.log(`Querying token ${song.token_address} from block ${fromBlock}`);
 
             const logs = await publicClient.getLogs({
               address: song.token_address as Address,
@@ -373,7 +378,6 @@ const Artist = ({ playSong, currentSong, isPlaying }: ArtistProps) => {
               toBlock: 'latest'
             });
 
-            // Track holder balances
             const holderBalances: Record<string, bigint> = {};
             
             for (const log of logs) {
@@ -393,39 +397,27 @@ const Artist = ({ playSong, currentSong, isPlaying }: ArtistProps) => {
               }
             }
 
-            // Add addresses with positive balances to unique holders set
             Object.entries(holderBalances).forEach(([address, balance]) => {
               if (balance > BigInt(0)) {
                 allHolders.add(address.toLowerCase());
               }
             });
-
-            console.log(`Token ${song.token_address}: ${Object.entries(holderBalances).filter(([_, bal]) => bal > BigInt(0)).length} holders`);
           } catch (tokenError) {
             console.error(`Error fetching holders for token ${song.token_address}:`, tokenError);
           }
         }
 
-        const uniqueHoldersCount = allHolders.size;
-        const holdersList = Array.from(allHolders);
-        console.log(`✅ Total unique holders across all songs: ${uniqueHoldersCount}`);
-        setHoldersCount(uniqueHoldersCount);
-        setHolderWallets(holdersList);
+        setHoldersCount(allHolders.size);
+        setHolderWallets(Array.from(allHolders));
 
-        // For holdings count, check what tokens this wallet holds
-        // (both artists and songs that this wallet address has bought, including their own songs)
+        // Now fetch holdings (what this wallet holds)
         try {
           const { data: allSongs, error: allSongsError } = await supabase
             .from("songs")
             .select("id, title, artist, token_address, wallet_address")
             .not('token_address', 'is', null);
-            // REMOVED: .neq('wallet_address', walletAddress)
-            // Artists can hold their own songs too!
 
           if (allSongsError) throw allSongsError;
-
-          console.log(`🔍 Checking holdings for wallet: ${walletAddress}`);
-          console.log(`🔍 Found ${allSongs?.length || 0} songs with token addresses to check`);
 
           const holdingsSet = new Set<string>();
           const holdingsData: Array<{type: 'artist' | 'song', id: string, name: string, wallet_address: string}> = [];
@@ -433,7 +425,6 @@ const Artist = ({ playSong, currentSong, isPlaying }: ArtistProps) => {
           for (const song of (allSongs || [])) {
             if (!song.token_address) continue;
 
-            console.log(`🔍 Checking song: ${song.title} by ${song.artist} (Token: ${song.token_address})`);
             try {
               // Check balance of this wallet for this token
               const balance = await publicClient.readContract({
@@ -450,8 +441,6 @@ const Artist = ({ playSong, currentSong, isPlaying }: ArtistProps) => {
               } as any);
 
               if (balance && BigInt(balance as any) > BigInt(0)) {
-                console.log(`🎵 Found tokens for song: ${song.title} by ${song.artist} (${song.token_address})`);
-                
                 // Add artist to holdings
                 holdingsSet.add(song.wallet_address.toLowerCase());
                 holdingsData.push({
@@ -469,24 +458,14 @@ const Artist = ({ playSong, currentSong, isPlaying }: ArtistProps) => {
                   name: song.title,
                   wallet_address: song.wallet_address
                 });
-                
-                console.log(`🎵 Added to holdings: Artist ${song.artist} and Song ${song.title}`);
-              } else {
-                console.log(`🎵 No tokens found for song: ${song.title} by ${song.artist}`);
               }
             } catch (balanceError) {
               console.error(`Error checking balance for ${song.token_address}:`, balanceError);
             }
           }
 
-          const holdingsList = Array.from(holdingsSet);
-          console.log(`✅ Holdings count (artists and songs this wallet holds): ${holdingsSet.size}`);
-          console.log(`✅ Holdings data:`, holdingsData);
-          console.log(`✅ Holdings list:`, holdingsList);
-          console.log(`✅ Artists in holdings: ${holdingsData.filter(h => h.type === 'artist').length}`);
-          console.log(`✅ Songs in holdings: ${holdingsData.filter(h => h.type === 'song').length}`);
           setHoldingsCount(holdingsSet.size);
-          setHoldingWallets(holdingsList);
+          setHoldingWallets(Array.from(holdingsSet));
         } catch (holdingsError) {
           console.error('Error fetching holdings:', holdingsError);
           setHoldingsCount(0);
@@ -501,37 +480,8 @@ const Artist = ({ playSong, currentSong, isPlaying }: ArtistProps) => {
       }
     };
 
-    fetchHoldersFromBlockchain();
+    fetchBlockchainStats();
   }, [walletAddress, publicClient]);
-
-  const toggleComments = async (postId: string) => {
-    const isExpanded = expandedComments.has(postId);
-    
-    if (isExpanded) {
-      setExpandedComments(prev => {
-        const next = new Set(prev);
-        next.delete(postId);
-        return next;
-      });
-    } else {
-      setExpandedComments(prev => new Set(prev).add(postId));
-      await loadComments(postId);
-    }
-  };
-
-  const toggleSongComments = (songId: string) => {
-    const isExpanded = expandedSongComments.has(songId);
-    
-    if (isExpanded) {
-      setExpandedSongComments(prev => {
-        const next = new Set(prev);
-        next.delete(songId);
-        return next;
-      });
-    } else {
-      setExpandedSongComments(prev => new Set(prev).add(songId));
-    }
-  };
 
   const loadComments = async (postId: string) => {
     try {

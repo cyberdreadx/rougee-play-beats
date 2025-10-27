@@ -39,6 +39,24 @@ export const AudioWaveform = ({
         setLoading(true);
         setError(null);
 
+        // Check cache first
+        const cacheKey = `waveform_${audioCid}`;
+        const cachedData = localStorage.getItem(cacheKey);
+        
+        if (cachedData) {
+          try {
+            const parsed = JSON.parse(cachedData);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              setWaveformData(parsed);
+              setLoading(false);
+              return;
+            }
+          } catch (e) {
+            console.warn('Failed to parse cached waveform:', e);
+            localStorage.removeItem(cacheKey);
+          }
+        }
+
         const audioUrl = getIPFSGatewayUrl(audioCid);
         const audio = new Audio(audioUrl);
         
@@ -93,6 +111,13 @@ export const AudioWaveform = ({
           setWaveformData(waveform);
           setLoading(false);
           
+          // Cache the waveform data
+          try {
+            localStorage.setItem(cacheKey, JSON.stringify(waveform));
+          } catch (e) {
+            console.warn('Failed to cache waveform:', e);
+          }
+          
           // Cleanup
           audioContext.close();
           
@@ -104,6 +129,13 @@ export const AudioWaveform = ({
           setWaveformData(fallbackWaveform);
           setLoading(false);
           
+          // Cache the fallback waveform
+          try {
+            localStorage.setItem(cacheKey, JSON.stringify(fallbackWaveform));
+          } catch (e) {
+            console.warn('Failed to cache fallback waveform:', e);
+          }
+          
           // Cleanup
           audioContext.close();
         }
@@ -113,6 +145,13 @@ export const AudioWaveform = ({
         const fallbackWaveform = generateFallbackWaveform(180); // 3 minutes default
         setWaveformData(fallbackWaveform);
         setLoading(false);
+        
+        // Cache the error fallback waveform
+        try {
+          localStorage.setItem(cacheKey, JSON.stringify(fallbackWaveform));
+        } catch (e) {
+          console.warn('Failed to cache error fallback waveform:', e);
+        }
       }
     };
 

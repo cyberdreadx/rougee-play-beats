@@ -42,13 +42,21 @@ serve(async (req) => {
     console.log('Wallet address validated:', walletAddress);
     const contentText = formData.get('content_text') as string;
     const mediaFile = formData.get('media') as File | null;
+    const songId = formData.get('song_id') as string | null;
+
+    // Validate that song_id is provided (mandatory for new posts)
+    if (!songId) {
+      return new Response(JSON.stringify({ error: 'Song selection is required for posts' }), 
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 });
+    }
 
     // Validate input
     const PostSchema = z.object({
-      content_text: z.string().max(5000).optional()
+      content_text: z.string().max(5000).optional(),
+      song_id: z.string().uuid()
     });
 
-    const validation = PostSchema.safeParse({ content_text: contentText || '' });
+    const validation = PostSchema.safeParse({ content_text: contentText || '', song_id: songId });
     if (!validation.success) {
       return new Response(JSON.stringify({ error: 'Invalid input', details: validation.error.issues }), 
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 });
@@ -60,9 +68,9 @@ serve(async (req) => {
         return new Response(JSON.stringify({ error: 'Media too large (max 20MB)' }), 
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 });
       }
-      const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'video/mp4', 'video/webm'];
+      const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
       if (!validTypes.includes(mediaFile.type)) {
-        return new Response(JSON.stringify({ error: 'Invalid media type' }), 
+        return new Response(JSON.stringify({ error: 'Invalid media type. Only images and GIFs allowed.' }), 
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 });
       }
     }
@@ -119,8 +127,7 @@ serve(async (req) => {
         try {
           const uploadData = await attemptUpload(attempt);
           mediaCid = uploadData.Hash;
-          mediaType = mediaFile.type.startsWith('image/') ? 'image' :
-                      mediaFile.type.startsWith('video/') ? 'video' : 'other';
+          mediaType = 'image';
 
           console.log('Media uploaded to IPFS:', mediaCid);
           break;
@@ -152,6 +159,7 @@ serve(async (req) => {
         content_text: contentText || null,
         media_cid: mediaCid,
         media_type: mediaType,
+        song_id: songId,
       })
       .select()
       .single();

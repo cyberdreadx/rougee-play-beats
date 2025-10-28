@@ -5,7 +5,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
-import { MessageCircle, Share2, Image as ImageIcon, Send, CheckCircle, Check, CircleCheckBig, Music, Loader2, Play, Pause, Lock } from 'lucide-react';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { MessageCircle, Share2, Image as ImageIcon, Send, CheckCircle, Check, CircleCheckBig, Music, Loader2, Play, Pause, Lock, ChevronsUpDown, X } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { getIPFSGatewayUrl } from '@/lib/ipfs';
 import StoriesBar from '@/components/StoriesBar';
@@ -53,6 +55,7 @@ interface FeedPost {
   content_text: string | null;
   media_cid: string | null;
   media_type: string | null;
+  song_id: string | null;
   created_at: string;
   like_count: number;
   comment_count: number;
@@ -60,6 +63,13 @@ interface FeedPost {
     artist_name: string | null;
     avatar_cid: string | null;
     verified: boolean | null;
+  };
+  songs?: {
+    id: string;
+    title: string;
+    artist: string;
+    audio_cid: string;
+    cover_cid: string | null;
   };
 }
 
@@ -116,6 +126,11 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
   const [commentText, setCommentText] = useState<Record<string, string>>({});
   const [copiedPostId, setCopiedPostId] = useState<string | null>(null);
   const [songCommentCounts, setSongCommentCounts] = useState<Record<string, number>>({});
+  const [selectedSong, setSelectedSong] = useState<SongPost | null>(null);
+  const [songSearchOpen, setSongSearchOpen] = useState(false);
+  const [songSearchQuery, setSongSearchQuery] = useState('');
+  const [allSongs, setAllSongs] = useState<SongPost[]>([]);
+  const [loadingAllSongs, setLoadingAllSongs] = useState(false);
 
   // Check if user holds XRGE tokens
   const { data: xrgeBalance } = useReadContract({
@@ -174,7 +189,16 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
         error
       } = await supabase
         .from('feed_posts')
-        .select('*')
+        .select(`
+          *,
+          songs (
+            id,
+            title,
+            artist,
+            audio_cid,
+            cover_cid
+          )
+        `)
         .order('created_at', { ascending: false })
         .range(from, to);
 
@@ -286,6 +310,28 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
     }
   };
 
+  // Load all songs for search dropdown
+  const loadAllSongsForSearch = async () => {
+    if (allSongs.length > 0) return; // Already loaded
+    
+    setLoadingAllSongs(true);
+    try {
+      // Load first 500 songs for search
+      const { data: songsData, error } = await supabase
+        .from('songs')
+        .select('id, title, artist, audio_cid, cover_cid, wallet_address')
+        .order('created_at', { ascending: false })
+        .limit(500);
+        
+      if (error) throw error;
+      setAllSongs(songsData as SongPost[] || []);
+    } catch (error) {
+      console.error('Error loading all songs:', error);
+    } finally {
+      setLoadingAllSongs(false);
+    }
+  };
+
   const loadLikedPosts = async () => {
     if (!fullAddress) return;
     try {
@@ -327,6 +373,14 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
       });
       return;
     }
+    if (!selectedSong) {
+      toast({
+        title: 'Song required',
+        description: 'Please select a song to play with your post',
+        variant: 'destructive'
+      });
+      return;
+    }
     setPosting(true);
     try {
       const token = await getAccessToken();
@@ -335,6 +389,7 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
       if (contentText) formData.append('content_text', contentText);
       if (mediaFile) formData.append('media', mediaFile);
       if (fullAddress) formData.append('walletAddress', fullAddress);
+      if (selectedSong) formData.append('song_id', selectedSong.id);
       
       const response = await fetch('https://phybdsfwycygroebrsdx.supabase.co/functions/v1/create-feed-post', {
         method: 'POST',
@@ -355,6 +410,7 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
       setContentText('');
       setMediaFile(null);
       setMediaPreview(null);
+      setSelectedSong(null);
       loadPosts();
     } catch (error) {
       console.error('Error creating post:', error);
@@ -789,8 +845,114 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
                   </Button>
                 </div>}
 
+              {/* Song Selection - MANDATORY */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <Music className="w-4 h-4 text-neon-green" />
+                  Select a song for your post <span className="text-red-400">*</span>
+                </label>
+                {selectedSong ? (
+                  <div className="flex items-center gap-2 p-3 bg-neon-green/10 border border-neon-green/20 rounded-lg">
+                    {selectedSong.cover_cid && (
+                      <img 
+                        src={getIPFSGatewayUrl(selectedSong.cover_cid)} 
+                        alt={selectedSong.title}
+                        className="w-10 h-10 rounded object-cover"
+                      />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-sm truncate">{selectedSong.title}</p>
+                      <p className="text-xs text-muted-foreground truncate">{selectedSong.artist}</p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSelectedSong(null)}
+                      disabled={!hasXRGE}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <Popover open={songSearchOpen} onOpenChange={(open) => {
+                    setSongSearchOpen(open);
+                    if (open) {
+                      loadAllSongsForSearch();
+                    }
+                  }}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={songSearchOpen}
+                        className="w-full justify-between"
+                        disabled={!hasXRGE}
+                      >
+                        <span className="text-muted-foreground">Search for a song...</span>
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[400px] p-0" align="start">
+                      <Command shouldFilter={false}>
+                        <CommandInput 
+                          placeholder="Search songs..." 
+                          value={songSearchQuery}
+                          onValueChange={setSongSearchQuery}
+                        />
+                        <CommandList>
+                          {loadingAllSongs ? (
+                            <div className="py-6 text-center text-sm text-muted-foreground">
+                              <Loader2 className="w-4 h-4 animate-spin mx-auto mb-2" />
+                              Loading songs...
+                            </div>
+                          ) : (
+                            <>
+                              <CommandEmpty>No songs found.</CommandEmpty>
+                              <CommandGroup>
+                                {(songSearchQuery ? allSongs : allSongs.slice(0, 20))
+                                  .filter(song => 
+                                    !songSearchQuery || 
+                                    song.title.toLowerCase().includes(songSearchQuery.toLowerCase()) ||
+                                    song.artist.toLowerCase().includes(songSearchQuery.toLowerCase())
+                                  )
+                                  .slice(0, 50)
+                                  .map(song => (
+                                    <CommandItem
+                                      key={song.id}
+                                      value={`${song.title} ${song.artist}`.toLowerCase()}
+                                      onSelect={() => {
+                                        setSelectedSong(song);
+                                        setSongSearchOpen(false);
+                                        setSongSearchQuery('');
+                                      }}
+                                      className="flex items-center gap-2"
+                                    >
+                                      {song.cover_cid && (
+                                        <img 
+                                          src={getIPFSGatewayUrl(song.cover_cid)} 
+                                          alt={song.title}
+                                          className="w-8 h-8 rounded object-cover"
+                                        />
+                                      )}
+                                      <div className="flex-1 min-w-0">
+                                        <p className="font-semibold text-sm truncate">{song.title}</p>
+                                        <p className="text-xs text-muted-foreground truncate">{song.artist}</p>
+                                      </div>
+                                      <Check className={selectedSong?.id === song.id ? "h-4 w-4" : "h-4 w-4 opacity-0"} />
+                                    </CommandItem>
+                                  ))}
+                              </CommandGroup>
+                            </>
+                          )}
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                )}
+              </div>
+
               <div className="flex gap-2">
-                <Input type="file" accept="image/*,video/*" onChange={handleMediaChange} className="hidden" id="media-upload" disabled={!hasXRGE} />
+                <Input type="file" accept="image/*" onChange={handleMediaChange} className="hidden" id="media-upload" disabled={!hasXRGE} />
                 <label htmlFor="media-upload">
                   <Button variant="outline" size="sm" asChild disabled={!hasXRGE}>
                     <span className={hasXRGE ? "cursor-pointer" : "cursor-not-allowed opacity-50"}>
@@ -800,7 +962,7 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
                   </Button>
                 </label>
 
-                <Button onClick={handlePost} disabled={posting || !contentText && !mediaFile || !hasXRGE} className="ml-auto">
+                <Button onClick={handlePost} disabled={posting || !selectedSong || !contentText && !mediaFile || !hasXRGE} className="ml-auto">
                   <Send className="w-4 h-4 mr-2" />
                   {posting ? 'Posting to IPFS...' : 'Post'}
                 </Button>
@@ -857,10 +1019,140 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
                     </div>
                   )}
 
-                  {/* Post Media */}
-                  {post.media_cid && <div className="mb-3 rounded-lg overflow-hidden">
-                      {post.media_type === 'image' ? <img src={getIPFSGatewayUrl(post.media_cid)} alt="Post media" loading="lazy" decoding="async" className="w-full max-h-[600px] object-contain bg-black/5 rounded-lg" /> : post.media_type === 'video' ? <video src={getIPFSGatewayUrl(post.media_cid)} controls preload="metadata" className="w-full max-h-[600px] object-contain rounded-lg" /> : null}
-                    </div>}
+                  {/* Post Media with Song Player Overlay */}
+                  {post.media_cid && post.songs && (
+                    <div className="mb-3 rounded-lg overflow-hidden relative group">
+                      <img 
+                        src={getIPFSGatewayUrl(post.media_cid)} 
+                        alt="Post media" 
+                        loading="lazy" 
+                        decoding="async" 
+                        className="w-full max-h-[600px] object-contain bg-black/5 rounded-lg" 
+                      />
+                      
+                      {/* Opaque Play/Pause Button Overlay */}
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <button
+                          onClick={() => {
+                            if (playSong) {
+                              playSong({
+                                id: post.songs.id,
+                                title: post.songs.title,
+                                artist: post.songs.artist,
+                                audio_cid: post.songs.audio_cid,
+                                cover_cid: post.songs.cover_cid
+                              });
+                            }
+                          }}
+                          className="pointer-events-auto bg-black/60 backdrop-blur-sm hover:bg-black/80 transition-all p-6 rounded-full opacity-0 group-hover:opacity-100"
+                        >
+                          {currentSong?.id === post.songs.id && isPlaying ? (
+                            <Pause className="w-12 h-12 text-white" />
+                          ) : (
+                            <Play className="w-12 h-12 text-white" />
+                          )}
+                        </button>
+                      </div>
+
+                      {/* Bottom Song Scroller */}
+                      <div 
+                        onClick={() => navigate(`/song/${post.songs.id}`)}
+                        className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/70 to-transparent p-3 cursor-pointer hover:bg-black/95 transition-all"
+                      >
+                        <div className="flex items-center gap-2">
+                          {post.songs.cover_cid && (
+                            <img 
+                              src={getIPFSGatewayUrl(post.songs.cover_cid)} 
+                              alt={post.songs.title}
+                              className="w-10 h-10 rounded object-cover flex-shrink-0"
+                            />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <Music className="w-3 h-3 text-neon-green flex-shrink-0" />
+                              <p className="font-semibold text-white text-sm truncate">
+                                {post.songs.title}
+                              </p>
+                            </div>
+                            <p className="text-xs text-gray-300 truncate">
+                              {post.songs.artist}
+                            </p>
+                          </div>
+                          {currentSong?.id === post.songs.id && isPlaying && (
+                            <div className="flex gap-0.5 items-end h-4">
+                              <div className="w-0.5 bg-neon-green animate-pulse" style={{ height: '60%' }}></div>
+                              <div className="w-0.5 bg-neon-green animate-pulse" style={{ height: '100%', animationDelay: '0.2s' }}></div>
+                              <div className="w-0.5 bg-neon-green animate-pulse" style={{ height: '80%', animationDelay: '0.4s' }}></div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Song Player Card for Text-Only Posts */}
+                  {!post.media_cid && post.songs && (
+                    <div 
+                      className="mb-3 rounded-lg overflow-hidden bg-gradient-to-br from-neon-green/5 to-purple-500/5 border border-neon-green/10 p-4 cursor-pointer hover:border-neon-green/30 transition-all group"
+                      onClick={() => {
+                        if (playSong) {
+                          playSong({
+                            id: post.songs.id,
+                            title: post.songs.title,
+                            artist: post.songs.artist,
+                            audio_cid: post.songs.audio_cid,
+                            cover_cid: post.songs.cover_cid
+                          });
+                        }
+                      }}
+                    >
+                      <div className="flex items-center gap-3">
+                        {/* Song Cover */}
+                        {post.songs.cover_cid && (
+                          <div className="relative flex-shrink-0">
+                            <img 
+                              src={getIPFSGatewayUrl(post.songs.cover_cid)} 
+                              alt={post.songs.title}
+                              className="w-16 h-16 rounded object-cover"
+                            />
+                            {/* Play/Pause Overlay on Cover */}
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/40 group-hover:bg-black/60 transition-all rounded">
+                              {currentSong?.id === post.songs.id && isPlaying ? (
+                                <Pause className="w-8 h-8 text-white" />
+                              ) : (
+                                <Play className="w-8 h-8 text-white" />
+                              )}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Song Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Music className="w-4 h-4 text-neon-green flex-shrink-0" />
+                            <p className="font-semibold text-base truncate">
+                              {post.songs.title}
+                            </p>
+                          </div>
+                          <p className="text-sm text-muted-foreground truncate">
+                            {post.songs.artist}
+                          </p>
+                          <p className="text-xs text-neon-green/70 mt-1">
+                            {currentSong?.id === post.songs.id && isPlaying ? 'Now Playing' : 'Click to play'}
+                          </p>
+                        </div>
+
+                        {/* Playing Animation */}
+                        {currentSong?.id === post.songs.id && isPlaying && (
+                          <div className="flex gap-0.5 items-end h-6 flex-shrink-0">
+                            <div className="w-1 bg-neon-green animate-pulse rounded-full" style={{ height: '60%' }}></div>
+                            <div className="w-1 bg-neon-green animate-pulse rounded-full" style={{ height: '100%', animationDelay: '0.2s' }}></div>
+                            <div className="w-1 bg-neon-green animate-pulse rounded-full" style={{ height: '80%', animationDelay: '0.4s' }}></div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Post Actions */}
                   <div className="flex items-center gap-4 pt-3 mt-auto border-t border-border">

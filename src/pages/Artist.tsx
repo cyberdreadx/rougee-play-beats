@@ -299,19 +299,45 @@ const Artist = ({ playSong, currentSong, isPlaying }: ArtistProps) => {
     fetchArtistSongs();
   }, [walletAddress]);
 
-  // Fetch artist posts
+  // Fetch artist posts (same approach as Feed page)
   useEffect(() => {
     const fetchArtistPosts = async () => {
       if (!walletAddress) return;
       try {
         setLoadingPosts(true);
-        const { data, error } = await supabase
+        
+        // Fetch posts with song data (same as Feed page)
+        const { data: postsData, error } = await supabase
           .from("feed_posts")
-          .select("*")
+          .select(`
+            *,
+            songs (
+              id,
+              title,
+              artist,
+              audio_cid,
+              cover_cid
+            )
+          `)
           .ilike("wallet_address", walletAddress)
           .order("created_at", { ascending: false });
+
         if (error) throw error;
-        setPosts(data || []);
+
+        // Fetch profile data (same as Feed page)
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('wallet_address, artist_name, avatar_cid, verified')
+          .ilike('wallet_address', walletAddress)
+          .maybeSingle();
+
+        // Merge data (same as Feed page)
+        const postsWithProfiles = postsData?.map(post => ({
+          ...post,
+          profiles: profileData || null
+        })) || [];
+
+        setPosts(postsWithProfiles);
       } catch (err) {
         console.error("Error fetching artist posts:", err);
       } finally {
@@ -912,7 +938,85 @@ const Artist = ({ playSong, currentSong, isPlaying }: ArtistProps) => {
                       </p>
                     )}
                     
-                    {post.media_cid && post.media_type && (
+                    {/* Post Media with Song Player Overlay */}
+                    {post.media_cid && post.media_type && post.songs && (
+                      <div className="mb-4 rounded-lg overflow-hidden relative group">
+                        {post.media_type.startsWith('image') ? (
+                          <img 
+                            src={getIPFSGatewayUrl(post.media_cid)}
+                            alt="Post media"
+                            className="w-full max-h-[600px] object-contain bg-black/5 rounded-lg"
+                          />
+                        ) : post.media_type.startsWith('video') ? (
+                          <video 
+                            src={getIPFSGatewayUrl(post.media_cid)}
+                            controls
+                            className="w-full max-h-[600px] object-contain bg-black/5 rounded-lg"
+                          />
+                        ) : null}
+                        
+                        {/* Opaque Play/Pause Button Overlay */}
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                          <button
+                            onClick={() => {
+                              if (playSong) {
+                                playSong({
+                                  id: post.songs.id,
+                                  title: post.songs.title,
+                                  artist: post.songs.artist,
+                                  audio_cid: post.songs.audio_cid,
+                                  cover_cid: post.songs.cover_cid
+                                });
+                              }
+                            }}
+                            className="pointer-events-auto bg-black/60 backdrop-blur-sm hover:bg-black/80 transition-all p-6 rounded-full opacity-0 group-hover:opacity-100"
+                          >
+                            {currentSong?.id === post.songs.id && isPlaying ? (
+                              <Pause className="w-12 h-12 text-white" />
+                            ) : (
+                              <Play className="w-12 h-12 text-white" />
+                            )}
+                          </button>
+                        </div>
+
+                        {/* Bottom Song Scroller */}
+                        <div 
+                          onClick={() => navigate(`/song/${post.songs.id}`)}
+                          className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/70 to-transparent p-3 cursor-pointer hover:bg-black/95 transition-all"
+                        >
+                          <div className="flex items-center gap-2">
+                            {post.songs.cover_cid && (
+                              <img 
+                                src={getIPFSGatewayUrl(post.songs.cover_cid)} 
+                                alt={post.songs.title}
+                                className="w-10 h-10 rounded object-cover flex-shrink-0"
+                              />
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <Music className="w-3 h-3 text-neon-green flex-shrink-0" />
+                                <p className="font-semibold text-white text-sm truncate">
+                                  {post.songs.title}
+                                </p>
+                              </div>
+                              <p className="text-xs text-gray-300 truncate">
+                                {post.songs.artist}
+                              </p>
+                            </div>
+                            {currentSong?.id === post.songs.id && isPlaying && (
+                              <div className="flex gap-0.5 items-end h-4">
+                                <div className="w-0.5 bg-neon-green animate-pulse" style={{ height: '60%' }}></div>
+                                <div className="w-0.5 bg-neon-green animate-pulse" style={{ height: '100%', animationDelay: '0.2s' }}></div>
+                                <div className="w-0.5 bg-neon-green animate-pulse" style={{ height: '80%', animationDelay: '0.4s' }}></div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Regular media without song */}
+                    {post.media_cid && post.media_type && !post.songs && (
                       <div className="mb-4">
                         {post.media_type.startsWith('image') ? (
                           <img 
@@ -927,6 +1031,50 @@ const Artist = ({ playSong, currentSong, isPlaying }: ArtistProps) => {
                             className="w-full rounded tech-border"
                           />
                         ) : null}
+                      </div>
+                    )}
+
+                    {/* Song Player Card for Text-Only Posts */}
+                    {!post.media_cid && post.songs && (
+                      <div 
+                        className="mb-4 rounded-lg overflow-hidden bg-gradient-to-br from-neon-green/5 to-purple-500/5 border border-neon-green/10 p-4 cursor-pointer hover:border-neon-green/30 transition-all group"
+                        onClick={() => {
+                          if (playSong) {
+                            playSong({
+                              id: post.songs.id,
+                              title: post.songs.title,
+                              artist: post.songs.artist,
+                              audio_cid: post.songs.audio_cid,
+                              cover_cid: post.songs.cover_cid
+                            });
+                          }
+                        }}
+                      >
+                        <div className="flex items-center gap-3">
+                          {post.songs.cover_cid && (
+                            <img 
+                              src={getIPFSGatewayUrl(post.songs.cover_cid)} 
+                              alt={post.songs.title}
+                              className="w-12 h-12 rounded object-cover flex-shrink-0"
+                            />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <Music className="w-4 h-4 text-neon-green flex-shrink-0" />
+                              <p className="font-semibold text-white text-sm truncate">
+                                {post.songs.title}
+                              </p>
+                            </div>
+                            <p className="text-xs text-gray-300 truncate">
+                              {post.songs.artist}
+                            </p>
+                          </div>
+                          {currentSong?.id === post.songs.id && isPlaying ? (
+                            <Pause className="w-6 h-6 text-neon-green" />
+                          ) : (
+                            <Play className="w-6 h-6 text-neon-green" />
+                          )}
+                        </div>
                       </div>
                     )}
 

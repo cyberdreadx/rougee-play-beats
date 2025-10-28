@@ -557,13 +557,6 @@ const SongRow = ({ song, index, onStatsUpdate, playSong, currentSong, isPlaying 
     </TableRow>
   );
 
-  // Return desktop view with hidden trade data loader
-  return (
-    <>
-      {desktopView}
-    </>
-  );
-
   // Mobile: Card View
   const mobileView = (
     <div

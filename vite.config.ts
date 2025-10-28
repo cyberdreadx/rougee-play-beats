@@ -15,6 +15,9 @@ export default defineConfig(({ mode }) => ({
       deny: ['**/x402-temp/**'],
     },
   },
+  css: {
+    devSourcemap: true,
+  },
   plugins: [react()].filter(Boolean),
   resolve: {
     alias: {

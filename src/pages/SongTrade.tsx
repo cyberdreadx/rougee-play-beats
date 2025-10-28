@@ -1243,8 +1243,9 @@ const SongTrade = ({ playSong, currentSong, isPlaying }: SongTradeProps) => {
     );
   }
 
+  // Use Lighthouse gateway for social media sharing (more reliable for your app)
   const coverImageUrl = song.cover_cid 
-    ? `https://gateway.lighthouse.storage/ipfs/${song.cover_cid}`
+    ? getIPFSGatewayUrl(song.cover_cid, 'https://gateway.lighthouse.storage/ipfs')
     : 'https://rougee.app/og-image.png';
   const pageUrl = `https://rougee.app/song/${song.id}`;
 

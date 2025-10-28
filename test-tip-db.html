@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Tip Database</title>
+</head>
+<body>
+    <h1>Test Tip Database Connection</h1>
+    <button onclick="testTip()">Test Tip Insert</button>
+    <div id="result"></div>
+
+    <script type="module">
+        import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.58.0';
+
+        const supabaseUrl = 'https://phybdsfwycygroebrsdx.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBoeWJkc2Z3eWN5Z3JvZWJyc2R4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY2NzM5NjksImV4cCI6MjA3MjI0OTk2OX0.wQY7tt0gN1fvRjgHiPJK7I1M9ZhmgTbLNffGvcbWJko';
+        
+        const supabase = createClient(supabaseUrl, supabaseKey);
+
+        window.testTip = async function() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = 'Testing...';
+            
+            try {
+                // Test if table exists by trying to query it
+                const { data, error } = await supabase
+                    .from('artist_tips')
+                    .select('*')
+                    .limit(1);
+                
+                if (error) {
+                    resultDiv.innerHTML = `❌ Error: ${error.message}`;
+                    return;
+                }
+                
+                // Try to insert a test tip
+                const { data: insertData, error: insertError } = await supabase
+                    .from('artist_tips')
+                    .insert({
+                        artist_id: 'test-artist-123',
+                        amount_usd: 1.00,
+                        payment_response: 'test_tip',
+                    })
+                    .select()
+                    .single();
+                
+                if (insertError) {
+                    resultDiv.innerHTML = `❌ Insert Error: ${insertError.message}`;
+                    return;
+                }
+                
+                resultDiv.innerHTML = `✅ Success! Tip recorded: ${JSON.stringify(insertData)}`;
+                
+            } catch (err) {
+                resultDiv.innerHTML = `❌ Exception: ${err.message}`;
+            }
+        };
+    </script>
+</body>
+</html>

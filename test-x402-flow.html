@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>x402 Protocol Test Client</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Monaco', 'Courier New', monospace;
+      background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
+      color: #00ff41;
+      min-height: 100vh;
+      padding: 40px 20px;
+    }
+    
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    
+    h1 {
+      font-size: 2.5rem;
+      text-align: center;
+      margin-bottom: 10px;
+      text-shadow: 0 0 20px #00ff41;
+    }
+    
+    .subtitle {
+      text-align: center;
+      color: #888;
+      margin-bottom: 40px;
+      font-size: 0.9rem;
+    }
+    
+    .card {
+      background: rgba(0, 255, 65, 0.05);
+      border: 2px solid #00ff41;
+      border-radius: 12px;
+      padding: 30px;
+      margin-bottom: 30px;
+      box-shadow: 0 0 30px rgba(0, 255, 65, 0.2);
+    }
+    
+    .card h2 {
+      font-size: 1.5rem;
+      margin-bottom: 20px;
+      color: #00ff41;
+    }
+    
+    .input-group {
+      margin-bottom: 20px;
+    }
+    
+    label {
+      display: block;
+      margin-bottom: 8px;
+      color: #00ff41;
+      font-size: 0.9rem;
+    }
+    
+    input {
+      width: 100%;
+      padding: 12px;
+      background: rgba(0, 0, 0, 0.6);
+      border: 1px solid #00ff41;
+      border-radius: 6px;
+      color: #00ff41;
+      font-family: inherit;
+      font-size: 1rem;
+    }
+    
+    input:focus {
+      outline: none;
+      box-shadow: 0 0 15px rgba(0, 255, 65, 0.5);
+    }
+    
+    .button-group {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    
+    button {
+      padding: 14px 24px;
+      background: linear-gradient(135deg, #00ff41 0%, #00cc33 100%);
+      color: #000;
+      border: none;
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 1rem;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    
+    button:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 20px rgba(0, 255, 65, 0.4);
+    }
+    
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    
+    button.full-width {
+      grid-column: 1 / -1;
+    }
+    
+    .log {
+      background: rgba(0, 0, 0, 0.8);
+      border: 1px solid #00ff41;
+      border-radius: 6px;
+      padding: 20px;
+      max-height: 400px;
+      overflow-y: auto;
+      font-size: 0.85rem;
+      line-height: 1.6;
+    }
+    
+    .log-entry {
+      margin-bottom: 12px;
+      padding: 8px;
+      border-left: 3px solid #00ff41;
+      padding-left: 12px;
+    }
+    
+    .log-entry.error {
+      border-left-color: #ff4136;
+      color: #ff4136;
+    }
+    
+    .log-entry.success {
+      border-left-color: #2ecc40;
+      color: #2ecc40;
+    }
+    
+    .log-entry.info {
+      border-left-color: #0074d9;
+      color: #0074d9;
+    }
+    
+    .log-entry.warning {
+      border-left-color: #ff851b;
+      color: #ff851b;
+    }
+    
+    .timestamp {
+      color: #666;
+      font-size: 0.75rem;
+      margin-right: 8px;
+    }
+    
+    .response-preview {
+      margin-top: 10px;
+      padding: 10px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 4px;
+      font-size: 0.8rem;
+      word-break: break-all;
+    }
+    
+    .badge {
+      display: inline-block;
+      padding: 4px 12px;
+      background: rgba(0, 255, 65, 0.2);
+      border: 1px solid #00ff41;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      margin-left: 10px;
+    }
+    
+    .status-402 {
+      background: rgba(255, 129, 27, 0.2);
+      border-color: #ff851b;
+      color: #ff851b;
+    }
+    
+    .status-200 {
+      background: rgba(46, 204, 64, 0.2);
+      border-color: #2ecc40;
+      color: #2ecc40;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🚀 x402 Protocol Test Client</h1>
+    <p class="subtitle">Test your artist tipping endpoint with HTTP 402 Payment Required flow</p>
+    
+    <div class="card">
+      <h2>🎯 Test Configuration</h2>
+      
+      <div class="input-group">
+        <label for="endpoint">Edge Function Endpoint:</label>
+        <input 
+          type="text" 
+          id="endpoint" 
+          value="https://phybdsfwycygroebrsdx.supabase.co/functions/v1/tip-artist"
+          placeholder="https://your-project.supabase.co/functions/v1/tip-artist"
+        >
+      </div>
+      
+      <div class="input-group">
+        <label for="artistId">Artist ID / Wallet Address:</label>
+        <input 
+          type="text" 
+          id="artistId" 
+          value="0xdf833f835c29040597e3bb84e2edf554df25d3eb"
+          placeholder="0x..."
+        >
+      </div>
+      
+      <div class="input-group">
+        <label for="amount">Tip Amount (USD):</label>
+        <div class="button-group">
+          <button onclick="setAmount(1)">$1</button>
+          <button onclick="setAmount(5)">$5</button>
+          <button onclick="setAmount(10)">$10</button>
+        </div>
+        <input 
+          type="number" 
+          id="amount" 
+          value="1.00"
+          step="0.01"
+          min="0.01"
+          placeholder="Enter custom amount"
+        >
+      </div>
+    </div>
+    
+    <div class="card">
+      <h2>⚡ Actions</h2>
+      <div class="button-group">
+        <button onclick="step1_sendInitialRequest()" class="full-width">
+          1️⃣ Send Initial Request (Expect 402)
+        </button>
+        <button onclick="step2_createPayment()" class="full-width">
+          2️⃣ Create Payment Payload (Demo)
+        </button>
+        <button onclick="step3_sendWithPayment()" class="full-width">
+          3️⃣ Retry with X-PAYMENT Header
+        </button>
+        <button onclick="testFullFlow()" class="full-width" style="margin-top: 10px; background: linear-gradient(135deg, #ff851b 0%, #ff6600 100%);">
+          🎬 Run Complete x402 Flow
+        </button>
+        <button onclick="clearLog()" style="background: #333; color: #fff;">
+          Clear Log
+        </button>
+      </div>
+    </div>
+    
+    <div class="card">
+      <h2>📋 Request/Response Log</h2>
+      <div id="log" class="log">
+        <div class="log-entry info">
+          <span class="timestamp">[READY]</span>
+          x402 Test Client initialized. Click a button to start testing.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let paymentRequirements = null;
+    let paymentPayload = null;
+
+    function log(message, type = 'info', details = null) {
+      const logDiv = document.getElementById('log');
+      const entry = document.createElement('div');
+      entry.className = `log-entry ${type}`;
+      
+      const timestamp = new Date().toLocaleTimeString();
+      entry.innerHTML = `<span class="timestamp">[${timestamp}]</span>${message}`;
+      
+      if (details) {
+        const preview = document.createElement('div');
+        preview.className = 'response-preview';
+        preview.textContent = JSON.stringify(details, null, 2);
+        entry.appendChild(preview);
+      }
+      
+      logDiv.appendChild(entry);
+      logDiv.scrollTop = logDiv.scrollHeight;
+    }
+
+    function clearLog() {
+      document.getElementById('log').innerHTML = '';
+      log('Log cleared', 'info');
+    }
+
+    function setAmount(amount) {
+      document.getElementById('amount').value = amount.toFixed(2);
+      log(`Amount set to $${amount}`, 'info');
+    }
+
+    async function step1_sendInitialRequest() {
+      log('🚀 STEP 1: Sending initial request (expecting 402)...', 'info');
+      
+      const endpoint = document.getElementById('endpoint').value;
+      const artistId = document.getElementById('artistId').value;
+      const amount = document.getElementById('amount').value;
+      const url = `${endpoint}/${artistId}`;
+      
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            amount: amount,
+            artistWallet: artistId,
+          })
+        });
+
+        const data = await response.json();
+        
+        if (response.status === 402) {
+          log(`✅ Received 402 Payment Required <span class="badge status-402">HTTP 402</span>`, 'success');
+          paymentRequirements = data.accepts[0];
+          log('💳 Payment requirements:', 'info', data);
+          log(`📋 Artist Wallet: ${paymentRequirements.payTo}`, 'info');
+          log(`💰 Amount Required: ${paymentRequirements.maxAmountRequired} (${parseInt(paymentRequirements.maxAmountRequired) / 1_000_000} USDC)`, 'info');
+          log(`🌐 Network: ${paymentRequirements.network}`, 'info');
+          log(`📝 Description: ${paymentRequirements.description}`, 'info');
+          log('✨ Ready for Step 2: Create payment payload', 'success');
+        } else {
+          log(`⚠️ Unexpected response status: ${response.status}`, 'warning', data);
+        }
+        
+      } catch (error) {
+        log(`❌ Error: ${error.message}`, 'error');
+        console.error('Error details:', error);
+      }
+    }
+
+    async function step2_createPayment() {
+      if (!paymentRequirements) {
+        log('⚠️ Please run Step 1 first to get payment requirements', 'warning');
+        return;
+      }
+      
+      log('🔐 STEP 2: Creating payment payload (DEMO MODE)...', 'info');
+      
+      // In a real x402 client, this would:
+      // 1. Use the user's wallet to sign a payment
+      // 2. Create a proper payment payload with signature
+      // 3. Format it according to x402 spec
+      
+      // For demo, we create a mock payload
+      paymentPayload = {
+        version: '1.0',
+        payment: {
+          network: paymentRequirements.network,
+          asset: paymentRequirements.asset,
+          amount: paymentRequirements.maxAmountRequired,
+          payTo: paymentRequirements.payTo,
+          from: '0xDemoWalletAddress',
+          signature: 'demo_signature_would_go_here',
+          timestamp: Date.now(),
+        },
+        demo: true,
+      };
+      
+      log('✅ Payment payload created (DEMO)', 'success', paymentPayload);
+      log('⚠️ Note: In production, this would use real wallet signatures via x402-axios', 'warning');
+      log('✨ Ready for Step 3: Send with payment', 'success');
+    }
+
+    async function step3_sendWithPayment() {
+      if (!paymentPayload) {
+        log('⚠️ Please run Step 2 first to create payment payload', 'warning');
+        return;
+      }
+      
+      log('📤 STEP 3: Retrying request with X-PAYMENT header...', 'info');
+      
+      const endpoint = document.getElementById('endpoint').value;
+      const artistId = document.getElementById('artistId').value;
+      const amount = document.getElementById('amount').value;
+      const url = `${endpoint}/${artistId}`;
+      
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-PAYMENT': btoa(JSON.stringify(paymentPayload)), // Base64 encoded
+          },
+          body: JSON.stringify({
+            amount: amount,
+            artistWallet: artistId,
+          })
+        });
+
+        const data = await response.json();
+        
+        if (response.status === 200) {
+          log(`🎉 SUCCESS! Payment accepted <span class="badge status-200">HTTP 200</span>`, 'success');
+          log('✅ Tip recorded successfully!', 'success', data);
+          
+          const paymentResponse = response.headers.get('x-payment-response');
+          if (paymentResponse) {
+            log('📋 Payment verification response:', 'info', JSON.parse(paymentResponse));
+          }
+          
+          log('🎊 x402 Protocol Flow Complete!', 'success');
+        } else {
+          log(`⚠️ Unexpected response status: ${response.status}`, 'warning', data);
+        }
+        
+      } catch (error) {
+        log(`❌ Error: ${error.message}`, 'error');
+        console.error('Error details:', error);
+      }
+    }
+
+    async function testFullFlow() {
+      log('🎬 Running complete x402 protocol flow...', 'info');
+      log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
+      
+      await step1_sendInitialRequest();
+      
+      setTimeout(async () => {
+        await step2_createPayment();
+        
+        setTimeout(async () => {
+          await step3_sendWithPayment();
+          
+          setTimeout(() => {
+            log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
+            log('🏁 Complete x402 flow finished!', 'success');
+          }, 1000);
+        }, 1000);
+      }, 1000);
+    }
+
+    // Auto-run on load
+    log('💡 Tip: Click "Run Complete x402 Flow" to see the entire payment process', 'info');
+  </script>
+</body>
+</html>

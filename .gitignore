@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# x402 example files (not part of our app)
+x402-temp/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

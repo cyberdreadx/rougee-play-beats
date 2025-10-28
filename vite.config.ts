@@ -10,6 +10,10 @@ export default defineConfig(({ mode }) => ({
     hmr: {
       clientPort: 8080,
     },
+    fs: {
+      // Don't serve x402-temp example files
+      deny: ['**/x402-temp/**'],
+    },
   },
   plugins: [react()].filter(Boolean),
   resolve: {
@@ -20,11 +24,16 @@ export default defineConfig(({ mode }) => ({
     dedupe: ['react', 'react-dom', 'styled-components'],
   },
   optimizeDeps: {
-    exclude: ['@xmtp/browser-sdk'],
+    exclude: ['@xmtp/browser-sdk', 'x402-temp'],
     include: ['react', 'react-dom', 'protobufjs/minimal', 'styled-components'],
     esbuildOptions: {
       target: 'esnext',
     },
+    entries: [
+      // Only scan our actual app source, not x402-temp examples
+      'src/**/*.{ts,tsx}',
+      'index.html',
+    ],
   },
   build: {
     target: 'esnext',
@@ -34,6 +43,8 @@ export default defineConfig(({ mode }) => ({
       include: [/protobufjs/, /node_modules/],
     },
     rollupOptions: {
+      // Exclude x402-temp example files from build
+      external: [/x402-temp/],
       onwarn(warning, warn) {
         // Suppress PURE annotation warnings
         if (warning.code === 'INVALID_ANNOTATION' && warning.message.includes('/*#__PURE__*/')) {
@@ -41,6 +52,10 @@ export default defineConfig(({ mode }) => ({
         }
         // Suppress eval warnings from protobufjs
         if (warning.code === 'EVAL' && warning.id?.includes('protobufjs')) {
+          return;
+        }
+        // Suppress unresolved imports from x402-temp examples
+        if (warning.code === 'UNRESOLVED_IMPORT' && warning.source?.includes('x402-temp')) {
           return;
         }
         // Use default for everything else

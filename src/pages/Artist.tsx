@@ -27,6 +27,7 @@ import { useTokenPrices } from "@/hooks/useTokenPrices";
 import { useSongPrice } from "@/hooks/useSongBondingCurve";
 import { AudioWaveform } from "@/components/AudioWaveform";
 import { useAudioStateForSong } from "@/hooks/useAudioState";
+import { TipButton } from "@/components/TipButton";
 
 interface Song {
   id: string;
@@ -673,15 +674,26 @@ const Artist = ({ playSong, currentSong, isPlaying }: ArtistProps) => {
                 EDIT PROFILE
               </Button>
             </div>
-          ) : fullAddress && (
-            <Button 
-              variant="outline" 
-              className="font-mono"
-              onClick={() => navigate(`/messages?to=${walletAddress}`)}
-            >
-              <MessageSquare className="mr-2 h-4 w-4" />
-              MESSAGE
-            </Button>
+          ) : (
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+              {fullAddress && (
+                <Button 
+                  variant="outline" 
+                  className="font-mono"
+                  onClick={() => navigate(`/messages?to=${walletAddress}`)}
+                >
+                  <MessageSquare className="mr-2 h-4 w-4" />
+                  MESSAGE
+                </Button>
+              )}
+              <TipButton
+                artistId={walletAddress || ''}
+                artistWalletAddress={walletAddress || ''}
+                artistName={profile.artist_name || 'this artist'}
+                variant="neon"
+                size="default"
+              />
+            </div>
           )}
         </div>
 

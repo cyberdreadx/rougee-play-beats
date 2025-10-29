@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import NetworkInfo from "@/components/NetworkInfo";
-import { Loader2, TrendingUp, TrendingDown, Flame, Music, Play, Pause } from "lucide-react";
+import { Loader2, TrendingUp, TrendingDown, Flame, Music, Play, Pause, ChevronDown, ChevronUp } from "lucide-react";
 import { getIPFSGatewayUrl } from "@/lib/ipfs";
 import logo from "@/assets/logo.png";
 import MusicBars from "@/components/MusicBars";
@@ -86,6 +86,7 @@ interface Song {
   const [change24h, setChange24h] = useState<number>(0);
   const [volume24h, setVolume24h] = useState<number>(0);
   const [recentTrades, setRecentTrades] = useState<TradeData[]>([]);
+  const [isChartExpanded, setIsChartExpanded] = useState<boolean>(false);
   
   console.log('🎯 FeaturedSong RENDER - recentTrades count:', recentTrades.length);
   
@@ -263,10 +264,23 @@ interface Song {
             </div>
           </div>
           
-          {/* Price Chart - Same as SongTrade */}
+          {/* Price Chart - Collapsible */}
           <div className="bg-black/40 rounded-lg px-4 py-3 border border-neon-green/20" data-tour="featured-chart">
-            <div className="text-xs text-muted-foreground font-mono mb-2">PRICE CHART</div>
-            {song.token_address && (
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-xs text-muted-foreground font-mono">PRICE CHART</div>
+              <button
+                onClick={() => setIsChartExpanded(!isChartExpanded)}
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-neon-green transition-colors font-mono"
+              >
+                {isChartExpanded ? 'HIDE' : 'SHOW'}
+                {isChartExpanded ? (
+                  <ChevronUp className="w-3 h-3" />
+                ) : (
+                  <ChevronDown className="w-3 h-3" />
+                )}
+              </button>
+            </div>
+            {isChartExpanded && song.token_address && (
               <>
                 {/* Hidden - Trading History Data Loader (EXACTLY like SongTrade page) */}
                 <div className="hidden">

@@ -31,7 +31,7 @@ import { useBalance, useConnect, useWaitForTransactionReceipt, usePublicClient }
 import { useXRGESwap, KTA_TOKEN_ADDRESS, USDC_TOKEN_ADDRESS, useXRGEQuote, useXRGEQuoteFromKTA, useXRGEQuoteFromUSDC, XRGE_TOKEN_ADDRESS as XRGE_TOKEN } from "@/hooks/useXRGESwap";
 import { usePrivyToken } from "@/hooks/usePrivyToken";
 import { usePrivyWagmi } from "@/hooks/usePrivyWagmi";
-import { useFundWallet } from "@privy-io/react-auth";
+import { useFundWallet, useWallets } from "@privy-io/react-auth";
 import { useTokenPrices } from "@/hooks/useTokenPrices";
 import { Play, TrendingUp, TrendingDown, Users, MessageSquare, ArrowUpRight, ArrowDownRight, Loader2, Rocket, Wallet, Copy, Check, ExternalLink, CreditCard, Share2, Pause } from "lucide-react";
 import { NetworkGuard } from "@/components/NetworkGuard";
@@ -87,6 +87,7 @@ const SongTrade = ({ playSong, currentSong, isPlaying }: SongTradeProps) => {
   const { address: wagmiAddress, isConnected: wagmiConnected } = useAccount(); // Wagmi account check
   const { getAuthHeaders } = usePrivyToken();
   const { prices } = useTokenPrices();
+  const { wallets } = useWallets(); // Get Privy wallets to detect external wallets
   
   // Ensure Privy wallet is connected to wagmi
   usePrivyWagmi();
@@ -128,23 +129,48 @@ const SongTrade = ({ playSong, currentSong, isPlaying }: SongTradeProps) => {
   const ensureWagmiConnected = async () => {
     if (wagmiConnected) return;
     
-    // When logged in with Privy, always use Privy connector
-    // Only use injected connector if user is NOT authenticated with Privy
-    const privyConn = connectors.find(c => /privy/i.test(c.id) || /privy/i.test(c.name));
-    const injected = connectors.find(c => c.id === 'injected');
+    // Check if user has an external wallet (like MetaMask) connected via Privy
+    const externalWallet = wallets.find(
+      (wallet) => wallet.walletClientType !== 'privy' && 
+                  wallet.walletClientType !== 'embedded_wallet' &&
+                  (wallet.walletClientType === 'metamask' || wallet.walletClientType === 'injected')
+    );
     
-    // Prioritize Privy if user is connected via Privy, otherwise use injected
-    const target = (isConnected && privyConn) ? privyConn : (injected || privyConn || connectors[0]);
+    // Also check if MetaMask is available directly (for users not connected through Privy)
+    const isMetaMaskAvailable = typeof window !== 'undefined' && 
+                                 (window as any).ethereum?.isMetaMask === true;
+    
+    const privyConn = connectors.find(c => /privy/i.test(c.id) || /privy/i.test(c.name));
+    const injected = connectors.find(c => c.id === 'injected' || c.name?.toLowerCase().includes('metamask'));
+    
+    // Priority: MetaMask (if available) > External wallet via Privy > Privy connector > Fallback
+    // If MetaMask is available or user has MetaMask connected via Privy, use injected connector
+    // Otherwise, use Privy connector if authenticated
+    let target;
+    if ((isMetaMaskAvailable || externalWallet) && injected) {
+      // User has MetaMask available or connected - use injected connector
+      target = injected;
+      console.log('🔌 Detected MetaMask/external wallet, using injected connector');
+    } else if (isConnected && privyConn) {
+      // User authenticated with Privy (embedded wallet) - use Privy connector
+      target = privyConn;
+      console.log('🔌 Using Privy connector for embedded wallet');
+    } else {
+      // Fallback: try injected first, then Privy, then any available
+      target = injected || privyConn || connectors[0];
+      console.log('🔌 Using fallback connector');
+    }
     
     if (!target) {
       throw new Error('No wallet connector available');
     }
     
-    console.log('🔌 Connecting wagmi with:', target.name, target.id, 'Privy authenticated:', isConnected);
+    console.log('🔌 Connecting wagmi with:', target.name, target.id, 'Privy authenticated:', isConnected, 'MetaMask available:', isMetaMaskAvailable, 'External wallet:', !!externalWallet);
     
     try {
       await connectAsync({ connector: target });
     } catch (e) {
+      console.error('❌ Failed to connect wagmi:', e);
       throw e;
     }
   };

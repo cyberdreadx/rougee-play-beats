@@ -627,23 +627,59 @@ export const useXRGESwap = () => {
 
       const submittedHash = await writeContractAsync(config as any);
       
-      // Wait for approval transaction to be mined
-      for (let i = 0; i < 30; i++) {
+      // Wait for approval transaction to be mined with better error handling
+      // Handle "receipt not found" errors gracefully
+      let receipt = null;
+      const maxAttempts = 60; // 60 seconds total
+      for (let i = 0; i < maxAttempts; i++) {
         await new Promise(resolve => setTimeout(resolve, 1000));
-        const receipt = await publicClient.getTransactionReceipt({ hash: submittedHash });
-        if (receipt) {
-          break;
-        }
-        if (i === 29) {
-          throw new Error("Approval transaction timed out");
+        try {
+          receipt = await publicClient.getTransactionReceipt({ hash: submittedHash });
+          if (receipt) {
+            console.log('✅ USDC approval transaction confirmed:', submittedHash);
+            break;
+          }
+        } catch (receiptError: any) {
+          // If it's a "not found" error, continue waiting - transaction might still be pending
+          if (receiptError?.message?.includes('not found') || 
+              receiptError?.message?.includes('Transaction receipt') ||
+              receiptError?.code === 'NOT_FOUND') {
+            // Continue waiting
+            continue;
+          }
+          // Other errors should be thrown
+          throw receiptError;
         }
       }
       
+      // If we still don't have a receipt after waiting, return the hash anyway
+      // The transaction was submitted successfully and may still be pending
+      if (!receipt) {
+        console.warn('⚠️ USDC approval transaction receipt not found after waiting, but transaction was submitted:', submittedHash);
+        toast({
+          title: "Transaction Submitted",
+          description: "USDC approval transaction submitted. It may still be processing. Please wait a moment and try again if needed.",
+          variant: "default",
+        });
+      }
+      
       return submittedHash;
-    } catch (err) {
+    } catch (err: any) {
+      // Better error handling
+      let errorMessage = "Failed to approve USDC";
+      if (err?.message) {
+        if (err.message.includes("User rejected") || err.message.includes("user rejected") || err.message.includes("User denied")) {
+          errorMessage = "Transaction was cancelled. Please approve the transaction to continue.";
+        } else if (err.message.includes("insufficient funds")) {
+          errorMessage = "Insufficient funds for transaction. Please check your USDC balance.";
+        } else {
+          errorMessage = err.message;
+        }
+      }
+      
       toast({
         title: "Approval Failed",
-        description: err instanceof Error ? err.message : "Failed to approve USDC",
+        description: errorMessage,
         variant: "destructive",
       });
       throw err;

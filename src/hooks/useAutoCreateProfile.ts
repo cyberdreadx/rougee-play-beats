@@ -17,7 +17,6 @@ export const useAutoCreateProfile = () => {
         return;
       }
 
-      console.log('🔧 Auto-creating profile for:', fullAddress);
 
       try {
         // Call the database function to ensure profile exists
@@ -28,8 +27,6 @@ export const useAutoCreateProfile = () => {
         if (error) {
           console.error('❌ Error auto-creating profile:', error);
         } else {
-          console.log('✅ Profile ensured for wallet:', fullAddress);
-          console.log('Profile data:', data);
         }
 
         // Mark as attempted (success or failure)

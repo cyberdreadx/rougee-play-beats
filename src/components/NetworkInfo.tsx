@@ -40,7 +40,7 @@ const NetworkInfo = () => {
             </Button>
           ))}
           <span className="text-xs font-mono text-muted-foreground/60">
-            KEETA coming soon
+            KTA coming soon
           </span>
         </div>
       </div>

@@ -92,9 +92,6 @@ function ChainChecker({ children }: { children: React.ReactNode }) {
   const { isOnCorrectChain, isPhantom } = useChainChecker();
   
   // Extra logging for Phantom users
-  if (isPhantom) {
-    console.log('👻 Phantom wallet active, on correct chain:', isOnCorrectChain);
-  }
   
   return <>{children}</>;
 }

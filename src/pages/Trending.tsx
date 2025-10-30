@@ -88,7 +88,6 @@ interface Song {
   const [recentTrades, setRecentTrades] = useState<TradeData[]>([]);
   const [isChartExpanded, setIsChartExpanded] = useState<boolean>(false);
   
-  console.log('🎯 FeaturedSong RENDER - recentTrades count:', recentTrades.length);
   
   const isCurrentSong = currentSong?.id === song.id;
   const isThisSongPlaying = isCurrentSong && isPlaying;
@@ -101,16 +100,6 @@ interface Song {
   const { metadata: metadataData, isLoading: metadataLoading, error: metadataError } = useSongMetadata(song.token_address as Address);
   const { supply: bondingSupply, isLoading: supplyLoading, error: supplyError } = useBondingCurveSupply(song.token_address as Address);
   
-  // Debug logging for FeaturedSong
-  console.log('🔍 FeaturedSong hooks:', { 
-    tokenAddress: song.token_address,
-    metadataLoading, 
-    metadataData, 
-    metadataError,
-    supplyLoading, 
-    bondingSupply, 
-    supplyError
-  });
   
   
   const bondingSupplyStr = bondingSupply ? bondingSupply.toString() : null;
@@ -157,13 +146,6 @@ interface Song {
   const volumeXRGE = xrgeRaisedNum > 0 ? xrgeRaisedNum : 0; // Use xrgeRaised as fallback for featured song
   const volumeUSD = volumeXRGE * xrgeUsdPrice;
   
-  // Debug logging for volume calculation
-  console.log('🔍 FeaturedSong volume calculation:', {
-    xrgeRaisedNum,
-    volumeXRGE,
-    volumeUSD,
-    xrgeUsdPrice
-  });
   
   // Calculate tokens sold - EXACTLY match SongTrade
   const tokensSold = activeTradingSupply !== undefined ? (990_000_000 - activeTradingSupply) : undefined;
@@ -379,31 +361,6 @@ const SongRow = ({ song, index, onStatsUpdate, playSong, currentSong, isPlaying 
   // Use fully diluted value as the market cap - EXACTLY match SongTrade
   const marketCap = marketCapUSD;
   
-  // Debug logging
-  console.log('🔍 SongRow 24h data:', { songId: song.id, priceChange24h, volume24h, bondingSupplyStr });
-  console.log('🔍 SongRow contract addresses:', { 
-    songTokenAddress: song.token_address,
-    hasTokenAddress: !!song.token_address
-  });
-  console.log('🔍 SongRow metadata loading:', { 
-    metadataLoading, 
-    metadataData,
-    supplyLoading,
-    bondingSupply
-  });
-  console.log('🔍 SongRow calculations (SongTrade match):', { 
-    currentPrice, 
-    xrgeUsdPrice,
-    activeTradingSupply,
-    totalSupply, 
-    marketCap, 
-    volume24h,
-    volumeXRGE,
-    volumeUSD,
-    xrgeRaisedNum,
-    tokensSold,
-    realizedValueUSD
-  });
   
   // Use real 24h price change (fetched from blockchain)
   const change24h = priceChange24h ?? 0;
@@ -711,8 +668,6 @@ const SongCard = ({ song, index, onStatsUpdate, playSong, currentSong, isPlaying
   // Use shared 24h data hook for consistent data between mobile and desktop
   const { priceChange24h, volume24h } = useSong24hData(song.token_address as Address, bondingSupplyStr);
   
-  // Debug logging
-  console.log('🔍 SongCard 24h data:', { songId: song.id, priceChange24h, volume24h, bondingSupplyStr });
   
   // EXACTLY match SongTrade page calculations
   const currentPrice = priceInXRGE && prices.xrge ? priceInXRGE * prices.xrge : undefined;

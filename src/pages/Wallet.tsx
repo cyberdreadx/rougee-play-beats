@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useWallet } from "@/hooks/useWallet";
+import { usePrivy } from "@privy-io/react-auth";
 import { useFundWallet } from "@privy-io/react-auth";
 import { useIPLogger } from "@/hooks/useIPLogger";
 import { useTokenPrices } from "@/hooks/useTokenPrices";
@@ -8,7 +9,7 @@ import { useSongPrice } from "@/hooks/useSongBondingCurve";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Wallet as WalletIcon, Copy, Check, CreditCard, ArrowDownToLine, RefreshCw, Send, Music2, ArrowLeftRight } from "lucide-react";
+import { Loader2, Wallet as WalletIcon, Copy, Check, CreditCard, ArrowDownToLine, RefreshCw, Send, Music2, ArrowLeftRight, Plus, Network, Trash2, QrCode, Settings, Download } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useBalance, useReadContract, useSendTransaction, useWriteContract, useWaitForTransactionReceipt, useAccount } from "wagmi";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,6 +24,10 @@ import ethLogo from "@/assets/tokens/ethereum-eth.svg";
 import usdcLogo from "@/assets/tokens/usdc.jpg";
 import { getIPFSGatewayUrl } from "@/lib/ipfs";
 import { SendTokenDialog } from "@/components/SendTokenDialog";
+import { useDualWallet } from "@/contexts/DualWalletContext";
+import { KeetaWalletDialog } from "@/components/KeetaWalletDialog";
+import { KeetaQRCode } from "@/components/KeetaQRCode";
+import keetaLogo from "@/assets/tokens/kta.png";
 
 const XRGE_TOKEN_ADDRESS = "0x147120faEC9277ec02d957584CFCD92B56A24317" as const;
 const KTA_TOKEN_ADDRESS = "0xc0634090F2Fe6c6d75e61Be2b949464aBB498973" as const;
@@ -218,9 +223,88 @@ const Wallet = () => {
   const navigate = useNavigate();
   const { fullAddress, isConnected, isPrivyReady } = useWallet();
   const { address: accountAddress, chain } = useAccount();
+  const { exportWallet, user } = usePrivy();
   const { fundWallet } = useFundWallet();
   const { logIP } = useIPLogger('wallet_visit');
   const { prices, calculateUsdValue } = useTokenPrices();
+
+  // Check if user has an embedded wallet (not external wallet)
+  const hasEmbeddedWallet = user?.linkedAccounts?.some(
+    (account) =>
+      account.type === 'wallet' &&
+      account.walletClientType === 'privy' &&
+      account.chainType === 'ethereum'
+  );
+
+  // Handle wallet export with proper error handling
+  const handleExportWallet = async () => {
+    try {
+      if (!hasEmbeddedWallet) {
+        toast({
+          title: "Export Not Available",
+          description: "Private key export is only available for embedded wallets. External wallets (like Phantom) manage their own private keys.",
+          variant: "destructive",
+        });
+        return;
+      }
+      await exportWallet();
+    } catch (error) {
+      console.error('Export wallet error:', error);
+      toast({
+        title: "Export Failed",
+        description: "Unable to export wallet. Please ensure you have an embedded wallet.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Format KEETA balance with correct decimal places (18 decimals)
+  const formatKeetaBalance = (balance: string) => {
+    if (!balance || balance === '0') return '0.000000000000000000';
+    const balanceNum = parseFloat(balance);
+    
+    // If the balance is already in human-readable format (less than 1), return as is
+    if (balanceNum < 1) {
+      return balanceNum.toFixed(18);
+    }
+    
+    // If the balance is >= 1, it's likely in base units, so divide by 10^18
+    // This handles both small base units (500000 -> 0.000000000000000500) and large ones
+    const divisor = Math.pow(10, 18);
+    const divided = balanceNum / divisor;
+    return divided.toFixed(7); // Show 7 decimal places for readability
+  };
+
+  // Format token balance with proper decimal handling
+  const formatTokenBalance = (balance: string, decimals: number = 18) => {
+    if (!balance || balance === '0') return '0.0000';
+    const balanceNum = parseFloat(balance);
+    
+    // If the balance is already in human-readable format (less than 1), return as is
+    if (balanceNum < 1) {
+      return balanceNum.toFixed(4);
+    }
+    
+    // If the balance is very large (likely in base units), divide by 10^decimals
+    if (balanceNum > 1000000) {
+      const formatted = (balanceNum / Math.pow(10, decimals)).toFixed(4);
+      return formatted;
+    }
+    
+    // For medium numbers, assume they're already in the correct format
+    return balanceNum.toFixed(4);
+  };
+  
+  // Dual wallet context
+  const { 
+    baseWallet, 
+    keetaWallet, 
+    activeNetwork, 
+    setActiveNetwork, 
+    hasAnyWallet, 
+    currentWallet 
+  } = useDualWallet();
+  
   const [copied, setCopied] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [showSendDialog, setShowSendDialog] = useState(false);
@@ -238,6 +322,14 @@ const Wallet = () => {
   const [sendSongDialog, setSendSongDialog] = useState(false);
   const [selectedSongForSend, setSelectedSongForSend] = useState<any>(null);
   const [selectedSongBalance, setSelectedSongBalance] = useState('0');
+  
+  // Keeta wallet dialog state
+  const [showKeetaDialog, setShowKeetaDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showKeetaQRDialog, setShowKeetaQRDialog] = useState(false);
+  const [showKeetaSettingsDialog, setShowKeetaSettingsDialog] = useState(false);
+  const [showBaseSettingsDialog, setShowBaseSettingsDialog] = useState(false);
+  const [deletingWallet, setDeletingWallet] = useState(false);
 
   const { data: balance, isLoading: balanceLoading, refetch: refetchBalance } = useBalance({
     address: fullAddress as `0x${string}`,
@@ -299,11 +391,11 @@ const Wallet = () => {
 
 
   useEffect(() => {
-    // Only redirect if Privy is ready and user is not connected
-    if (isPrivyReady && !isConnected) {
+    // Only redirect if Privy is ready and user is not connected to any wallet
+    if (isPrivyReady && !hasAnyWallet) {
       navigate("/");
     }
-  }, [isConnected, isPrivyReady, navigate]);
+  }, [hasAnyWallet, isPrivyReady, navigate]);
 
   useEffect(() => {
     if (fullAddress) {
@@ -328,11 +420,6 @@ const Wallet = () => {
         throw error;
       }
       
-      console.log(`✅ Fetched ${songs?.length || 0} songs with token addresses for wallet UI`);
-      console.log(`🔍 Checking balances for wallet: ${fullAddress}`);
-      if (songs && songs.length > 0) {
-        console.log(`📋 Songs to check:`, songs.map(s => `${s.ticker} (${s.token_address})`));
-      }
       setAllSongs(songs || []);
     } catch (error) {
       console.error('Error fetching songs:', error);
@@ -365,8 +452,9 @@ const Wallet = () => {
 
 
   const copyAddress = async () => {
-    if (fullAddress) {
-      await navigator.clipboard.writeText(fullAddress);
+    const addressToCopy = currentWallet.fullAddress;
+    if (addressToCopy) {
+      await navigator.clipboard.writeText(addressToCopy);
       setCopied(true);
       toast({
         title: "Address copied!",
@@ -417,6 +505,31 @@ const Wallet = () => {
     setTimeout(() => setRefreshing(false), 500);
   };
 
+  const handleDeleteKeetaWallet = async () => {
+    setDeletingWallet(true);
+    try {
+      await keetaWallet.deleteWallet();
+      toast({
+        title: "Keeta Wallet Deleted",
+        description: "Your Keeta wallet has been permanently deleted",
+      });
+      setShowDeleteDialog(false);
+      // Switch back to Base network if we were on Keeta
+      if (activeNetwork === 'keeta') {
+        setActiveNetwork('base');
+      }
+    } catch (error) {
+      console.error('Failed to delete Keeta wallet:', error);
+      toast({
+        title: "Delete Failed",
+        description: "Failed to delete Keeta wallet. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingWallet(false);
+    }
+  };
+
   const handleSend = async () => {
     if (!sendForm.to || !sendForm.amount) {
       toast({
@@ -428,28 +541,41 @@ const Wallet = () => {
     }
 
     try {
-      if (sendType === 'ETH') {
-        sendTransaction({
-          to: sendForm.to as `0x${string}`,
-          value: parseEther(sendForm.amount),
+      if (activeNetwork === 'keeta') {
+        // Handle Keeta transactions - convert to base units (18 decimals)
+        const amountInBaseUnits = (parseFloat(sendForm.amount) * Math.pow(10, 18)).toString();
+        await keetaWallet.sendTokens(sendForm.to, amountInBaseUnits);
+        toast({
+          title: "Transaction sent!",
+          description: "Your KTA tokens have been sent successfully.",
         });
+        setShowSendDialog(false);
+        setSendForm({ to: '', amount: '' });
       } else {
-        const tokenAddress = sendType === 'XRGE' ? XRGE_TOKEN_ADDRESS : KTA_TOKEN_ADDRESS;
-        const decimals = Number((sendType === 'XRGE' ? xrgeDecimals : ktaDecimals) || 18);
-        const amount = BigInt(Math.floor(parseFloat(sendForm.amount) * Math.pow(10, decimals)));
-        
-        if (!accountAddress || !chain) {
-          throw new Error("Wallet not properly connected");
+        // Handle Base network transactions
+        if (sendType === 'ETH') {
+          sendTransaction({
+            to: sendForm.to as `0x${string}`,
+            value: parseEther(sendForm.amount),
+          });
+        } else {
+          const tokenAddress = sendType === 'XRGE' ? XRGE_TOKEN_ADDRESS : KTA_TOKEN_ADDRESS;
+          const decimals = Number((sendType === 'XRGE' ? xrgeDecimals : ktaDecimals) || 18);
+          const amount = BigInt(Math.floor(parseFloat(sendForm.amount) * Math.pow(10, decimals)));
+          
+          if (!accountAddress || !chain) {
+            throw new Error("Wallet not properly connected");
+          }
+          
+          writeContract({
+            account: accountAddress,
+            chain: chain,
+            address: tokenAddress,
+            abi: ERC20_ABI,
+            functionName: 'transfer',
+            args: [sendForm.to as `0x${string}`, amount],
+          });
         }
-        
-        writeContract({
-          account: accountAddress,
-          chain: chain,
-          address: tokenAddress,
-          abi: ERC20_ABI,
-          functionName: 'transfer',
-          args: [sendForm.to as `0x${string}`, amount],
-        });
       }
     } catch (error) {
       console.error('Send error:', error);
@@ -489,6 +615,21 @@ const Wallet = () => {
     }
   }, [tokenTxSuccess]);
 
+  // Reset send type when switching networks
+  useEffect(() => {
+    if (activeNetwork === 'keeta') {
+      // For Keeta, set send type to KTA
+      setSendType('KTA');
+      setSendForm({ to: '', amount: '' });
+    } else {
+      // For Base network, reset to ETH if not already set
+      if (sendType !== 'ETH' && sendType !== 'XRGE' && sendType !== 'KTA') {
+        setSendType('ETH');
+      }
+      setSendForm({ to: '', amount: '' });
+    }
+  }, [activeNetwork]);
+
   if (!isConnected) {
     return null;
   }
@@ -501,25 +642,85 @@ const Wallet = () => {
             <h1 className="text-xl md:text-2xl font-bold font-mono mb-1 text-neon-green">MY WALLET</h1>
             <p className="text-xs md:text-sm text-muted-foreground font-mono hidden sm:block">Manage your crypto assets and music collection</p>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleRefresh}
-            disabled={refreshing}
-            className="font-mono border-neon-green/50 shrink-0"
-          >
-            <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-            <span className="ml-1.5 hidden sm:inline">REFRESH</span>
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="font-mono border-neon-green/50 shrink-0"
+            >
+              <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+              <span className="ml-1.5 hidden sm:inline">REFRESH</span>
+            </Button>
+          </div>
         </div>
+
+        {/* Network Selector */}
+        <Card className="p-3 mb-3 bg-white/5 backdrop-blur-xl border border-white/10 shadow-[0_4px_16px_0_rgba(0,255,159,0.1)] rounded-2xl">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Network className="h-4 w-4 text-neon-green" />
+              <span className="text-xs text-muted-foreground font-mono">Active Network</span>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant={activeNetwork === 'base' ? 'neon' : 'outline'}
+                size="sm"
+                onClick={() => {
+                  setActiveNetwork('base');
+                }}
+                className="font-mono text-xs"
+              >
+                Base
+                {baseWallet.isConnected && (
+                  <Badge variant="outline" className="ml-1 text-[10px] border-green-500 text-green-500">
+                    ✓
+                  </Badge>
+                )}
+              </Button>
+              <Button
+                variant={activeNetwork === 'keeta' ? 'neon' : 'outline'}
+                size="sm"
+                onClick={() => {
+                  setActiveNetwork('keeta');
+                }}
+                className="font-mono text-xs"
+              >
+                <img src={keetaLogo} alt="Keeta" className="h-3 w-3 mr-1" />
+                Keeta
+                {keetaWallet.isConnected && (
+                  <Badge variant="outline" className="ml-1 text-[10px] border-purple-500 text-purple-500">
+                    ✓
+                  </Badge>
+                )}
+              </Button>
+              {!keetaWallet.isConnected && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowKeetaDialog(true)}
+                  className="font-mono text-xs border-purple-500/50 text-purple-400 hover:bg-purple-500/10"
+                >
+                  <Plus className="h-3 w-3 mr-1" />
+                  Create Keeta
+                </Button>
+              )}
+            </div>
+          </div>
+        </Card>
 
         {/* Connected Wallet Card */}
         <Card className="p-3 mb-3 bg-white/5 backdrop-blur-xl border border-white/10 shadow-[0_4px_16px_0_rgba(0,255,159,0.1)] rounded-2xl">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs text-muted-foreground font-mono mb-1">Connected Wallet</p>
+              <p className="text-xs text-muted-foreground font-mono mb-1">
+                {activeNetwork === 'base' ? 'Base Wallet' : 'Keeta Wallet'}
+              </p>
               <div className="flex items-center gap-2">
-                <p className="text-sm font-mono font-bold text-neon-green">{formatAddress(fullAddress || "")}</p>
+                <p className="text-sm font-mono font-bold text-neon-green">
+                  {formatAddress(currentWallet.fullAddress || "")}
+                </p>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -532,11 +733,56 @@ const Wallet = () => {
                     <Copy className="h-3 w-3" />
                   )}
                 </Button>
+                {activeNetwork === 'keeta' && keetaWallet.isConnected && (
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowKeetaQRDialog(true)}
+                      className="h-6 w-6 p-0"
+                      title="Show QR Code"
+                    >
+                      <QrCode className="h-3 w-3" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowKeetaSettingsDialog(true)}
+                      className="h-6 w-6 p-0"
+                      title="Keeta Wallet Settings"
+                    >
+                      <Settings className="h-3 w-3" />
+                    </Button>
+                  </>
+                )}
+                {activeNetwork === 'base' && currentWallet.isConnected && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowBaseSettingsDialog(true)}
+                    className="h-6 w-6 p-0"
+                    title="Base Wallet Settings"
+                  >
+                    <Settings className="h-3 w-3" />
+                  </Button>
+                )}
               </div>
             </div>
-            <Badge variant="outline" className="border-neon-green/50 text-neon-green text-xs">
-              Connected
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Badge 
+                variant="outline" 
+                className={`text-xs ${
+                  activeNetwork === 'base' 
+                    ? 'border-green-500/50 text-green-400' 
+                    : 'border-purple-500/50 text-purple-400'
+                }`}
+              >
+                {activeNetwork === 'base' ? 'Base' : 'Keeta'}
+              </Badge>
+              <Badge variant="outline" className="border-neon-green/50 text-neon-green text-xs">
+                Connected
+              </Badge>
+            </div>
           </div>
         </Card>
 
@@ -579,6 +825,7 @@ const Wallet = () => {
                   size="sm"
                   onClick={handleFundWallet}
                   className="font-mono text-xs h-auto py-3 flex-col gap-1"
+                  disabled={activeNetwork === 'keeta'}
                 >
                   <CreditCard className="h-4 w-4" />
                   <span className="text-[10px]">BUY</span>
@@ -588,6 +835,7 @@ const Wallet = () => {
                   size="sm"
                   onClick={() => navigate('/swap')}
                   className="font-mono text-xs h-auto py-3 flex-col gap-1 border-neon-green/50"
+                  disabled={activeNetwork === 'keeta'}
                 >
                   <ArrowLeftRight className="h-4 w-4" />
                   <span className="text-[10px]">SWAP</span>
@@ -595,7 +843,13 @@ const Wallet = () => {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={handleFundWallet}
+                  onClick={() => {
+                    if (activeNetwork === 'keeta') {
+                      setShowKeetaQRDialog(true);
+                    } else {
+                      handleFundWallet();
+                    }
+                  }}
                   className="font-mono text-xs h-auto py-3 flex-col gap-1 border-neon-green/50"
                 >
                   <ArrowDownToLine className="h-4 w-4" />
@@ -615,6 +869,62 @@ const Wallet = () => {
 
             {/* Token Balances Grid - Mobile Optimized */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+              {activeNetwork === 'keeta' ? (
+                <>
+                  {/* Keeta Native Token */}
+                  <Card className="p-4 bg-white/5 backdrop-blur-xl border border-white/10 shadow-[0_4px_16px_0_rgba(168,85,247,0.1)] rounded-2xl hover:bg-white/8 active:bg-white/10 active:scale-[0.99] transition-all duration-300">
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center">
+                        <img src={keetaLogo} alt="Keeta" className="h-6 w-6" />
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground font-mono mb-1">KTA</p>
+                    {keetaWallet.isConnecting ? (
+                      <Loader2 className="h-5 w-5 animate-spin text-purple-400" />
+                    ) : (
+                      <>
+                        <div className="mb-1">
+                          <span className="text-2xl font-bold font-mono text-purple-400 block">
+                            {formatKeetaBalance(keetaWallet.balance)}
+                          </span>
+                          <span className="text-xs text-muted-foreground/70 font-mono">KTA</span>
+                        </div>
+                        <p className="text-sm font-mono text-muted-foreground">
+                          Native Keeta Token
+                        </p>
+                      </>
+                    )}
+                  </Card>
+
+                  {/* Keeta Tokens */}
+                  {keetaWallet.tokens.map((token, index) => (
+                    <Card key={index} className="p-4 bg-white/5 backdrop-blur-xl border border-white/10 shadow-[0_4px_16px_0_rgba(168,85,247,0.1)] rounded-2xl hover:bg-white/8 active:bg-white/10 active:scale-[0.99] transition-all duration-300">
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center">
+                          {token.symbol === 'KTA' ? (
+                            <img src={keetaLogo} alt="KTA" className="w-6 h-6" />
+                          ) : (
+                            <span className="text-lg font-bold text-purple-400">
+                              {token.symbol?.[0] || 'T'}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground font-mono mb-1">{token.symbol}</p>
+                      <div className="mb-1">
+                        <span className="text-2xl font-bold font-mono text-purple-400 block">
+                          {formatTokenBalance(token.balance, token.decimals)}
+                        </span>
+                        <span className="text-xs text-muted-foreground/70 font-mono">{token.symbol}</span>
+                      </div>
+                      <p className="text-sm font-mono text-muted-foreground">
+                        {token.name}
+                      </p>
+                    </Card>
+                  ))}
+                </>
+              ) : (
+                <>
           {/* XRGE Token */}
           <Card className="p-4 bg-white/5 backdrop-blur-xl border border-white/10 shadow-[0_4px_16px_0_rgba(0,255,159,0.1)] rounded-2xl hover:bg-white/8 active:bg-white/10 active:scale-[0.99] transition-all duration-300">
             <div className="flex items-start justify-between mb-2">
@@ -752,7 +1062,9 @@ const Wallet = () => {
               </>
             )}
           </Card>
-        </div>
+                </>
+              )}
+            </div>
           </>
         )}
 
@@ -854,38 +1166,55 @@ const Wallet = () => {
           <DialogHeader>
             <DialogTitle className="font-mono text-xl">SEND CRYPTO</DialogTitle>
             <DialogDescription className="font-mono">
-              Send ETH or XRGE tokens to another wallet
+              {activeNetwork === 'base' 
+                ? 'Send ETH or XRGE tokens to another wallet'
+                : 'Send KTA tokens to another wallet'
+              }
             </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4 mt-4">
             <div>
               <Label className="font-mono text-sm mb-2">Asset Type</Label>
-              <div className="grid grid-cols-3 gap-2">
-                <Button
-                  variant={sendType === 'ETH' ? 'neon' : 'outline'}
-                  size="sm"
-                  onClick={() => setSendType('ETH')}
-                  className="font-mono"
-                >
-                  ETH
-                </Button>
-                <Button
-                  variant={sendType === 'XRGE' ? 'neon' : 'outline'}
-                  size="sm"
-                  onClick={() => setSendType('XRGE')}
-                  className="font-mono"
-                >
-                  XRGE
-                </Button>
-                <Button
-                  variant={sendType === 'KTA' ? 'neon' : 'outline'}
-                  size="sm"
-                  onClick={() => setSendType('KTA')}
-                  className="font-mono"
-                >
-                  KTA
-                </Button>
+              <div className={`grid gap-2 ${activeNetwork === 'base' ? 'grid-cols-3' : 'grid-cols-1'}`}>
+                {activeNetwork === 'base' ? (
+                  <>
+                    <Button
+                      variant={sendType === 'ETH' ? 'neon' : 'outline'}
+                      size="sm"
+                      onClick={() => setSendType('ETH')}
+                      className="font-mono"
+                    >
+                      ETH
+                    </Button>
+                    <Button
+                      variant={sendType === 'XRGE' ? 'neon' : 'outline'}
+                      size="sm"
+                      onClick={() => setSendType('XRGE')}
+                      className="font-mono"
+                    >
+                      XRGE
+                    </Button>
+                    <Button
+                      variant={sendType === 'KTA' ? 'neon' : 'outline'}
+                      size="sm"
+                      onClick={() => setSendType('KTA')}
+                      className="font-mono"
+                    >
+                      KTA
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    variant="neon"
+                    size="sm"
+                    className="font-mono"
+                    disabled
+                  >
+                    <img src={keetaLogo} alt="Keeta" className="h-4 w-4 mr-2" />
+                    KTA
+                  </Button>
+                )}
               </div>
             </div>
 
@@ -893,7 +1222,7 @@ const Wallet = () => {
               <Label htmlFor="send-to" className="font-mono text-sm">Recipient Address</Label>
               <Input
                 id="send-to"
-                placeholder="0x..."
+                placeholder={activeNetwork === 'keeta' ? 'keeta_...' : '0x...'}
                 value={sendForm.to}
                 onChange={(e) => setSendForm({ ...sendForm, to: e.target.value })}
                 className="font-mono mt-1"
@@ -914,11 +1243,13 @@ const Wallet = () => {
                 className="font-mono mt-1"
               />
               <p className="text-xs text-muted-foreground font-mono mt-1">
-                Available: {sendType === 'ETH' 
-                  ? (balance ? parseFloat(balance.formatted).toFixed(4) : '0')
+                Available: {activeNetwork === 'keeta' 
+                  ? `${formatKeetaBalance(keetaWallet.balance || '0')} KTA`
+                  : sendType === 'ETH' 
+                  ? `${balance ? parseFloat(balance.formatted).toFixed(4) : '0'} ETH`
                   : sendType === 'XRGE'
-                  ? formatXrgeBalance()
-                  : formatKtaBalance()} {sendType}
+                  ? `${formatXrgeBalance()} XRGE`
+                  : `${formatKtaBalance()} KTA`}
               </p>
               
               {/* Percentage Selector Buttons */}
@@ -935,11 +1266,18 @@ const Wallet = () => {
                     variant="outline"
                     size="sm"
                     onClick={() => {
-                      const availableBalance = sendType === 'ETH' 
-                        ? (balance ? parseFloat(balance.formatted) : 0)
-                        : sendType === 'XRGE'
-                        ? parseFloat(formatXrgeBalance())
-                        : parseFloat(formatKtaBalance());
+                      let availableBalance = 0;
+                      if (activeNetwork === 'keeta') {
+                        // Use Keeta balance - convert from base units to human-readable format
+                        availableBalance = parseFloat(keetaWallet.balance || '0') / Math.pow(10, 18);
+                      } else {
+                        // Use Base network balances
+                        availableBalance = sendType === 'ETH' 
+                          ? (balance ? parseFloat(balance.formatted) : 0)
+                          : sendType === 'XRGE'
+                          ? parseFloat(formatXrgeBalance())
+                          : parseFloat(formatKtaBalance());
+                      }
                       const amount = (availableBalance * option.value).toFixed(4);
                       setSendForm({ ...sendForm, amount });
                     }}
@@ -965,7 +1303,7 @@ const Wallet = () => {
               ) : (
                 <>
                   <Send className="h-4 w-4 mr-2" />
-                  SEND {sendType}
+                  {activeNetwork === 'keeta' ? 'SEND KTA' : `SEND ${sendType}`}
                 </>
               )}
             </Button>
@@ -988,6 +1326,232 @@ const Wallet = () => {
           }}
         />
       )}
+
+      {/* Keeta Wallet Dialog */}
+      <KeetaWalletDialog
+        open={showKeetaDialog}
+        onOpenChange={setShowKeetaDialog}
+        onSuccess={(address) => {
+          console.log('Keeta wallet created/imported:', address);
+          setShowKeetaDialog(false);
+          // Don't automatically switch networks - let user choose
+        }}
+      />
+
+      {/* Delete Keeta Wallet Confirmation Dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-mono text-xl text-red-500">DELETE KTA WALLET</DialogTitle>
+            <DialogDescription className="font-mono">
+              This will permanently delete your Keeta wallet and all associated data. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 mt-4">
+            <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+              <div className="flex items-start gap-2">
+                <Trash2 className="h-5 w-5 text-red-600 mt-0.5" />
+                <div className="text-sm">
+                  <p className="font-semibold text-red-800">Warning: Permanent Deletion</p>
+                  <ul className="text-red-700 mt-2 space-y-1 text-xs">
+                    <li>• Your Keeta wallet will be permanently deleted</li>
+                    <li>• All tokens and balances will be lost</li>
+                    <li>• Your mnemonic phrase will be removed</li>
+                    <li>• This action cannot be undone</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setShowDeleteDialog(false)}
+                className="flex-1 font-mono"
+                disabled={deletingWallet}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleDeleteKeetaWallet}
+                disabled={deletingWallet}
+                className="flex-1 font-mono"
+              >
+                {deletingWallet ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Deleting Keeta...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete Keeta Wallet
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Keeta QR Code Dialog */}
+      <KeetaQRCode
+        open={showKeetaQRDialog}
+        onOpenChange={setShowKeetaQRDialog}
+        address={keetaWallet.address || ''}
+      />
+
+      {/* Keeta Settings Dialog */}
+      <Dialog open={showKeetaSettingsDialog} onOpenChange={setShowKeetaSettingsDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-mono text-xl text-purple-400">KTA WALLET SETTINGS</DialogTitle>
+            <DialogDescription className="font-mono">
+              Manage your Keeta wallet settings and export private key
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label className="font-mono text-sm">Wallet Address</Label>
+              <div className="flex items-center gap-2 mt-1">
+                <Input
+                  value={keetaWallet.address || ''}
+                  readOnly
+                  className="font-mono text-xs"
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    navigator.clipboard.writeText(keetaWallet.address || '');
+                    toast({
+                      title: "Copied!",
+                      description: "Address copied to clipboard",
+                    });
+                  }}
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+            <div>
+              <Label className="font-mono text-sm">Private Key</Label>
+              <div className="flex items-center gap-2 mt-1">
+                <Input
+                  value={keetaWallet.privateKey || ''}
+                  readOnly
+                  type="password"
+                  className="font-mono text-xs"
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    navigator.clipboard.writeText(keetaWallet.privateKey || '');
+                    toast({
+                      title: "Copied!",
+                      description: "Private key copied to clipboard",
+                    });
+                  }}
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1 font-mono">
+                ⚠️ Never share your private key with anyone
+              </p>
+            </div>
+            <div className="flex gap-2 pt-2">
+              <Button
+                variant="outline"
+                onClick={() => setShowKeetaSettingsDialog(false)}
+                className="flex-1 font-mono"
+              >
+                Close
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowKeetaSettingsDialog(false);
+                  setShowDeleteDialog(true);
+                }}
+                className="flex-1 font-mono text-red-400 hover:text-red-300 hover:bg-red-500/10 border-red-500/50"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete Wallet
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Base Settings Dialog */}
+      <Dialog open={showBaseSettingsDialog} onOpenChange={setShowBaseSettingsDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-mono text-xl text-neon-green">BASE WALLET SETTINGS</DialogTitle>
+            <DialogDescription className="font-mono">
+              Manage your Base wallet settings and export private key
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label className="font-mono text-sm">Wallet Address</Label>
+              <div className="flex items-center gap-2 mt-1">
+                <Input
+                  value={currentWallet.address || ''}
+                  readOnly
+                  className="font-mono text-xs"
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    navigator.clipboard.writeText(currentWallet.address || '');
+                    toast({
+                      title: "Copied!",
+                      description: "Address copied to clipboard",
+                    });
+                  }}
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+            <div>
+              <Label className="font-mono text-sm">Export Private Key</Label>
+              <div className="flex items-center gap-2 mt-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleExportWallet}
+                  className="flex-1 font-mono text-xs"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Export Wallet
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1 font-mono">
+                {hasEmbeddedWallet 
+                  ? "Export your embedded wallet private key to import into other wallets"
+                  : "Private key export is only available for embedded wallets. External wallets manage their own private keys."
+                }
+              </p>
+            </div>
+            <div className="flex gap-2 pt-2">
+              <Button
+                variant="outline"
+                onClick={() => setShowBaseSettingsDialog(false)}
+                className="flex-1 font-mono"
+              >
+                Close
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

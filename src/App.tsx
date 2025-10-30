@@ -5,6 +5,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { HelmetProvider } from "react-helmet-async";
 import Web3Provider from "@/providers/Web3Provider";
 import { ThemeProvider } from "@/contexts/ThemeContext";
+import { DualWalletProvider } from "@/contexts/DualWalletContext";
 import ScrollToTop from "@/components/ScrollToTop";
 import { useRadioPlayer } from "@/hooks/useRadioPlayer";
 import { useAudioPlayer } from "@/hooks/useAudioPlayer";
@@ -142,15 +143,17 @@ const App = () => (
   <HelmetProvider>
     <ThemeProvider>
       <Web3Provider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <PWAUpdatePrompt />
-          <BrowserRouter>
-            <ScrollToTop />
-            <AppContent />
-          </BrowserRouter>
-        </TooltipProvider>
+        <DualWalletProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <PWAUpdatePrompt />
+            <BrowserRouter>
+              <ScrollToTop />
+              <AppContent />
+            </BrowserRouter>
+          </TooltipProvider>
+        </DualWalletProvider>
       </Web3Provider>
     </ThemeProvider>
   </HelmetProvider>

@@ -29,7 +29,6 @@ export const useSong24hData = (tokenAddress: Address | null, _bondingSupplyStr?:
 
   useEffect(() => {
     const calculate24hData = async () => {
-      console.log('🔍 useSong24hData: Starting calculation for', { tokenAddress });
       
       if (!tokenAddress || !publicClient) {
         console.log('❌ useSong24hData: Missing required params', { tokenAddress, publicClient: !!publicClient });

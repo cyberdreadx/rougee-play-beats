@@ -11,27 +11,10 @@ export const useWallet = () => {
   // PRIORITY 1: Try to get address from Privy's useWallets hook (most reliable)
   let address: string | undefined = undefined;
   
-  console.log('🔍 Checking Privy wallets:', {
-    walletsCount: wallets.length,
-    wallets: wallets.map(w => ({
-      type: w.walletClientType,
-      address: w.address,
-      chainId: w.chainId,
-      connectorType: w.connectorType,
-      imported: w.imported,
-      delegated: w.delegated,
-      // Show ALL properties for debugging
-      allKeys: Object.keys(w)
-    }))
-  });
   
   // CRITICAL: Log if wallets array is empty
   if (wallets.length === 0) {
     console.warn('⚠️ WALLETS ARRAY IS EMPTY! Embedded wallet may not be created yet.');
-    console.log('Privy user linkedAccounts:', user?.linkedAccounts?.map(acc => ({
-      type: acc.type,
-      address: (acc as any).address
-    })));
   }
   
   // Try useWallets first (this is the proper way)
@@ -45,11 +28,8 @@ export const useWallet = () => {
     
     const primaryWallet = smartWallet || wallets[0]; // Prefer smart wallet
     address = primaryWallet.address;
-    console.log('✅ Got address from useWallets:', address, 'Type:', primaryWallet.walletClientType);
-    
     // CRITICAL: For external wallets, we need to authenticate them with loginOrLink()
     if (primaryWallet.walletClientType !== 'privy' && primaryWallet.walletClientType !== 'embedded_wallet') {
-      console.log('🔐 External wallet detected, may need authentication...');
       // Note: loginOrLink() should be called when user initiates a transaction
       // For now, we'll use the address as-is
     }
@@ -57,15 +37,6 @@ export const useWallet = () => {
   
   // FALLBACK: Try user.linkedAccounts (especially for smart wallets)
   if (!address && user?.linkedAccounts) {
-    console.log('🔄 Trying user.linkedAccounts as fallback...');
-    console.log('All linked accounts:', user.linkedAccounts.map((acc: any) => ({
-      type: acc.type,
-      address: acc.address,
-      hasAddress: !!acc.address,
-      keys: Object.keys(acc),
-      // Show all properties for debugging
-      ...acc
-    })));
     
     // PRIORITY for smart wallets: Look for smart_wallet type first
     let walletAccount = user.linkedAccounts.find((account: any) =>
@@ -98,7 +69,6 @@ export const useWallet = () => {
     
     if (walletAccount) {
       address = walletAccount.address as string;
-      console.log('✅ Got address from linkedAccounts:', address, 'Type:', walletAccount.type);
     } else {
       console.error('❌ No wallet account found in linkedAccounts!');
     }
@@ -107,23 +77,8 @@ export const useWallet = () => {
   // Additional logging for debugging
   if (authenticated && !address) {
     console.warn('⚠️ User authenticated but no wallet address found!');
-    console.log('Available accounts:', user?.linkedAccounts?.map((acc: any) => 
-      ({ type: acc.type, address: acc.address })
-    ));
   }
 
-  // Debug logging for ProfileEdit issues
-  console.log('🔍 useWallet FINAL STATE:', {
-    ready,
-    authenticated,
-    hasUser: !!user,
-    address,
-    fullAddress: address,
-    walletsCount: wallets.length,
-    linkedAccountsCount: user?.linkedAccounts?.length || 0,
-    linkedAccountTypes: user?.linkedAccounts?.map(acc => acc.type),
-    SOURCE: address ? (wallets.length > 0 ? 'useWallets' : 'linkedAccounts') : 'NONE'
-  });
   
   // CRITICAL ERROR LOGGING
   if (authenticated && !address) {
@@ -214,18 +169,11 @@ export const useWallet = () => {
   // Additional fallback for mobile/PWA issues
   useEffect(() => {
     if (authenticated && !address && user?.linkedAccounts?.length > 0) {
-      console.log('🔄 No address found, checking all linked accounts...');
       const allAccounts = user.linkedAccounts;
-      console.log('All linked accounts:', allAccounts.map((acc: any) => ({
-        type: acc.type,
-        address: acc.address,
-        hasAddress: !!acc.address
-      })));
       
       // Try to find any account with an address
       const accountWithAddress = allAccounts.find((acc: any) => acc.address);
       if (accountWithAddress) {
-        console.log('✅ Found account with address:', accountWithAddress);
       }
     }
   }, [authenticated, address, user]);

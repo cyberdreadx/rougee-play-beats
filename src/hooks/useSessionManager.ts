@@ -17,14 +17,12 @@ export const useSessionManager = () => {
       // Wait for Privy to be ready
       if (!ready) return;
 
-      console.log('🔍 Checking session status...', { authenticated, userId: user?.id });
 
       // Session check complete
       setIsSessionChecked(true);
 
       // If authenticated, session was restored
       if (authenticated && user) {
-        console.log('✅ Session restored for user:', user.id);
         // First try specific wallet types
         let walletAccount = user.linkedAccounts?.find((account: any) =>
           ['wallet', 'smart_wallet', 'embedded_wallet'].includes(account.type)
@@ -40,12 +38,10 @@ export const useSessionManager = () => {
           ) as any;
           
           if (walletAccount) {
-            console.log('👛 Wallet restored via fallback, type:', walletAccount.type);
           }
         }
         
         if (walletAccount?.address) {
-          console.log('👛 Wallet restored:', walletAccount.address);
           setSessionRestored(true);
           
           logAuthEvent(AuthEventType.SESSION_RESTORED, {

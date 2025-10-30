@@ -31,22 +31,33 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Extract artistId from URL path (expecting /tip/:artistId)
+    // Extract artistId from URL path or body
+    let artistId = 'default';
+    let tipAmount = '0.01';
+    let artistWallet = '0xDa31C963E979495f4374979127c34E980eF3184e';
+    
+    // Try to get artistId from URL path first
     const tipIndex = pathParts.indexOf('tip');
-    if (tipIndex === -1 || tipIndex + 1 >= pathParts.length) {
-      return new Response(JSON.stringify({
-        error: 'Invalid endpoint',
-        message: 'Expected /tip/:artistId'
-      }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+    if (tipIndex !== -1 && tipIndex + 1 < pathParts.length) {
+      artistId = pathParts[tipIndex + 1];
     }
-
-    const artistId = pathParts[tipIndex + 1];
-    const body = await req.json().catch(() => ({}));
-    const tipAmount = body.amount || '0.01';
-    const artistWallet = body.artistWallet || artistId;
+    
+    // Get parameters from body (for POST) or query params (for GET)
+    let body = {};
+    if (req.method === 'POST') {
+      body = await req.json().catch(() => ({}));
+    } else if (req.method === 'GET') {
+      const url = new URL(req.url);
+      body = {
+        amount: url.searchParams.get('amount') || '0.01',
+        artistWallet: url.searchParams.get('artistWallet') || '0xDa31C963E979495f4374979127c34E980eF3184e',
+        artistId: url.searchParams.get('artistId') || 'default'
+      };
+    }
+    
+    if (body.amount) tipAmount = body.amount;
+    if (body.artistWallet) artistWallet = body.artistWallet;
+    if (body.artistId) artistId = body.artistId;
 
     console.log('💸 Tip request:', {
       artistId,
@@ -62,16 +73,41 @@ Deno.serve(async (req) => {
       const amountInTokens = (parseFloat(tipAmount) * 1_000_000).toString(); // USDC 6 decimals
       
       const paymentRequirements = {
-        scheme: 'exact' as const,
-        resource: `tip-artist/${artistId}`,
-        mimeType: 'application/json',
-        maxTimeoutSeconds: 300,
-        description: `Tip $${tipAmount} to artist`,
+        x402Version: 1,
         accepts: [{
-          asset: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', // USDC on Base
-          amount: amountInTokens,
+          scheme: 'exact' as const,
           network: 'base' as const,
-          recipient: artistWallet,
+          maxAmountRequired: amountInTokens,
+          resource: `https://phybdsfwycygroebrsdx.supabase.co/functions/v1/tip-artist/${artistId}`,
+          description: `Tip $${tipAmount} to artist`,
+          mimeType: 'application/json',
+          payTo: artistWallet, // Dynamic recipient - the artist being tipped
+          maxTimeoutSeconds: 300,
+          asset: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', // USDC on Base
+          outputSchema: {
+            input: {
+              type: 'http',
+              method: 'POST',
+              bodyType: 'json',
+              bodyFields: {
+                amount: {
+                  type: 'string',
+                  required: true,
+                  description: 'Tip amount in USDC'
+                },
+                artistWallet: {
+                  type: 'string',
+                  required: true,
+                  description: 'Artist wallet address'
+                }
+              }
+            },
+            output: {
+              success: 'boolean',
+              message: 'string',
+              txHash: 'string'
+            }
+          }
         }],
       };
       

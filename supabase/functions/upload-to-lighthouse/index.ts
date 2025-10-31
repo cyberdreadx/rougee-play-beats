@@ -8,6 +8,74 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-wallet-address, x-privy-token',
 };
 
+// Helper function to cache OG image during upload
+async function cacheOGImageForSong(supabase: any, songId: string, coverCid: string): Promise<void> {
+  // Fetch image from IPFS
+  const ipfsGateways = [
+    'https://gateway.lighthouse.storage/ipfs',
+    'https://dweb.link/ipfs',
+    'https://ipfs.io/ipfs',
+    'https://cloudflare-ipfs.com/ipfs',
+  ];
+
+  let imageBlob: Blob | null = null;
+
+  for (const gateway of ipfsGateways) {
+    try {
+      const ipfsUrl = `${gateway}/${coverCid}`;
+      const imageResponse = await fetch(ipfsUrl, {
+        headers: { 'Accept': 'image/*' },
+      });
+
+      if (imageResponse.ok) {
+        imageBlob = await imageResponse.blob();
+        console.log(`✅ Fetched image from ${gateway} for OG cache`);
+        break;
+      }
+    } catch (error) {
+      console.warn(`⚠️ Failed to fetch from ${gateway}:`, error);
+      continue;
+    }
+  }
+
+  if (!imageBlob) {
+    throw new Error('Failed to fetch image from IPFS gateways');
+  }
+
+  // Upload to Supabase Storage
+  const fileName = `songs/${songId}.jpg`;
+  const { error: uploadError } = await supabase.storage
+    .from('og-images')
+    .upload(fileName, imageBlob, {
+      contentType: 'image/jpeg',
+      upsert: true,
+    });
+
+  if (uploadError) {
+    throw new Error(`Failed to upload OG image: ${uploadError.message}`);
+  }
+
+  // Get public URL
+  const { data: urlData } = supabase.storage
+    .from('og-images')
+    .getPublicUrl(fileName);
+
+  const ogImageUrl = urlData.publicUrl;
+
+  // Update song record with OG image URL
+  const { error: updateError } = await supabase
+    .from('songs')
+    .update({ og_image_url: ogImageUrl })
+    .eq('id', songId);
+
+  if (updateError) {
+    console.error('Database update error:', updateError);
+    // Don't throw - image is still uploaded
+  } else {
+    console.log(`✅ OG image cached and saved: ${ogImageUrl}`);
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -259,6 +327,20 @@ serve(async (req) => {
 
       songData = data; // Store data in outer scope
       console.log('✅ Song metadata saved to database:', songData);
+      
+      // Cache OG image immediately after song creation
+      // This ensures the cached image is available before Discord crawls the page
+      if (songData && coverCid) {
+        console.log('🖼️ Caching OG image for new song...');
+        try {
+          // Call cache-og-image function internally (no HTTP request needed)
+          await cacheOGImageForSong(supabase, songData.id, coverCid);
+          console.log('✅ OG image cached during upload');
+        } catch (ogError) {
+          // Non-critical - log but don't fail upload
+          console.warn('⚠️ Failed to cache OG image during upload (will retry on page load):', ogError);
+        }
+      }
     } catch (error) {
       console.error('❌ Database save failed:', error);
       throw new Error(`Database save failed: ${error.message}`);

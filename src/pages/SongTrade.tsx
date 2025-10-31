@@ -801,8 +801,12 @@ const SongTrade = ({ playSong, currentSong, isPlaying }: SongTradeProps) => {
       setSong(data);
       
       // Cache OG image if cover exists but OG image doesn't
+      // This needs to happen before Discord crawls the page
       if (data && data.cover_cid && !data.og_image_url) {
-        cacheOGImage(data.id, data.cover_cid).catch(err => {
+        // Try to cache immediately - wait for it if possible
+        const cachePromise = cacheOGImage(data.id, data.cover_cid);
+        // Don't block page load, but cache will update state when ready
+        cachePromise.catch(err => {
           console.warn('Failed to cache OG image:', err);
           // Non-blocking - continue even if cache fails
         });
@@ -1565,11 +1569,26 @@ const SongTrade = ({ playSong, currentSong, isPlaying }: SongTradeProps) => {
   }
 
   // Use cached OG image if available, otherwise fallback to IPFS or default
-  const coverImageUrl = song.og_image_url 
-    ? song.og_image_url 
-    : song.cover_cid 
-      ? getIPFSGatewayUrl(song.cover_cid, 'https://gateway.lighthouse.storage/ipfs')
-      : 'https://rougee.app/og-image.png';
+  // Always prefer cached OG image for social sharing (Discord, Twitter, etc.)
+  // NOTE: Discord caches OG images aggressively - cached images must be available when Discord crawls
+  let coverImageUrl: string;
+  
+  if (song.og_image_url) {
+    // Use cached OG image (best for social sharing)
+    coverImageUrl = song.og_image_url;
+  } else if (song.cover_cid) {
+    // Fallback to IPFS gateway (Discord may not be able to access IPFS)
+    coverImageUrl = getIPFSGatewayUrl(song.cover_cid, 'https://gateway.lighthouse.storage/ipfs');
+  } else {
+    // Final fallback to default OG image
+    coverImageUrl = 'https://rougee.app/og-image.png';
+  }
+  
+  // Ensure absolute URL for social crawlers (they need full URLs)
+  if (coverImageUrl && !coverImageUrl.startsWith('http')) {
+    coverImageUrl = `${window.location.origin}${coverImageUrl}`;
+  }
+  
   const pageUrl = `https://rougee.app/song/${song.id}`;
 
   return (
@@ -1582,6 +1601,10 @@ const SongTrade = ({ playSong, currentSong, isPlaying }: SongTradeProps) => {
         <meta property="og:title" content={`${song.title} - ${song.artist || 'Unknown Artist'}`} />
         <meta property="og:description" content={`Listen to ${song.title} by ${song.artist || 'Unknown Artist'} on ROUGEE PLAY`} />
         <meta property="og:image" content={coverImageUrl} />
+        <meta property="og:image:secure_url" content={coverImageUrl} />
+        <meta property="og:image:type" content="image/jpeg" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
         <meta property="og:url" content={pageUrl} />
         <meta property="og:type" content="music.song" />
         
@@ -1589,6 +1612,7 @@ const SongTrade = ({ playSong, currentSong, isPlaying }: SongTradeProps) => {
         <meta name="twitter:title" content={`${song.title} - ${song.artist || 'Unknown Artist'}`} />
         <meta name="twitter:description" content={`Listen to ${song.title} by ${song.artist || 'Unknown Artist'} on ROUGEE PLAY`} />
         <meta name="twitter:image" content={coverImageUrl} />
+        <meta name="twitter:image:src" content={coverImageUrl} />
       </Helmet>
 
       <NetworkInfo />

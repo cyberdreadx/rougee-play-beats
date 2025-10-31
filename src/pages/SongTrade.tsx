@@ -54,6 +54,7 @@ interface Song {
   download_enabled?: boolean | null;
   download_type?: string | null;
   download_price_usdc?: number | null;
+  og_image_url?: string | null;
 }
 
 
@@ -92,6 +93,56 @@ const SongTrade = ({ playSong, currentSong, isPlaying }: SongTradeProps) => {
   const { fundWallet } = useFundWallet();
   const { address: wagmiAddress, isConnected: wagmiConnected } = useAccount(); // Wagmi account check
   const { getAuthHeaders } = usePrivyToken();
+  
+  // Function to cache OG image via edge function
+  // Note: This is a public operation, uses anon key for Supabase Edge Function
+  const cacheOGImage = async (songId: string, coverCid: string) => {
+    try {
+      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '';
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/cache-og-image`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': anonKey,
+          'Authorization': `Bearer ${anonKey}`, // Supabase requires both apikey and Authorization headers
+        },
+        body: JSON.stringify({ songId, coverCid }),
+      });
+      
+      if (!response.ok) {
+        // Try to get error details from response
+        let errorMessage = `Failed to cache OG image: ${response.status} ${response.statusText}`;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorData.message || errorMessage;
+          if (errorData.details) {
+            errorMessage += ` - ${errorData.details}`;
+          }
+        } catch {
+          // If JSON parsing fails, use status text
+          const text = await response.text().catch(() => '');
+          errorMessage = text || errorMessage;
+        }
+        throw new Error(errorMessage);
+      }
+      
+      const result = await response.json();
+      
+      // Update song with cached OG image URL
+      if (result.success && result.ogImageUrl) {
+        setSong((prev) => (prev ? { ...prev, og_image_url: result.ogImageUrl } : prev));
+      }
+    } catch (error: any) {
+      console.error('Error caching OG image:', error);
+      console.error('Error details:', {
+        message: error?.message,
+        stack: error?.stack,
+        songId,
+        coverCid,
+      });
+      // Non-blocking error - don't throw
+    }
+  };
   const { prices } = useTokenPrices();
   const { wallets } = useWallets(); // Get Privy wallets to detect external wallets
   const { user, ready } = usePrivy();
@@ -748,6 +799,14 @@ const SongTrade = ({ playSong, currentSong, isPlaying }: SongTradeProps) => {
 
       if (error) throw error;
       setSong(data);
+      
+      // Cache OG image if cover exists but OG image doesn't
+      if (data && data.cover_cid && !data.og_image_url) {
+        cacheOGImage(data.id, data.cover_cid).catch(err => {
+          console.warn('Failed to cache OG image:', err);
+          // Non-blocking - continue even if cache fails
+        });
+      }
     } catch (error) {
       toast({
         title: "Error",
@@ -1505,10 +1564,12 @@ const SongTrade = ({ playSong, currentSong, isPlaying }: SongTradeProps) => {
     );
   }
 
-  // Use Lighthouse gateway for social media sharing (more reliable for your app)
-  const coverImageUrl = song.cover_cid 
-    ? getIPFSGatewayUrl(song.cover_cid, 'https://gateway.lighthouse.storage/ipfs')
-    : 'https://rougee.app/og-image.png';
+  // Use cached OG image if available, otherwise fallback to IPFS or default
+  const coverImageUrl = song.og_image_url 
+    ? song.og_image_url 
+    : song.cover_cid 
+      ? getIPFSGatewayUrl(song.cover_cid, 'https://gateway.lighthouse.storage/ipfs')
+      : 'https://rougee.app/og-image.png';
   const pageUrl = `https://rougee.app/song/${song.id}`;
 
   return (

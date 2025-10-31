@@ -45,18 +45,29 @@ const Genre = ({ playSong, currentSong, isPlaying }: GenreProps) => {
   const fetchGenreSongs = async (genre: string) => {
     try {
       setLoading(true);
-      const decodedGenre = decodeURIComponent(genre);
+      const decodedGenre = decodeURIComponent(genre).trim();
 
+      // Use case-insensitive matching and handle whitespace variations
+      // Fetch all songs with genres and filter in JavaScript for better matching
       const { data, error } = await supabase
         .from("songs")
         .select("id, title, artist, wallet_address, audio_cid, cover_cid, play_count, ticker, genre, created_at, token_address, ai_usage")
-        .eq("genre", decodedGenre)
+        .not("genre", "is", null)
         .not("token_address", "is", null) // Only show deployed songs
         .order("play_count", { ascending: false });
 
       if (error) throw error;
 
-      setSongs(data || []);
+      // Filter songs by genre with case-insensitive matching and whitespace normalization
+      const normalizedSearchGenre = decodedGenre.toLowerCase().trim();
+      const filteredSongs = (data || []).filter((song) => {
+        if (!song.genre) return false;
+        // Normalize both for comparison
+        const normalizedSongGenre = song.genre.toLowerCase().trim();
+        return normalizedSongGenre === normalizedSearchGenre;
+      });
+
+      setSongs(filteredSongs);
     } catch (error) {
       console.error("Error fetching genre songs:", error);
     } finally {

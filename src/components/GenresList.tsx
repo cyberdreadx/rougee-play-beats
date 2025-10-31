@@ -36,18 +36,32 @@ const GenresList = ({ playSong }: GenresListProps) => {
 
       if (error) throw error;
 
-      // Count occurrences of each genre
+      // Count occurrences of each genre (normalize to lowercase and trim for consistency)
       const genreCounts: { [key: string]: number } = {};
+      const genreDisplayNames: { [key: string]: string } = {}; // Store original display name
+      
       songs?.forEach((song) => {
         if (song.genre) {
-          const genre = song.genre.trim();
-          genreCounts[genre] = (genreCounts[genre] || 0) + 1;
+          // Normalize for counting (lowercase + trim)
+          const normalizedGenre = song.genre.toLowerCase().trim();
+          const originalGenre = song.genre.trim();
+          
+          // Count by normalized genre
+          genreCounts[normalizedGenre] = (genreCounts[normalizedGenre] || 0) + 1;
+          
+          // Store the most common display name (first one encountered, or keep existing)
+          if (!genreDisplayNames[normalizedGenre]) {
+            genreDisplayNames[normalizedGenre] = originalGenre;
+          }
         }
       });
 
-      // Convert to array and sort by count
+      // Convert to array with normalized counting but original display names
       const genresArray = Object.entries(genreCounts)
-        .map(([genre, count]) => ({ genre, count }))
+        .map(([normalizedGenre, count]) => ({ 
+          genre: genreDisplayNames[normalizedGenre] || normalizedGenre, // Use original display name
+          count 
+        }))
         .sort((a, b) => b.count - a.count);
 
       setGenres(genresArray);
@@ -71,14 +85,22 @@ const GenresList = ({ playSong }: GenresListProps) => {
     try {
       console.log('🎵 Fetching all songs for genre:', genre);
       
-      const { data: songs, error } = await supabase
+      const { data, error } = await supabase
         .from("songs")
         .select("id, title, artist, wallet_address, audio_cid, cover_cid, play_count, ticker, genre, created_at, token_address, ai_usage")
-        .eq("genre", genre)
+        .not("genre", "is", null)
         .not("token_address", "is", null) // Only show deployed songs
         .order("play_count", { ascending: false });
 
       if (error) throw error;
+
+      // Filter songs by genre with case-insensitive matching and whitespace normalization
+      const normalizedSearchGenre = genre.toLowerCase().trim();
+      const songs = (data || []).filter((song) => {
+        if (!song.genre) return false;
+        const normalizedSongGenre = song.genre.toLowerCase().trim();
+        return normalizedSongGenre === normalizedSearchGenre;
+      });
 
       if (songs && songs.length > 0) {
         console.log('🎵 Playing all songs in genre:', genre, 'Count:', songs.length);
@@ -97,14 +119,22 @@ const GenresList = ({ playSong }: GenresListProps) => {
     try {
       console.log('🎵 Fetching all songs for shuffle play in genre:', genre);
       
-      const { data: songs, error } = await supabase
+      const { data, error } = await supabase
         .from("songs")
         .select("id, title, artist, wallet_address, audio_cid, cover_cid, play_count, ticker, genre, created_at, token_address, ai_usage")
-        .eq("genre", genre)
+        .not("genre", "is", null)
         .not("token_address", "is", null) // Only show deployed songs
         .order("play_count", { ascending: false });
 
       if (error) throw error;
+
+      // Filter songs by genre with case-insensitive matching and whitespace normalization
+      const normalizedSearchGenre = genre.toLowerCase().trim();
+      const songs = (data || []).filter((song) => {
+        if (!song.genre) return false;
+        const normalizedSongGenre = song.genre.toLowerCase().trim();
+        return normalizedSongGenre === normalizedSearchGenre;
+      });
 
       if (songs && songs.length > 0) {
         // Shuffle the songs array

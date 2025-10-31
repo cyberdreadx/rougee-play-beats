@@ -131,49 +131,52 @@ interface SongTokenItemProps {
   
   return (
     <div
-      className="group flex items-center justify-between p-4 rounded-xl bg-white/5 backdrop-blur-xl border border-white/10 shadow-[0_4px_16px_0_rgba(0,255,159,0.1)] hover:bg-white/8 active:bg-white/10 transition-all duration-300 cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
+      className="group flex items-start sm:items-center gap-3 p-3 sm:p-4 rounded-xl bg-white/5 backdrop-blur-xl border border-white/10 shadow-[0_4px_16px_0_rgba(0,255,159,0.1)] hover:bg-white/8 active:bg-white/10 transition-all duration-300 cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
       onClick={onClick}
     >
-      <div className="flex items-center gap-3 flex-1">
-        {song.cover_cid ? (
-          <img
-            src={getIPFSGatewayUrl(song.cover_cid)}
-            alt={song.title}
-            className="w-12 h-12 rounded-lg object-cover ring-2 ring-border group-hover:ring-neon-green/50 transition-all duration-300"
-          />
-        ) : (
-          <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-neon-green/20 to-purple-500/20 flex items-center justify-center ring-2 ring-border group-hover:ring-neon-green/50 transition-all duration-300">
-            <span className="text-lg font-mono font-bold text-neon-green">
-              {song.ticker?.[0] || '?'}
-            </span>
-          </div>
-        )}
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-bold font-mono truncate group-hover:text-neon-green transition-colors flex items-center gap-1.5">
-            <span className="truncate">{song.title}</span>
-            <AiBadge aiUsage={song.ai_usage} size="sm" />
-          </p>
-          <p className="text-xs text-muted-foreground font-mono mt-0.5">{song.ticker || 'Unknown'}</p>
+      {/* Song Image */}
+      {song.cover_cid ? (
+        <img
+          src={getIPFSGatewayUrl(song.cover_cid)}
+          alt={song.title}
+          className="w-12 h-12 rounded-lg object-cover ring-2 ring-border group-hover:ring-neon-green/50 transition-all duration-300 flex-shrink-0"
+        />
+      ) : (
+        <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-neon-green/20 to-purple-500/20 flex items-center justify-center ring-2 ring-border group-hover:ring-neon-green/50 transition-all duration-300 flex-shrink-0">
+          <span className="text-lg font-mono font-bold text-neon-green">
+            {song.ticker?.[0] || '?'}
+          </span>
         </div>
+      )}
+      
+      {/* Song Info - Show full text with wrapping */}
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-bold font-mono group-hover:text-neon-green transition-colors flex items-center gap-1.5 flex-wrap">
+          <span className="break-words">{song.title}</span>
+          <AiBadge aiUsage={song.ai_usage} size="sm" className="flex-shrink-0" />
+        </p>
+        <p className="text-xs text-muted-foreground font-mono mt-0.5 break-words">{song.ticker || 'Unknown'}</p>
       </div>
-      <div className="flex items-center gap-3">
+      
+      {/* Balance and Send Button - Compact, won't shrink */}
+      <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2 flex-shrink-0">
         <div className="text-right">
-          <p className="text-base font-bold font-mono text-neon-green">
+          <p className="text-base font-bold font-mono text-neon-green whitespace-nowrap">
             {formatCompactNumber(balance)}
           </p>
           {valueUSD > 0 ? (
             <>
-              <p className="text-xs text-muted-foreground font-mono mt-0.5">
+              <p className="text-xs text-muted-foreground font-mono mt-0.5 whitespace-nowrap">
                 ${valueUSD.toLocaleString(undefined, {maximumFractionDigits: 2})}
               </p>
               {priceUSD > 0 && (
-                <p className="text-[10px] text-muted-foreground/70 font-mono">
+                <p className="text-[10px] text-muted-foreground/70 font-mono whitespace-nowrap">
                   ${priceUSD < 0.01 ? priceUSD.toFixed(6) : priceUSD.toFixed(4)}/token
                 </p>
               )}
             </>
           ) : (
-            <p className="text-xs text-muted-foreground/60 font-mono italic">
+            <p className="text-xs text-muted-foreground/60 font-mono italic whitespace-nowrap">
               Loading price...
             </p>
           )}
@@ -182,7 +185,7 @@ interface SongTokenItemProps {
           variant="outline"
           size="sm"
           onClick={handleSendClick}
-          className="font-mono text-xs hover:bg-neon-green/10 hover:text-neon-green hover:border-neon-green/50"
+          className="font-mono text-xs hover:bg-neon-green/10 hover:text-neon-green hover:border-neon-green/50 flex-shrink-0"
         >
           <Send className="h-3 w-3 mr-1" />
           Send

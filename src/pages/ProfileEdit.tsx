@@ -19,6 +19,7 @@ import { toast } from "@/hooks/use-toast";
 import { getIPFSGatewayUrl } from "@/lib/ipfs";
 import { supabase } from "@/integrations/supabase/client";
 import { usePrivyToken } from "@/hooks/usePrivyToken";
+import { usePrivy } from "@privy-io/react-auth";
 import { UploadSlotsCard } from "@/components/UploadSlotsCard";
 import { UploadSlotsBadge } from "@/components/UploadSlotsBadge";
 import { XRGETierBadge } from "@/components/XRGETierBadge";
@@ -31,6 +32,7 @@ const ProfileEdit = () => {
   const { fullAddress, isConnected, isPrivyReady, createWallet, isCreatingWallet, authenticateWallet } = useWallet();
   const { profile, loading, updating, updateProfile } = useCurrentUserProfile();
   const { getAuthHeaders } = usePrivyToken();
+  const { getAccessToken } = usePrivy();
   
   // Ensure Privy wallet is synced with wagmi (fixes mobile/PWA issues)
   const { isConnected: wagmiConnected, forceRetry } = usePrivyWagmi();
@@ -117,7 +119,7 @@ const ProfileEdit = () => {
       const { data } = await supabase
         .from('verification_requests')
         .select('status')
-        .eq('wallet_address', fullAddress)
+        .eq('wallet_address', fullAddress.toLowerCase())
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -135,7 +137,13 @@ const ProfileEdit = () => {
     
     setRequestingVerification(true);
     try {
-      const { error } = await supabase.functions.invoke('request-verification-simple', {
+      const token = await getAccessToken();
+      const { data, error } = await supabase.functions.invoke('request-verification-simple', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'x-privy-token': token,
+          'x-wallet-address': fullAddress.toLowerCase(),
+        },
         body: { 
           message: verificationMessage,
           wallet_address: fullAddress
@@ -143,6 +151,11 @@ const ProfileEdit = () => {
       });
 
       if (error) throw error;
+      
+      // Check if response indicates an error
+      if (data && typeof data === 'object' && 'error' in data) {
+        throw new Error((data as any).error);
+      }
 
       setVerificationStatus('pending');
       toast({

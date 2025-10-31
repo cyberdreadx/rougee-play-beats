@@ -24,8 +24,8 @@ Deno.serve(async (req) => {
       throw new Error('wallet_address is required');
     }
     
-    if (typeof wallet_address !== 'string' || !wallet_address.startsWith('0x')) {
-      throw new Error('Invalid wallet address format');
+    if (typeof wallet_address !== 'string' || (!wallet_address.startsWith('0x') && !wallet_address.startsWith('keeta_'))) {
+      throw new Error('Invalid wallet address format. Must start with 0x or keeta_');
     }
 
     // Create Supabase client

@@ -39,6 +39,9 @@ export const AppTutorial = ({ onComplete }: AppTutorialProps) => {
         </div>
       ),
       placement: 'bottom',
+      disableScrolling: false,
+      scrollOffset: 100,
+      disableOverlayClose: false,
     },
     {
       target: '[data-tour="featured-chart"]',
@@ -94,7 +97,18 @@ export const AppTutorial = ({ onComplete }: AppTutorialProps) => {
   ];
 
   const handleJoyrideCallback = (data: CallBackProps) => {
-    const { status } = data;
+    const { status, action, index } = data;
+
+    // When moving to step 2 (index 1), ensure the target element is visible
+    if (action === 'next' && index === 1) {
+      // Small delay to ensure scrolling completes
+      setTimeout(() => {
+        const target = document.querySelector('[data-tour="trending"]');
+        if (target) {
+          target.scrollIntoView({ behavior: 'smooth', block: 'start', inline: 'nearest' });
+        }
+      }, 300);
+    }
 
     if (status === STATUS.FINISHED || status === STATUS.SKIPPED) {
       setRun(false);
@@ -110,6 +124,10 @@ export const AppTutorial = ({ onComplete }: AppTutorialProps) => {
       continuous
       showProgress
       showSkipButton
+      scrollToFirstStep
+      disableScrolling={false}
+      spotlightClicks
+      disableOverlayClose
       callback={handleJoyrideCallback}
       styles={{
         options: {

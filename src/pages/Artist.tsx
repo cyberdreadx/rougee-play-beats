@@ -796,6 +796,7 @@ const Artist = ({ playSong, currentSong, isPlaying }: ArtistProps) => {
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-muted-foreground hover:text-neon-green transition-colors"
+                    aria-label="Twitter/X"
                   >
                     <FaXTwitter className="h-5 w-5" />
                   </a>
@@ -806,6 +807,7 @@ const Artist = ({ playSong, currentSong, isPlaying }: ArtistProps) => {
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-muted-foreground hover:text-neon-green transition-colors"
+                    aria-label="Instagram"
                   >
                     <Instagram className="h-5 w-5" />
                   </a>
@@ -816,8 +818,20 @@ const Artist = ({ playSong, currentSong, isPlaying }: ArtistProps) => {
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-muted-foreground hover:text-neon-green transition-colors"
+                    aria-label="Website"
                   >
                     <Globe className="h-5 w-5" />
+                  </a>
+                )}
+                {profile.social_links.soundcloud && (
+                  <a
+                    href={profile.social_links.soundcloud}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-muted-foreground hover:text-neon-green transition-colors"
+                    aria-label="SoundCloud"
+                  >
+                    <Music className="h-5 w-5" />
                   </a>
                 )}
               </div>

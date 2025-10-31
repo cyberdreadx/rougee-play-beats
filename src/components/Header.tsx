@@ -3,18 +3,33 @@ import { useNavigate } from "react-router-dom";
 import { useWallet } from "@/hooks/useWallet";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUserProfile } from "@/hooks/useCurrentUserProfile";
+import { useLockCode } from "@/hooks/useLockCode";
 import WalletButton from "@/components/WalletButton";
 import ThemeSwitcher from "@/components/ThemeSwitcher";
 import { Button } from "@/components/ui/button";
-import { User, Shield, CheckCircle, HelpCircle } from "lucide-react";
+import { User, Shield, CheckCircle, HelpCircle, Lock } from "lucide-react";
 import { UploadSlotsBadge } from "@/components/UploadSlotsBadge";
+import { toast } from "@/hooks/use-toast";
 
 
 const Header = () => {
   const navigate = useNavigate();
   const { isConnected, fullAddress, isPrivyReady } = useWallet();
   const { profile, isArtist } = useCurrentUserProfile();
+  const { hasLockCode, lock, triggerLockUpdate } = useLockCode();
   const [isAdmin, setIsAdmin] = useState(false);
+
+  const handleLock = () => {
+    console.log('🔒 Header: handleLock called');
+    lock();
+    console.log('🔒 Header: lock() called');
+    toast({
+      title: "App Locked",
+      description: "The app has been locked. Enter your lock code to continue.",
+    });
+    // Refresh the page to immediately show the lock screen
+    window.location.reload();
+  };
 
   useEffect(() => {
     const checkAdminStatus = async () => {
@@ -74,6 +89,20 @@ const Header = () => {
             <UploadSlotsBadge className="hidden md:flex" />
           )}
           
+          {/* Lock Button - Show if lock code is enabled */}
+          {isConnected && hasLockCode && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleLock}
+              className="font-mono text-yellow-500 hover:text-yellow-400 hover:bg-yellow-500/10"
+              title="Lock App"
+            >
+              <Lock className="h-4 w-4 md:h-5 md:w-5 md:mr-2" />
+              <span className="hidden md:inline">LOCK</span>
+            </Button>
+          )}
+
           {/* How It Works - always visible */}
           <Button
             variant="ghost"

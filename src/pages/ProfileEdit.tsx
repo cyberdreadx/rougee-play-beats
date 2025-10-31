@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { AvatarCropModal } from "@/components/AvatarCropModal";
 import { CoverCropModal } from "@/components/CoverCropModal";
 import { useCurrentUserProfile } from "@/hooks/useCurrentUserProfile";
@@ -21,6 +22,9 @@ import { usePrivyToken } from "@/hooks/usePrivyToken";
 import { UploadSlotsCard } from "@/components/UploadSlotsCard";
 import { UploadSlotsBadge } from "@/components/UploadSlotsBadge";
 import { XRGETierBadge } from "@/components/XRGETierBadge";
+import { LockCodeKeypad } from "@/components/LockCodeKeypad";
+import { useLockCode } from "@/hooks/useLockCode";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 const ProfileEdit = () => {
   const navigate = useNavigate();
@@ -40,6 +44,7 @@ const ProfileEdit = () => {
   const [twitter, setTwitter] = useState("");
   const [instagram, setInstagram] = useState("");
   const [website, setWebsite] = useState("");
+  const [soundcloud, setSoundcloud] = useState("");
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
@@ -52,6 +57,16 @@ const ProfileEdit = () => {
   const [tempAvatarUrl, setTempAvatarUrl] = useState<string | null>(null);
   const [showCoverCrop, setShowCoverCrop] = useState(false);
   const [tempCoverUrl, setTempCoverUrl] = useState<string | null>(null);
+  
+  // Lock code state
+  const lockCodeHook = useLockCode();
+  const { hasLockCode, setLockCode, removeLockCode, verifyLockCode, autoLockTimeoutMinutes, setAutoLockTimeout, requirePinAfterLogin, setRequirePinAfterLogin } = lockCodeHook;
+  const [autoLockMinutes, setAutoLockMinutes] = useState(5);
+  const [showLockCodeSetup, setShowLockCodeSetup] = useState(false);
+  const [showLockCodeRemove, setShowLockCodeRemove] = useState(false);
+  const [lockCodeStep, setLockCodeStep] = useState<'enter' | 'confirm'>('enter');
+  const [enteredCode, setEnteredCode] = useState("");
+  const [lockCodeError, setLockCodeError] = useState("");
 
   useEffect(() => {
     // Only redirect if Privy is ready and user is not connected
@@ -76,7 +91,9 @@ const ProfileEdit = () => {
       setTwitter(profile.social_links?.twitter || "");
       setInstagram(profile.social_links?.instagram || "");
       setWebsite(profile.social_links?.website || "");
+      setSoundcloud(profile.social_links?.soundcloud || "");
       setIsArtist(!!profile.artist_name);
+      setAutoLockMinutes(autoLockTimeoutMinutes);
       if (profile.avatar_cid) {
         setAvatarPreview(getIPFSGatewayUrl(profile.avatar_cid));
       }
@@ -321,7 +338,7 @@ const ProfileEdit = () => {
     formData.append("bio", bio.trim());
     formData.append("email", email.trim());
     formData.append("email_notifications", emailNotifications.toString());
-    formData.append("social_links", JSON.stringify({ twitter, instagram, website }));
+    formData.append("social_links", JSON.stringify({ twitter, instagram, website, soundcloud }));
 
     if (avatarFile) {
       formData.append("avatar", avatarFile);
@@ -720,6 +737,137 @@ const ProfileEdit = () => {
                   placeholder="https://yourwebsite.com"
                 />
               </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="soundcloud" className="font-mono">SoundCloud</Label>
+                <Input
+                  id="soundcloud"
+                  value={soundcloud}
+                  onChange={(e) => setSoundcloud(e.target.value)}
+                  placeholder="https://soundcloud.com/yourhandle"
+                />
+              </div>
+            </div>
+
+            {/* Lock Code Settings */}
+            <div className="space-y-2 pt-6 border-t-2 border-yellow-500/30">
+              <div className="flex items-center gap-2">
+                <Label className="font-mono text-lg text-yellow-500">Security Settings</Label>
+                <span className="text-yellow-500">🔒</span>
+              </div>
+              <Card className="p-4 bg-gradient-to-br from-yellow-500/10 via-amber-500/5 to-yellow-500/10 border-2 border-yellow-500/30 shadow-[0_4px_16px_0_rgba(234,179,8,0.2)]">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <h3 className="font-mono font-semibold text-yellow-500">Lock Code</h3>
+                      <p className="text-xs text-yellow-500/80 font-mono">
+                        {hasLockCode 
+                          ? "A 4-digit lock code is enabled. You'll be asked to enter it after logging in."
+                          : "Set a 4-digit code to protect your account after login."
+                        }
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {hasLockCode ? (
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => setShowLockCodeRemove(true)}
+                          className="font-mono"
+                        >
+                          Remove Code
+                        </Button>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setLockCodeStep('enter');
+                            setEnteredCode("");
+                            setLockCodeError("");
+                            setShowLockCodeSetup(true);
+                          }}
+                          className="font-mono border-yellow-500/50 text-yellow-500 hover:bg-yellow-500/20 hover:border-yellow-500"
+                        >
+                          Set Lock Code
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Lock Code Options */}
+                  {hasLockCode && (
+                    <>
+                      {/* Require PIN After Login */}
+                      <div className="pt-4 border-t border-yellow-500/20">
+                        <div className="flex items-center justify-between">
+                          <div className="space-y-1 flex-1">
+                            <h4 className="font-mono font-semibold text-yellow-500/90 text-sm">Require PIN After Login</h4>
+                            <p className="text-xs text-yellow-500/70 font-mono">
+                              Require lock code immediately after logging in
+                            </p>
+                          </div>
+                          <Switch
+                            checked={requirePinAfterLogin}
+                            onCheckedChange={(checked) => {
+                              setRequirePinAfterLogin(checked);
+                              toast({
+                                title: "Setting updated",
+                                description: checked 
+                                  ? "Lock code will be required after login."
+                                  : "Lock code will not be required after login (only when manually locked or after inactivity).",
+                              });
+                            }}
+                            className="data-[state=checked]:bg-yellow-500"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Auto-Lock Settings */}
+                      <div className="pt-4 border-t border-yellow-500/20">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="space-y-1">
+                            <h4 className="font-mono font-semibold text-yellow-500/90 text-sm">Auto-Lock Timer</h4>
+                            <p className="text-xs text-yellow-500/70 font-mono">
+                              Automatically lock the app after inactivity
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="flex-1">
+                            <Input
+                              type="number"
+                              min="1"
+                              max="60"
+                              value={autoLockMinutes}
+                              onChange={(e) => {
+                                const minutes = parseInt(e.target.value) || 1;
+                                setAutoLockMinutes(Math.max(1, Math.min(60, minutes)));
+                              }}
+                              onBlur={() => {
+                                if (autoLockMinutes >= 1 && autoLockMinutes <= 60) {
+                                  setAutoLockTimeout(autoLockMinutes);
+                                  toast({
+                                    title: "Auto-lock updated",
+                                    description: `App will auto-lock after ${autoLockMinutes} minute${autoLockMinutes !== 1 ? 's' : ''} of inactivity.`,
+                                  });
+                                }
+                              }}
+                              className="font-mono bg-background border-yellow-500/30 text-yellow-500 focus:border-yellow-500"
+                            />
+                          </div>
+                          <span className="text-xs text-yellow-500/70 font-mono whitespace-nowrap">minutes</span>
+                        </div>
+                        <p className="text-xs text-yellow-500/60 font-mono mt-2">
+                          Current: {autoLockTimeoutMinutes} minute{autoLockTimeoutMinutes !== 1 ? 's' : ''} of inactivity
+                        </p>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </Card>
             </div>
 
             {/* Submit */}
@@ -763,6 +911,110 @@ const ProfileEdit = () => {
             )}
           </form>
         </Card>
+
+        {/* Lock Code Setup Dialog */}
+        <Dialog open={showLockCodeSetup} onOpenChange={setShowLockCodeSetup}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="font-mono text-xl text-neon-green">
+                {lockCodeStep === 'enter' ? 'Set Lock Code' : 'Confirm Lock Code'}
+              </DialogTitle>
+              <DialogDescription className="font-mono">
+                {lockCodeStep === 'enter' 
+                  ? 'Enter a 4-digit code to protect your account'
+                  : 'Re-enter your code to confirm'
+                }
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+              <LockCodeKeypad
+                onComplete={(code) => {
+                  if (lockCodeStep === 'enter') {
+                    setEnteredCode(code);
+                    setLockCodeStep('confirm');
+                    setLockCodeError("");
+                  } else {
+                    if (code === enteredCode) {
+                      const success = setLockCode(code);
+                      if (success) {
+                      setShowLockCodeSetup(false);
+                      setLockCodeStep('enter');
+                      setEnteredCode("");
+                      setLockCodeError("");
+                      toast({
+                        title: "Lock code set",
+                        description: "Your lock code has been saved successfully.",
+                      });
+                      } else {
+                        setLockCodeError("Failed to save lock code. Please try again.");
+                      }
+                    } else {
+                      setLockCodeError("Codes don't match. Please try again.");
+                      setLockCodeStep('enter');
+                      setEnteredCode("");
+                      // Small delay before allowing next input
+                      setTimeout(() => setLockCodeError(""), 2000);
+                    }
+                  }
+                }}
+                onCancel={() => {
+                  setShowLockCodeSetup(false);
+                  setLockCodeStep('enter');
+                  setEnteredCode("");
+                  setLockCodeError("");
+                }}
+                title={lockCodeStep === 'enter' ? 'Enter Lock Code' : 'Confirm Lock Code'}
+                subtitle={lockCodeStep === 'enter' 
+                  ? 'Enter your 4-digit code'
+                  : 'Re-enter your code to confirm'
+                }
+                showCancel
+                errorMessage={lockCodeError}
+                resetKey={lockCodeStep} // Reset when step changes
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Lock Code Remove Dialog */}
+        <Dialog open={showLockCodeRemove} onOpenChange={setShowLockCodeRemove}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="font-mono text-xl text-destructive">
+                Remove Lock Code
+              </DialogTitle>
+              <DialogDescription className="font-mono">
+                Enter your current lock code to remove it
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+              <LockCodeKeypad
+                onComplete={(code) => {
+                  // Verify current code before removing
+                  if (verifyLockCode(code)) {
+                    removeLockCode();
+                    setShowLockCodeRemove(false);
+                    setLockCodeError("");
+                    toast({
+                      title: "Lock code removed",
+                      description: "Your lock code has been removed.",
+                    });
+                  } else {
+                    setLockCodeError("Incorrect code. Please try again.");
+                  }
+                }}
+                onCancel={() => {
+                  setShowLockCodeRemove(false);
+                  setLockCodeError("");
+                }}
+                title="Enter Current Code"
+                subtitle="Enter your lock code to remove it"
+                showCancel
+                errorMessage={lockCodeError}
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

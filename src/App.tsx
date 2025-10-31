@@ -36,11 +36,17 @@ import Messages from "./pages/Messages";
 import Genre from "./pages/Genre";
 import SongEdit from "./pages/SongEdit";
 import NotFound from "./pages/NotFound";
+import { LockCodeScreen } from "@/components/LockCodeScreen";
+import { useLockCode } from "@/hooks/useLockCode";
+import { useWallet } from "@/hooks/useWallet";
+import * as React from "react";
 
 const AppContent = () => {
   const radioPlayer = useRadioPlayer();
   const audioPlayer = useAudioPlayer();
   const [showAdModal, setShowAdModal] = useState(false);
+  const { isLocked, lockUpdateTrigger } = useLockCode();
+  const [unlockTrigger, setUnlockTrigger] = useState(0);
 
   // Determine active source (radio or manual)
   const isRadioActive = radioPlayer.isRadioMode;
@@ -53,6 +59,85 @@ const AppContent = () => {
     }
     audioPlayer.playSong(song);
   };
+
+  // Show lock screen if locked
+  // Also check sessionStorage directly to handle immediate unlocks and locks
+  // Use shouldBeLocked as source of truth since it reads from sessionStorage directly
+  const { fullAddress } = useWallet();
+  // Include isLocked in dependencies so it recalculates when lock() is called
+  const shouldBeLocked = React.useMemo(() => {
+    if (!fullAddress) return false;
+    const sessionKey = `lock_code_verified_${fullAddress.toLowerCase()}`;
+    const isVerified = sessionStorage.getItem(sessionKey) === "true";
+    const hasLockCode = localStorage.getItem(`lock_code_enabled_${fullAddress.toLowerCase()}`) === "true";
+    const requireAfterLogin = localStorage.getItem(`require_pin_after_login_${fullAddress.toLowerCase()}`);
+    const requirePin = requireAfterLogin !== null ? requireAfterLogin === "true" : true;
+    
+    // If lock code is enabled and not verified and require after login, lock
+    if (hasLockCode && !isVerified && requirePin) {
+      return true;
+    }
+    return false;
+  }, [fullAddress, unlockTrigger, isLocked]); // Added isLocked so it recalculates when lock() is called
+  
+  // Check sessionStorage directly for immediate lock/unlock detection
+  // Priority: isLocked=true locks immediately, isVerified=true unlocks immediately
+  const actuallyLocked = React.useMemo(() => {
+    if (!fullAddress) return isLocked;
+    
+    // Read sessionStorage directly for immediate detection
+    const sessionKey = `lock_code_verified_${fullAddress.toLowerCase()}`;
+    const isVerified = sessionStorage.getItem(sessionKey) === "true";
+    const hasLockCode = localStorage.getItem(`lock_code_enabled_${fullAddress.toLowerCase()}`) === "true";
+    const requireAfterLogin = localStorage.getItem(`require_pin_after_login_${fullAddress.toLowerCase()}`);
+    const requirePin = requireAfterLogin !== null ? requireAfterLogin === "true" : true;
+    
+    console.log('🔍 actuallyLocked: isVerified=', isVerified, 'hasLockCode=', hasLockCode, 'requirePin=', requirePin, 'isLocked=', isLocked, 'unlockTrigger=', unlockTrigger, 'lockUpdateTrigger=', lockUpdateTrigger);
+    console.log('🔍 actuallyLocked: sessionStorage key=', sessionKey, 'value=', sessionStorage.getItem(sessionKey));
+    
+    // Priority 1: If user is verified in sessionStorage, unlock immediately (even if isLocked is true)
+    // This handles the unlock case when verifyLockCode sets sessionStorage
+    if (isVerified) {
+      console.log('🔓 actuallyLocked: isVerified=true, unlocking immediately');
+      return false;
+    }
+    
+    // Priority 2: If isLocked is true (manual lock was just called), lock immediately
+    if (isLocked) {
+      console.log('🔒 actuallyLocked: isLocked=true, locking immediately');
+      return true;
+    }
+    
+    // Priority 3: If lock code is enabled and not verified and require after login, lock
+    if (hasLockCode && !isVerified && requirePin) {
+      console.log('🔒 actuallyLocked: Should lock (not verified)');
+      return true;
+    }
+    
+    // Default: unlocked
+    console.log('🔓 actuallyLocked: Default unlocked');
+    return false;
+  }, [fullAddress, isLocked, unlockTrigger, lockUpdateTrigger]); // Added lockUpdateTrigger to force recalculation on lock
+  
+  console.log('🔍 App: isLocked =', isLocked, 'shouldBeLocked =', shouldBeLocked, 'actuallyLocked =', actuallyLocked, 'fullAddress =', fullAddress);
+  
+  if (actuallyLocked) {
+    console.log('🔒 App: Showing lock screen');
+    return (
+      <LockCodeScreen 
+        key={`locked-${unlockTrigger}`}
+        onUnlock={() => {
+          console.log('🔓 App: onUnlock called, forcing re-render');
+          // Force a re-render to check isLocked state again
+          setUnlockTrigger(prev => {
+            console.log('🔓 App: Unlock trigger incremented from', prev, 'to', prev + 1);
+            return prev + 1;
+          });
+        }} 
+      />
+    );
+  }
+  console.log('✅ App: Not locked, showing main content');
 
   return (
     <>

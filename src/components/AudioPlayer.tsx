@@ -66,6 +66,7 @@ const AudioPlayer = ({
 }: AudioPlayerProps) => {
   const navigate = useNavigate();
   const audioRef = useRef<HTMLAudioElement>(null);
+  const lastKnownTimeRef = useRef<number>(0); // Track last known valid time to prevent glitches
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(1);
@@ -86,7 +87,10 @@ const AudioPlayer = ({
   const { isPWA, audioSupported, handlePWAAudioPlay } = usePWAAudio();
   const { isConnected } = useWallet();
   const { authenticated } = usePrivy();
-  const { playStatus, recordPlay, checkPlayStatus } = usePlayTracking(currentSong?.id);
+  const { playStatus, recordPlay, checkPlayStatus } = usePlayTracking(
+    currentSong?.id,
+    currentSong?.token_address as `0x${string}` | undefined
+  );
   const { getPreloadStrategy, getGatewayCount, shouldPreloadNext } = useConnectionAwareLoading();
 
   // Track mobile nav visibility on scroll
@@ -206,13 +210,37 @@ const AudioPlayer = ({
     if (!audio) return;
 
     const updateTime = () => {
-      const newTime = audio.currentTime || 0;
-      setCurrentTime(newTime);
-      updateAudioState({ 
-        currentTime: newTime,
-        currentSongId: currentSong?.id || null,
-        isPlaying 
-      });
+      // Only update if audio is valid and has currentTime
+      if (!audio || isNaN(audio.currentTime)) return;
+      
+      const newTime = audio.currentTime;
+      
+      // Only update if we have a valid positive time
+      // Don't reset to 0 if we're paused and were at a different time
+      // Only accept 0 if we're actually at the start of the song (and playing)
+      if (newTime >= 0 && (!isNaN(newTime) && isFinite(newTime))) {
+        // If newTime is 0, only update if:
+        // 1. We're playing (song just started), OR
+        // 2. The last known time was also 0 (we're at the start)
+        if (newTime === 0) {
+          if (!isPlaying && lastKnownTimeRef.current > 0) {
+            // Don't update to 0 if we were at a different time and paused
+            // This prevents glitches when audio reloads or fires spurious timeupdate events
+            return;
+          }
+        }
+        
+        // Update last known time
+        lastKnownTimeRef.current = newTime;
+        
+        // Update state and global audio state
+        setCurrentTime(newTime);
+        updateAudioState({ 
+          currentTime: newTime,
+          currentSongId: currentSong?.id || null,
+          isPlaying 
+        });
+      }
     };
     
     const updateDuration = () => {
@@ -257,9 +285,16 @@ const AudioPlayer = ({
     };
   }, [onSongEnd, currentSong?.id, repeatMode]);
 
-  // Reset time when song changes
+  // Reset time when song changes (NOT when play/pause changes)
+  // Use a ref to track the last song ID to prevent unnecessary resets
+  const lastSongIdRef = useRef<string | null>(null);
+  
   useEffect(() => {
-    if (currentSong) {
+    // Only reset if the song actually changed (not just the object reference)
+    if (currentSong && currentSong.id !== lastSongIdRef.current) {
+      lastSongIdRef.current = currentSong.id;
+      lastKnownTimeRef.current = 0; // Reset tracked time for new song
+      
       setCurrentTime(0);
       setDuration(0);
       setCurrentAudioUrlIndex(0); // Reset to first URL
@@ -272,7 +307,7 @@ const AudioPlayer = ({
         isPlaying 
       });
     }
-  }, [currentSong?.id, isPlaying]);
+  }, [currentSong?.id]); // Only reset when song ID changes, not when isPlaying changes
 
   // Preview timer for non-logged-in users
   useEffect(() => {
@@ -312,16 +347,43 @@ const AudioPlayer = ({
   }, [authenticated, isPlaying, currentSong, playStatus]);
 
   // Record play when song starts playing (for authenticated users)
+  // Use a ref to track if we've already recorded this continuous play session
+  const playRecordedRef = useRef<{ songId: string | null; timestamp: number; isRecording: boolean }>({ songId: null, timestamp: 0, isRecording: false });
+  
   useEffect(() => {
-    if (authenticated && isPlaying && currentSong && playStatus?.canPlay) {
-      // Record the play after a short delay to ensure it's a real play
-      const timer = setTimeout(() => {
-        recordPlay(currentSong.id, 0); // Duration will be updated when song ends
-      }, 2000); // Record after 2 seconds of playing
+    if (authenticated && isPlaying && currentSong) {
+      const isDifferentSong = playRecordedRef.current.songId !== currentSong.id;
+      const wasRecording = playRecordedRef.current.isRecording;
+      
+      // Record if:
+      // 1. Different song (always record new songs), OR
+      // 2. Same song but we haven't recorded yet for this continuous play session
+      if (isDifferentSong || !wasRecording) {
+        // Mark as recording to prevent duplicate records
+        playRecordedRef.current.isRecording = true;
+        playRecordedRef.current.songId = currentSong.id;
+        
+        // Record the play after a short delay to ensure it's a real play
+        const timer = setTimeout(() => {
+          recordPlay(currentSong.id, 0).then(() => {
+            // Always check play status again after recording to update UI with latest count
+            checkPlayStatus(currentSong.id);
+            playRecordedRef.current.timestamp = Date.now();
+          }).catch((error) => {
+            console.error('Failed to record play:', error);
+            // Reset on error so we can retry
+            playRecordedRef.current.isRecording = false;
+          });
+        }, 2000); // Record after 2 seconds of playing
 
-      return () => clearTimeout(timer);
+        return () => clearTimeout(timer);
+      }
+    } else if (!isPlaying) {
+      // Reset recording flag when playback stops so we can record again on next play
+      // This ensures each new play (after pause/stop) gets recorded
+      playRecordedRef.current.isRecording = false;
     }
-  }, [authenticated, isPlaying, currentSong, playStatus, recordPlay]);
+  }, [authenticated, isPlaying, currentSong?.id, recordPlay, checkPlayStatus]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -379,6 +441,7 @@ const AudioPlayer = ({
     
     const newTime = Math.min(value[0], duration);
     audio.currentTime = newTime;
+    lastKnownTimeRef.current = newTime; // Update tracked time when seeking
     setCurrentTime(newTime);
   };
 
@@ -465,10 +528,27 @@ const AudioPlayer = ({
       // Update the audio source
       const audio = audioRef.current;
       if (audio) {
+        // Preserve current playback time before reloading
+        const preservedTime = audio.currentTime || currentTime;
+        
         try { audio.pause(); } catch {}
         audio.src = sourceUrls[nextIndex];
         audio.volume = isMuted ? 0 : volume; // Ensure volume is maintained
         audio.load();
+        
+        // Restore playback time after loading (but wait for metadata)
+        const restoreTime = () => {
+          if (audio && preservedTime > 0) {
+            try {
+              audio.currentTime = preservedTime;
+            } catch (e) {
+              // Ignore if seeking fails (audio might not be ready yet)
+            }
+          }
+          audio.removeEventListener('loadedmetadata', restoreTime);
+        };
+        audio.addEventListener('loadedmetadata', restoreTime);
+        
         if (isPlaying) {
           const p = audio.play();
           if (p && typeof (p as any).catch === 'function') {

@@ -48,7 +48,7 @@ serve(async (req) => {
     const { data: playStatus, error: statusError } = await supabase.rpc('can_user_play_song', {
       p_user_wallet: walletAddress.toLowerCase(),
       p_song_id: songId,
-      p_max_free_plays: 5
+      p_max_free_plays: 3
     });
 
     if (statusError) {

@@ -34,6 +34,7 @@ import PrivacyPolicy from "./pages/PrivacyPolicy";
 import CookiePolicy from "./pages/CookiePolicy";
 import Messages from "./pages/Messages";
 import Genre from "./pages/Genre";
+import SongEdit from "./pages/SongEdit";
 import NotFound from "./pages/NotFound";
 
 const AppContent = () => {
@@ -107,6 +108,7 @@ const AppContent = () => {
           <Route path="/artist/:walletAddress" element={<Artist playSong={handlePlaySong} currentSong={activeSong} isPlaying={activeIsPlaying} />} />
           <Route path="/profile/edit" element={<ProfileEdit />} />
           <Route path="/song/:songId" element={<SongTrade playSong={handlePlaySong} currentSong={activeSong} isPlaying={activeIsPlaying} />} />
+          <Route path="/song/:songId/edit" element={<SongEdit />} />
           <Route path="/genre/:genreName" element={<Genre playSong={handlePlaySong} currentSong={activeSong} isPlaying={activeIsPlaying} />} />
           <Route path="/playlists" element={<Playlists />} />
           <Route path="/admin" element={<Admin />} />

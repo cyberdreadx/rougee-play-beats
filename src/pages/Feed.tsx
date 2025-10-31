@@ -916,31 +916,54 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
                                     song.artist.toLowerCase().includes(songSearchQuery.toLowerCase())
                                   )
                                   .slice(0, 50)
-                                  .map(song => (
-                                    <CommandItem
-                                      key={song.id}
-                                      value={`${song.title} ${song.artist}`.toLowerCase()}
-                                      onSelect={() => {
-                                        setSelectedSong(song);
-                                        setSongSearchOpen(false);
-                                        setSongSearchQuery('');
-                                      }}
-                                      className="flex items-center gap-2"
-                                    >
-                                      {song.cover_cid && (
-                                        <img 
-                                          src={getIPFSGatewayUrl(song.cover_cid)} 
-                                          alt={song.title}
-                                          className="w-8 h-8 rounded object-cover"
-                                        />
-                                      )}
-                                      <div className="flex-1 min-w-0">
-                                        <p className="font-semibold text-sm truncate">{song.title}</p>
-                                        <p className="text-xs text-muted-foreground truncate">{song.artist}</p>
-                                      </div>
-                                      <Check className={selectedSong?.id === song.id ? "h-4 w-4" : "h-4 w-4 opacity-0"} />
-                                    </CommandItem>
-                                  ))}
+                                  .map(song => {
+                                    const isCurrentlyPlaying = currentSong?.id === song.id && isPlaying;
+                                    return (
+                                      <CommandItem
+                                        key={song.id}
+                                        value={`${song.title} ${song.artist}`.toLowerCase()}
+                                        onSelect={() => {
+                                          setSelectedSong(song);
+                                          setSongSearchOpen(false);
+                                          setSongSearchQuery('');
+                                        }}
+                                        className="flex items-center gap-2 group"
+                                      >
+                                        {song.cover_cid && (
+                                          <img 
+                                            src={getIPFSGatewayUrl(song.cover_cid)} 
+                                            alt={song.title}
+                                            className="w-8 h-8 rounded object-cover flex-shrink-0"
+                                          />
+                                        )}
+                                        <div className="flex-1 min-w-0">
+                                          <p className="font-semibold text-sm truncate">{song.title}</p>
+                                          <p className="text-xs text-muted-foreground truncate">{song.artist}</p>
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              if (playSong) {
+                                                playSong(song);
+                                              }
+                                            }}
+                                            disabled={!playSong}
+                                          >
+                                            {isCurrentlyPlaying ? (
+                                              <Pause className="h-3 w-3" />
+                                            ) : (
+                                              <Play className="h-3 w-3" />
+                                            )}
+                                          </Button>
+                                          <Check className={selectedSong?.id === song.id ? "h-4 w-4" : "h-4 w-4 opacity-0"} />
+                                        </div>
+                                      </CommandItem>
+                                    );
+                                  })}
                               </CommandGroup>
                             </>
                           )}

@@ -14,6 +14,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
 import NetworkInfo from "@/components/NetworkInfo";
 import LikeButton from "@/components/LikeButton";
@@ -31,9 +32,11 @@ import { useBalance, useConnect, useWaitForTransactionReceipt, usePublicClient }
 import { useXRGESwap, KTA_TOKEN_ADDRESS, USDC_TOKEN_ADDRESS, useXRGEQuote, useXRGEQuoteFromKTA, useXRGEQuoteFromUSDC, XRGE_TOKEN_ADDRESS as XRGE_TOKEN } from "@/hooks/useXRGESwap";
 import { usePrivyToken } from "@/hooks/usePrivyToken";
 import { usePrivyWagmi } from "@/hooks/usePrivyWagmi";
-import { useFundWallet, useWallets } from "@privy-io/react-auth";
+import { useFundWallet, useWallets, usePrivy } from "@privy-io/react-auth";
 import { useTokenPrices } from "@/hooks/useTokenPrices";
-import { Play, TrendingUp, TrendingDown, Users, MessageSquare, ArrowUpRight, ArrowDownRight, Loader2, Rocket, Wallet, Copy, Check, ExternalLink, CreditCard, Share2, Pause } from "lucide-react";
+import { createWalletClient, custom } from "viem";
+import { base } from "viem/chains";
+import { Play, TrendingUp, TrendingDown, Users, MessageSquare, ArrowUpRight, ArrowDownRight, Loader2, Rocket, Wallet, Copy, Check, ExternalLink, CreditCard, Share2, Pause, Edit, Download, Lock } from "lucide-react";
 import { NetworkGuard } from "@/components/NetworkGuard";
 
 interface Song {
@@ -48,6 +51,9 @@ interface Song {
   token_address?: string | null;
   ticker?: string | null;
   description?: string | null;
+  download_enabled?: boolean | null;
+  download_type?: string | null;
+  download_price_usdc?: number | null;
 }
 
 
@@ -88,6 +94,7 @@ const SongTrade = ({ playSong, currentSong, isPlaying }: SongTradeProps) => {
   const { getAuthHeaders } = usePrivyToken();
   const { prices } = useTokenPrices();
   const { wallets } = useWallets(); // Get Privy wallets to detect external wallets
+  const { user, ready } = usePrivy();
   
   // Ensure Privy wallet is connected to wagmi
   usePrivyWagmi();
@@ -110,6 +117,8 @@ const SongTrade = ({ playSong, currentSong, isPlaying }: SongTradeProps) => {
   const [tradeMode, setTradeMode] = useState<'buy' | 'sell'>('buy');
   const [recentTrades, setRecentTrades] = useState<TradeData[]>([]);
   const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
+  const [downloading, setDownloading] = useState(false);
+  const [showDownloadModal, setShowDownloadModal] = useState(false);
 
   // Fetch artist profile from IPFS
   const { profile: artistProfile } = useArtistProfile(song?.wallet_address || null);
@@ -1248,6 +1257,233 @@ const SongTrade = ({ playSong, currentSong, isPlaying }: SongTradeProps) => {
     }
   };
 
+  const handleDownload = async () => {
+    if (!song || !song.audio_cid) {
+      toast({
+        title: "Download unavailable",
+        description: "Audio file not found",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Check if download is enabled
+    if (!song.download_enabled) {
+      toast({
+        title: "Downloads disabled",
+        description: "The artist has disabled downloads for this song",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const downloadType = song.download_type || 'disabled';
+    
+    // Check download type and handle accordingly
+    if (downloadType === 'disabled') {
+      toast({
+        title: "Downloads disabled",
+        description: "Downloads are not available for this song",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (downloadType === 'free') {
+      // Free download - proceed directly
+      performDownload();
+      return;
+    }
+
+    if (downloadType === 'holders_only') {
+      // Check if user holds tokens
+      if (!fullAddress || !songTokenAddress) {
+        toast({
+          title: "Wallet required",
+          description: "Please connect your wallet to verify token ownership",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Check token balance
+      const hasTokens = userBalance && parseFloat(userBalance) > 0;
+      if (!hasTokens) {
+        toast({
+          title: "Token holder required",
+          description: "You need to hold tokens for this song to download. Purchase tokens to unlock downloads.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // User has tokens - proceed with download
+      performDownload();
+      return;
+    }
+
+    if (downloadType === 'purchase_usdc') {
+      // Handle USDC payment
+      if (!fullAddress || !isConnected) {
+        toast({
+          title: "Wallet required",
+          description: "Please connect your wallet to purchase download",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const price = song.download_price_usdc || 0;
+      if (price <= 0) {
+        toast({
+          title: "Invalid price",
+          description: "Download price not set",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Show payment modal
+      setShowDownloadModal(true);
+      return;
+    }
+  };
+
+  const performDownloadPayment = async () => {
+    if (!song || !fullAddress || !user) {
+      return;
+    }
+
+    const price = song.download_price_usdc || 0;
+    setDownloading(true);
+    setShowDownloadModal(false);
+
+    try {
+      // Create wallet client for signing (same as TipButton)
+      const embeddedWallet = wallets.find(w => w.walletClientType === 'privy');
+      if (!embeddedWallet) {
+        throw new Error('Embedded wallet not found. Please use an embedded wallet for payments.');
+      }
+
+      // Get Ethereum provider from Privy wallet
+      let provider;
+      try {
+        await embeddedWallet.switchChain(8453); // Ensure on Base
+        provider = await embeddedWallet.getEthereumProvider();
+      } catch (providerError) {
+        throw new Error('Could not access wallet provider for payment.');
+      }
+
+      // Create viem wallet client
+      const walletClient = createWalletClient({
+        chain: base,
+        transport: custom(provider),
+      });
+      
+      const addresses = await walletClient.getAddresses();
+      const account = addresses[0];
+      
+      if (!account) {
+        throw new Error('Could not get account from wallet.');
+      }
+
+      const signingClient = createWalletClient({
+        account,
+        chain: base,
+        transport: custom(provider),
+      });
+
+      toast({
+        title: "Processing Payment... 💸",
+        description: `Creating payment for $${price} USDC`,
+      });
+
+      // Create USDC transfer directly using ERC20 contract (same pattern as TipButton)
+      const usdcContractAddress = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913'; // USDC on Base
+      const amountInWei = BigInt(Math.floor(price * 1_000_000)); // USDC 6 decimals
+      
+      // USDC transfer function signature: transfer(address,uint256)
+      const transferData = `0xa9059cbb${song.wallet_address.slice(2).padStart(64, '0')}${amountInWei.toString(16).padStart(64, '0')}` as `0x${string}`;
+      
+      // Send the actual USDC transfer transaction
+      const txHash = await signingClient.sendTransaction({
+        to: usdcContractAddress as Address,
+        data: transferData,
+        value: 0n, // No ETH value, just USDC transfer
+      });
+
+      toast({
+        title: "✅ Payment sent!",
+        description: `Transaction submitted: ${txHash.substring(0, 10)}...`,
+      });
+
+      // Wait for transaction confirmation (optional - could proceed immediately)
+      // For now, proceed with download after transaction is submitted
+      // In production, you might want to wait for confirmation
+      await new Promise(resolve => setTimeout(resolve, 2000)); // Brief delay for UX
+
+      toast({
+        title: "✅ Payment successful!",
+        description: "Downloading your song...",
+      });
+
+      // Proceed with download after payment
+      performDownload();
+    } catch (error: any) {
+      console.error('Download payment error:', error);
+      toast({
+        title: "Payment failed",
+        description: error.message || "Failed to process payment",
+        variant: "destructive",
+      });
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const performDownload = async () => {
+    if (!song || !song.audio_cid) return;
+
+    setDownloading(true);
+
+    try {
+      // Get audio URL from IPFS
+      const audioUrl = getIPFSGatewayUrl(song.audio_cid, undefined, true);
+      
+      // Fetch the audio file
+      const response = await fetch(audioUrl);
+      if (!response.ok) {
+        throw new Error('Failed to fetch audio file');
+      }
+
+      const blob = await response.blob();
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${song.title} - ${song.artist || 'Unknown Artist'}.mp3`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+
+      toast({
+        title: "✅ Download started!",
+        description: `Downloading ${song.title}`,
+      });
+    } catch (error: any) {
+      console.error('Download error:', error);
+      toast({
+        title: "Download failed",
+        description: error.message || "Failed to download song",
+        variant: "destructive",
+      });
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -1300,16 +1536,16 @@ const SongTrade = ({ playSong, currentSong, isPlaying }: SongTradeProps) => {
         {/* Song Header */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 md:gap-6 mb-6 md:mb-8">
           <Card className="console-bg tech-border p-4 md:p-6 lg:col-span-2 relative overflow-hidden">
-            {/* Background Cover Image with Fade */}
+            {/* Background Cover Image with Fade - Use song album art */}
             <div 
               className="absolute inset-0 z-0"
-              style={(artistProfile?.cover_cid || song.cover_cid) ? {
-                backgroundImage: `url(${getIPFSGatewayUrl(artistProfile?.cover_cid || song.cover_cid)})`,
+              style={song.cover_cid ? {
+                backgroundImage: `url(${getIPFSGatewayUrl(song.cover_cid)})`,
                 backgroundSize: 'cover',
                 backgroundPosition: 'center'
               } : undefined}
             >
-              {(artistProfile?.cover_cid || song.cover_cid) && (
+              {song.cover_cid && (
                 <div className="absolute inset-0 bg-gradient-to-b from-background/60 via-background/80 to-background/95" />
               )}
             </div>
@@ -1376,6 +1612,44 @@ const SongTrade = ({ playSong, currentSong, isPlaying }: SongTradeProps) => {
                     {copied ? <Check className="h-4 w-4 mr-2" /> : <Share2 className="h-4 w-4 mr-2" />}
                     {copied ? 'COPIED' : 'SHARE'}
                   </Button>
+                  {song.download_enabled && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleDownload}
+                      className="font-mono"
+                      disabled={downloading || !song.audio_cid}
+                    >
+                      {downloading ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          DOWNLOADING...
+                        </>
+                      ) : (
+                        <>
+                          {song.download_type === 'holders_only' && (!userBalance || parseFloat(userBalance) === 0) ? (
+                            <Lock className="h-4 w-4 mr-2" />
+                          ) : (
+                            <Download className="h-4 w-4 mr-2" />
+                          )}
+                          {song.download_type === 'purchase_usdc' ? `DOWNLOAD ($${song.download_price_usdc || 0})` : 
+                           song.download_type === 'holders_only' && (!userBalance || parseFloat(userBalance) === 0) ? 'LOCKED' :
+                           'DOWNLOAD'}
+                        </>
+                      )}
+                    </Button>
+                  )}
+                  {song.wallet_address?.toLowerCase() === fullAddress?.toLowerCase() && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => navigate(`/song/${song.id}/edit`)}
+                      className="font-mono"
+                    >
+                      <Edit className="h-4 w-4 mr-2" />
+                      EDIT
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>
@@ -2237,6 +2511,57 @@ const SongTrade = ({ playSong, currentSong, isPlaying }: SongTradeProps) => {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Download Payment Dialog */}
+      <Dialog open={showDownloadModal} onOpenChange={setShowDownloadModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-mono text-xl text-neon-green">Purchase Download</DialogTitle>
+            <DialogDescription className="font-mono">
+              Pay {song?.download_price_usdc || 0} USDC to download "{song?.title}"
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/10">
+              <span className="font-mono text-sm text-muted-foreground">Download Price:</span>
+              <span className="font-mono text-lg font-bold text-neon-green">
+                ${song?.download_price_usdc || 0} USDC
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground font-mono">
+              Payment will be sent to the artist's wallet address.
+            </p>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowDownloadModal(false)}
+              className="font-mono"
+              disabled={downloading}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={performDownloadPayment}
+              className="font-mono"
+              disabled={downloading || !isConnected}
+              variant="neon"
+            >
+              {downloading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <CreditCard className="h-4 w-4 mr-2" />
+                  Pay & Download
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
     </NetworkGuard>
   );

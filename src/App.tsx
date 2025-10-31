@@ -96,7 +96,7 @@ const AppContent = () => {
           />
           <Route path="/upload" element={<Upload />} />
           <Route path="/become-artist" element={<BecomeArtist />} />
-          <Route path="/wallet" element={<Wallet />} />
+          <Route path="/wallet" element={<Wallet playSong={handlePlaySong} currentSong={activeSong} isPlaying={activeIsPlaying} />} />
           <Route path="/swap" element={<Swap />} />
           <Route path="/tiers" element={<Tiers />} />
           <Route path="/messages" element={<Messages />} />

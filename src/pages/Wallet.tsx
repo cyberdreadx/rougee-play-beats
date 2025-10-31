@@ -28,6 +28,7 @@ import { useDualWallet } from "@/contexts/DualWalletContext";
 import { KeetaWalletDialog } from "@/components/KeetaWalletDialog";
 import { KeetaQRCode } from "@/components/KeetaQRCode";
 import keetaLogo from "@/assets/tokens/kta.png";
+import { Play, Pause } from "lucide-react";
 
 const XRGE_TOKEN_ADDRESS = "0x147120faEC9277ec02d957584CFCD92B56A24317" as const;
 const KTA_TOKEN_ADDRESS = "0xc0634090F2Fe6c6d75e61Be2b949464aBB498973" as const;
@@ -53,16 +54,23 @@ interface SongTokenItemProps {
     token_address: string;
     cover_cid?: string;
     ai_usage?: 'none' | 'partial' | 'full' | null;
+    audio_cid?: string;
   };
   userAddress: string;
   xrgeUsdPrice: number;
   onClick: () => void;
   onBalanceLoaded?: (songId: string, hasBalance: boolean) => void;
   onSendClick?: (song: any, balance: string) => void;
+  playSong?: (song: any) => void;
+  currentSong?: any;
+  isPlaying?: boolean;
 }
 
-  const SongTokenItem = ({ song, userAddress, xrgeUsdPrice, onClick, onBalanceLoaded, onSendClick }: SongTokenItemProps) => {
+  const SongTokenItem = ({ song, userAddress, xrgeUsdPrice, onClick, onBalanceLoaded, onSendClick, playSong, currentSong, isPlaying }: SongTokenItemProps) => {
   const navigate = useNavigate();
+  
+  // Check if this song is currently playing
+  const isCurrentlyPlaying = currentSong?.id === song.id && isPlaying;
   
   // Log when component mounts
   useEffect(() => {
@@ -129,69 +137,154 @@ interface SongTokenItemProps {
     }
   };
   
+  const handlePlayClick = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent navigation to song page
+    if (playSong) {
+      playSong(song);
+    }
+  };
+  
   return (
-    <div
-      className="group flex items-start sm:items-center gap-3 p-3 sm:p-4 rounded-xl bg-white/5 backdrop-blur-xl border border-white/10 shadow-[0_4px_16px_0_rgba(0,255,159,0.1)] hover:bg-white/8 active:bg-white/10 transition-all duration-300 cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
+    <Card
+      className="group relative overflow-hidden bg-white/5 backdrop-blur-xl border border-white/10 shadow-[0_4px_16px_0_rgba(0,255,159,0.1)] hover:bg-white/8 hover:border-neon-green/30 active:bg-white/10 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
       onClick={onClick}
     >
-      {/* Song Image */}
-      {song.cover_cid ? (
-        <img
-          src={getIPFSGatewayUrl(song.cover_cid)}
-          alt={song.title}
-          className="w-12 h-12 rounded-lg object-cover ring-2 ring-border group-hover:ring-neon-green/50 transition-all duration-300 flex-shrink-0"
-        />
-      ) : (
-        <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-neon-green/20 to-purple-500/20 flex items-center justify-center ring-2 ring-border group-hover:ring-neon-green/50 transition-all duration-300 flex-shrink-0">
-          <span className="text-lg font-mono font-bold text-neon-green">
-            {song.ticker?.[0] || '?'}
-          </span>
-        </div>
-      )}
-      
-      {/* Song Info - Show full text with wrapping */}
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-bold font-mono group-hover:text-neon-green transition-colors flex items-center gap-1.5 flex-wrap">
-          <span className="break-words">{song.title}</span>
-          <AiBadge aiUsage={song.ai_usage} size="sm" className="flex-shrink-0" />
-        </p>
-        <p className="text-xs text-muted-foreground font-mono mt-0.5 break-words">{song.ticker || 'Unknown'}</p>
-      </div>
-      
-      {/* Balance and Send Button - Compact, won't shrink */}
-      <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2 flex-shrink-0">
-        <div className="text-right">
-          <p className="text-base font-bold font-mono text-neon-green whitespace-nowrap">
-            {formatCompactNumber(balance)}
-          </p>
-          {valueUSD > 0 ? (
-            <>
-              <p className="text-xs text-muted-foreground font-mono mt-0.5 whitespace-nowrap">
-                ${valueUSD.toLocaleString(undefined, {maximumFractionDigits: 2})}
-              </p>
-              {priceUSD > 0 && (
-                <p className="text-[10px] text-muted-foreground/70 font-mono whitespace-nowrap">
-                  ${priceUSD < 0.01 ? priceUSD.toFixed(6) : priceUSD.toFixed(4)}/token
-                </p>
+      <div className="flex flex-col sm:flex-row gap-4 p-4">
+        {/* Song Image - Larger and more prominent */}
+        <div className="relative flex-shrink-0">
+          {song.cover_cid ? (
+            <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-xl overflow-hidden ring-2 ring-border group-hover:ring-neon-green/50 transition-all duration-300">
+              <img
+                src={getIPFSGatewayUrl(song.cover_cid)}
+                alt={song.title}
+                className="w-full h-full object-cover"
+              />
+              {/* Play overlay button */}
+              {playSong && (
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handlePlayClick}
+                    className="h-12 w-12 rounded-full bg-neon-green/20 hover:bg-neon-green/30 border-2 border-neon-green/50 backdrop-blur-sm"
+                  >
+                    {isCurrentlyPlaying ? (
+                      <Pause className="h-6 w-6 text-neon-green fill-neon-green" />
+                    ) : (
+                      <Play className="h-6 w-6 text-neon-green fill-neon-green" />
+                    )}
+                  </Button>
+                </div>
               )}
-            </>
+            </div>
           ) : (
-            <p className="text-xs text-muted-foreground/60 font-mono italic whitespace-nowrap">
-              Loading price...
-            </p>
+            <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-xl bg-gradient-to-br from-neon-green/20 to-purple-500/20 flex items-center justify-center ring-2 ring-border group-hover:ring-neon-green/50 transition-all duration-300">
+              <span className="text-2xl font-mono font-bold text-neon-green">
+                {song.ticker?.[0] || '?'}
+              </span>
+              {/* Play overlay button for fallback */}
+              {playSong && (
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center rounded-xl">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handlePlayClick}
+                    className="h-12 w-12 rounded-full bg-neon-green/20 hover:bg-neon-green/30 border-2 border-neon-green/50 backdrop-blur-sm"
+                  >
+                    {isCurrentlyPlaying ? (
+                      <Pause className="h-6 w-6 text-neon-green fill-neon-green" />
+                    ) : (
+                      <Play className="h-6 w-6 text-neon-green fill-neon-green" />
+                    )}
+                  </Button>
+                </div>
+              )}
+            </div>
           )}
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleSendClick}
-          className="font-mono text-xs hover:bg-neon-green/10 hover:text-neon-green hover:border-neon-green/50 flex-shrink-0"
-        >
-          <Send className="h-3 w-3 mr-1" />
-          Send
-        </Button>
+        
+        {/* Song Info and Details */}
+        <div className="flex-1 min-w-0 flex flex-col justify-between gap-3">
+          {/* Song Title and Ticker */}
+          <div className="min-w-0">
+            <div className="flex items-start gap-2 mb-1">
+              <h3 className="text-base sm:text-lg font-bold font-mono group-hover:text-neon-green transition-colors break-words flex-1">
+                {song.title}
+              </h3>
+              <AiBadge aiUsage={song.ai_usage} size="sm" className="flex-shrink-0 mt-0.5" />
+            </div>
+            <p className="text-xs sm:text-sm text-muted-foreground font-mono">
+              {song.ticker || 'Unknown'}
+            </p>
+            {song.artist && (
+              <p className="text-xs text-muted-foreground/70 font-mono mt-1">
+                by {song.artist}
+              </p>
+            )}
+          </div>
+          
+          {/* Balance, Value, and Actions */}
+          <div className="flex items-end justify-between gap-3">
+            {/* Balance and Price Info */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-baseline gap-2 mb-1">
+                <p className="text-lg sm:text-xl font-bold font-mono text-neon-green">
+                  {formatCompactNumber(balance)}
+                </p>
+                <span className="text-xs text-muted-foreground font-mono">tokens</span>
+              </div>
+              {valueUSD > 0 ? (
+                <>
+                  <p className="text-sm font-semibold font-mono text-foreground">
+                    ${valueUSD.toLocaleString(undefined, {maximumFractionDigits: 2})}
+                  </p>
+                  {priceUSD > 0 && (
+                    <p className="text-xs text-muted-foreground/70 font-mono mt-0.5">
+                      ${priceUSD < 0.01 ? priceUSD.toFixed(6) : priceUSD.toFixed(4)}/token
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p className="text-xs text-muted-foreground/60 font-mono italic">
+                  Loading price...
+                </p>
+              )}
+            </div>
+            
+            {/* Action Buttons */}
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {playSong && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handlePlayClick}
+                  className={`h-9 w-9 rounded-full transition-all ${
+                    isCurrentlyPlaying
+                      ? 'bg-neon-green/20 text-neon-green border border-neon-green/50'
+                      : 'hover:bg-neon-green/10 hover:text-neon-green'
+                  }`}
+                >
+                  {isCurrentlyPlaying ? (
+                    <Pause className="h-4 w-4" />
+                  ) : (
+                    <Play className="h-4 w-4" />
+                  )}
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleSendClick}
+                className="font-mono text-xs hover:bg-neon-green/10 hover:text-neon-green hover:border-neon-green/50"
+              >
+                <Send className="h-3 w-3 mr-1" />
+                Send
+              </Button>
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
+    </Card>
   );
 };
 
@@ -222,7 +315,13 @@ const ERC20_ABI = [
   },
 ] as const;
 
-const Wallet = () => {
+interface WalletProps {
+  playSong?: (song: any) => void;
+  currentSong?: any;
+  isPlaying?: boolean;
+}
+
+const Wallet = ({ playSong, currentSong, isPlaying }: WalletProps = {}) => {
   const navigate = useNavigate();
   const { fullAddress, isConnected, isPrivyReady } = useWallet();
   const { address: accountAddress, chain } = useAccount();
@@ -415,7 +514,7 @@ const Wallet = () => {
       // Get all deployed songs with token addresses
       const { data: songs, error } = await supabase
         .from('songs')
-        .select('id, title, artist, ticker, token_address, cover_cid')
+        .select('id, title, artist, ticker, token_address, cover_cid, ai_usage')
         .not('token_address', 'is', null);
         
       if (error) {
@@ -1115,7 +1214,7 @@ const Wallet = () => {
           ) : (
             <>
               {/* Always render components to check balances, they'll return null if balance is 0 */}
-              <div className="space-y-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {fullAddress && allSongs.map((song) => (
                   <SongTokenItem
                     key={song.id}
@@ -1125,6 +1224,9 @@ const Wallet = () => {
                     onClick={() => navigate(`/song/${song.id}`)}
                     onBalanceLoaded={handleBalanceLoaded}
                     onSendClick={handleSongSendClick}
+                    playSong={playSong}
+                    currentSong={currentSong}
+                    isPlaying={isPlaying}
                   />
                 ))}
               </div>

@@ -470,15 +470,39 @@ export const useXRGESwap = () => {
           description: "Waiting for reset transaction to confirm...",
         });
         
-        for (let i = 0; i < 30; i++) {
+        // Wait for reset transaction with better error handling
+        let receipt = null;
+        const maxResetAttempts = 60; // 60 seconds total
+        for (let i = 0; i < maxResetAttempts; i++) {
           await new Promise(resolve => setTimeout(resolve, 1000));
-          const receipt = await publicClient.getTransactionReceipt({ hash: resetHash });
-          if (receipt) {
-            break;
+          try {
+            receipt = await publicClient.getTransactionReceipt({ hash: resetHash });
+            if (receipt) {
+              console.log('✅ KTA reset transaction confirmed:', resetHash);
+              break;
+            }
+          } catch (receiptError: any) {
+            // If it's a "not found" error, continue waiting - transaction might still be pending
+            if (receiptError?.message?.includes('not found') || 
+                receiptError?.message?.includes('Transaction receipt') ||
+                receiptError?.code === 'NOT_FOUND') {
+              // Continue waiting
+              continue;
+            }
+            // Other errors should be thrown
+            throw receiptError;
           }
-          if (i === 29) {
-            throw new Error("Reset transaction timed out. Please try again.");
-          }
+        }
+        
+        // If we still don't have a receipt after waiting, continue anyway
+        // The transaction was submitted successfully and may still be pending
+        if (!receipt) {
+          console.warn('⚠️ KTA reset transaction receipt not found after waiting, but transaction was submitted:', resetHash);
+          toast({
+            title: "Transaction Submitted",
+            description: "KTA reset transaction submitted. It may still be processing. Continuing...",
+            variant: "default",
+          });
         }
       }
       
@@ -499,16 +523,40 @@ export const useXRGESwap = () => {
 
       const submittedHash = await writeContractAsync(config as any);
       
-      // Wait for approval transaction to be mined
-      for (let i = 0; i < 30; i++) {
+      // Wait for approval transaction to be mined with better error handling
+      // Handle "receipt not found" errors gracefully
+      let receipt = null;
+      const maxAttempts = 60; // 60 seconds total
+      for (let i = 0; i < maxAttempts; i++) {
         await new Promise(resolve => setTimeout(resolve, 1000));
-        const receipt = await publicClient.getTransactionReceipt({ hash: submittedHash });
-        if (receipt) {
-          break;
+        try {
+          receipt = await publicClient.getTransactionReceipt({ hash: submittedHash });
+          if (receipt) {
+            console.log('✅ KTA approval transaction confirmed:', submittedHash);
+            break;
+          }
+        } catch (receiptError: any) {
+          // If it's a "not found" error, continue waiting - transaction might still be pending
+          if (receiptError?.message?.includes('not found') || 
+              receiptError?.message?.includes('Transaction receipt') ||
+              receiptError?.code === 'NOT_FOUND') {
+            // Continue waiting
+            continue;
+          }
+          // Other errors should be thrown
+          throw receiptError;
         }
-        if (i === 29) {
-          throw new Error("Approval transaction timed out");
-        }
+      }
+      
+      // If we still don't have a receipt after waiting, return the hash anyway
+      // The transaction was submitted successfully and may still be pending
+      if (!receipt) {
+        console.warn('⚠️ KTA approval transaction receipt not found after waiting, but transaction was submitted:', submittedHash);
+        toast({
+          title: "Transaction Submitted",
+          description: "KTA approval transaction submitted. It may still be processing. Please wait a moment and try again if needed.",
+          variant: "default",
+        });
       }
       
       toast({

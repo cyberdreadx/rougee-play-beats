@@ -22,13 +22,25 @@ serve(async (req) => {
     
     console.log('Validating Privy token...');
     console.log('Authorization header present:', !!req.headers.get('authorization'));
+    console.log('x-privy-token header present:', !!req.headers.get('x-privy-token'));
     
     const formData = await req.formData();
     const providedWalletAddress = formData.get('walletAddress') as string | null;
     
     // Validate JWT token (this throws if invalid/expired)
     const { validatePrivyToken } = await import('../_shared/privy.ts');
-    const user = await validatePrivyToken(req.headers.get('x-privy-token') || req.headers.get('authorization'));
+    
+    // Get the token - prefer Authorization header, fall back to x-privy-token
+    let authHeader = req.headers.get('authorization');
+    if (!authHeader) {
+      const privyToken = req.headers.get('x-privy-token');
+      if (privyToken) {
+        authHeader = `Bearer ${privyToken}`;
+      }
+    }
+    
+    console.log('Auth header to validate:', authHeader ? 'present' : 'missing');
+    const user = await validatePrivyToken(authHeader);
     
     // Use wallet from form data if provided, otherwise try to extract from JWT
     let walletAddress: string;
@@ -52,7 +64,7 @@ serve(async (req) => {
 
     // Validate input
     const PostSchema = z.object({
-      content_text: z.string().max(5000).optional(),
+      content_text: z.string().max(360).optional(),
       song_id: z.string().uuid()
     });
 

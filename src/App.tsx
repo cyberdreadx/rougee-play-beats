@@ -1,7 +1,7 @@
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { HelmetProvider } from "react-helmet-async";
 import Web3Provider from "@/providers/Web3Provider";
 import { ThemeProvider } from "@/contexts/ThemeContext";
@@ -43,11 +43,17 @@ import { useWallet } from "@/hooks/useWallet";
 import * as React from "react";
 
 const AppContent = () => {
+  const location = useLocation();
   const radioPlayer = useRadioPlayer();
   const audioPlayer = useAudioPlayer();
   const [showAdModal, setShowAdModal] = useState(false);
   const { isLocked, lockUpdateTrigger } = useLockCode();
   const [unlockTrigger, setUnlockTrigger] = useState(0);
+  
+  // Auto-dock player on feed page whenever a song starts playing
+  const shouldAutoMinimize = React.useMemo(() => {
+    return location.pathname === '/feed' && !!audioPlayer.currentSong;
+  }, [location.pathname, audioPlayer.currentSong]);
 
   // Determine active source (radio or manual)
   const isRadioActive = radioPlayer.isRadioMode;
@@ -232,6 +238,7 @@ const AppContent = () => {
         onPrevious={!isRadioActive ? audioPlayer.playPrevious : undefined}
         onShuffle={!isRadioActive ? audioPlayer.toggleShuffle : undefined}
         onRepeat={!isRadioActive ? audioPlayer.toggleRepeat : undefined}
+        initialMinimized={shouldAutoMinimize}
         onClose={() => {
           if (isRadioActive) {
             radioPlayer.stopRadio();

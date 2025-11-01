@@ -28,6 +28,8 @@ import { useSongPrice } from "@/hooks/useSongBondingCurve";
 import { AudioWaveform } from "@/components/AudioWaveform";
 import { useAudioStateForSong } from "@/hooks/useAudioState";
 import { TipButton } from "@/components/TipButton";
+import gltchLogo from '@/assets/gltch-logo.png';
+import gltchTabLogo from '@/assets/gltch-tab-logo.png';
 import TaggedText from "@/components/TaggedText";
 
 interface Song {
@@ -290,7 +292,7 @@ const Artist = ({ playSong, currentSong, isPlaying }: ArtistProps) => {
   const [showHoldingsModal, setShowHoldingsModal] = useState(false);
 
   const isOwnProfile = fullAddress?.toLowerCase() === walletAddress?.toLowerCase();
-  const shortWallet = walletAddress ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : '';
+  const shortWallet = walletAddress ? `0x...${walletAddress.slice(-4)}` : '';
   const isNewProfile = !!profile && (
     (!profile.avatar_cid) &&
     !(profile.artist_name || profile.display_name) &&
@@ -693,6 +695,9 @@ const Artist = ({ playSong, currentSong, isPlaying }: ArtistProps) => {
   const coverUrl = profile.cover_cid ? getIPFSGatewayUrl(profile.cover_cid) : null;
   const avatarUrl = profile.avatar_cid ? getIPFSGatewayUrl(profile.avatar_cid) : null;
   const coverPosition = profile.social_links?.coverPosition || 50; // Default to center (50%)
+  
+  // Debug social links
+  console.log('Artist Profile Social Links:', profile.social_links);
 
   return (
     <div className="min-h-screen bg-background pb-16 md:pb-0">
@@ -989,46 +994,46 @@ const Artist = ({ playSong, currentSong, isPlaying }: ArtistProps) => {
         <Tabs defaultValue="all" className="w-full">
           {/* Modern Navigation Tabs */}
             <div className="mb-8">
-            <TabsList className="h-auto p-1.5 bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl inline-flex overflow-x-auto scrollbar-hide w-full md:w-auto">
+            <TabsList className="h-auto p-1.5 bg-black/60 backdrop-blur-xl border border-neon-green/20 shadow-[0_0_20px_rgba(0,255,159,0.15)] rounded-2xl inline-flex overflow-x-auto scrollbar-hide w-full md:w-auto">
               <TabsTrigger 
                 value="all" 
-                className="px-5 py-2.5 font-medium text-sm data-[state=active]:bg-neon-green data-[state=active]:text-black data-[state=active]:shadow-lg data-[state=inactive]:text-white/70 data-[state=inactive]:hover:text-white rounded-xl transition-all"
+                className="px-3 md:px-5 py-2.5 font-medium text-sm font-mono uppercase data-[state=active]:bg-gradient-to-r data-[state=active]:from-neon-green/20 data-[state=active]:to-emerald-500/20 data-[state=active]:text-neon-green data-[state=active]:shadow-[0_0_15px_rgba(0,255,159,0.5)] data-[state=active]:border data-[state=active]:border-neon-green/50 data-[state=inactive]:text-white/50 data-[state=inactive]:hover:text-white/80 rounded-xl transition-all duration-300 flex-shrink-0"
               >
                 ALL
               </TabsTrigger>
               <TabsTrigger 
                 value="posts" 
-                className="px-5 py-2.5 font-medium text-sm data-[state=active]:bg-neon-green data-[state=active]:text-black data-[state=active]:shadow-lg data-[state=inactive]:text-white/70 data-[state=inactive]:hover:text-white rounded-xl transition-all"
+                className="px-3 md:px-5 py-2.5 font-medium text-sm uppercase data-[state=active]:bg-gradient-to-r data-[state=active]:from-neon-green/20 data-[state=active]:to-emerald-500/20 data-[state=active]:shadow-[0_0_15px_rgba(0,255,159,0.5)] data-[state=active]:border data-[state=active]:border-neon-green/50 data-[state=inactive]:opacity-50 data-[state=inactive]:hover:opacity-80 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 flex-shrink-0"
               >
-                POSTS
+                <img src={gltchTabLogo} alt="GLTCH" className="h-4 md:h-5 w-auto" />
               </TabsTrigger>
               <TabsTrigger 
                 value="popular" 
-                className="px-5 py-2.5 font-medium text-sm data-[state=active]:bg-neon-green data-[state=active]:text-black data-[state=active]:shadow-lg data-[state=inactive]:text-white/70 data-[state=inactive]:hover:text-white rounded-xl transition-all"
+                className="px-3 md:px-5 py-2.5 font-medium text-sm font-mono uppercase data-[state=active]:bg-gradient-to-r data-[state=active]:from-neon-green/20 data-[state=active]:to-emerald-500/20 data-[state=active]:text-neon-green data-[state=active]:shadow-[0_0_15px_rgba(0,255,159,0.5)] data-[state=active]:border data-[state=active]:border-neon-green/50 data-[state=inactive]:text-white/50 data-[state=inactive]:hover:text-white/80 rounded-xl transition-all duration-300 flex-shrink-0"
               >
                 POPULAR
               </TabsTrigger>
               <TabsTrigger 
                 value="tracks" 
-                className="px-5 py-2.5 font-medium text-sm data-[state=active]:bg-neon-green data-[state=active]:text-black data-[state=active]:shadow-lg data-[state=inactive]:text-white/70 data-[state=inactive]:hover:text-white rounded-xl transition-all"
+                className="px-3 md:px-5 py-2.5 font-medium text-sm font-mono uppercase data-[state=active]:bg-gradient-to-r data-[state=active]:from-neon-green/20 data-[state=active]:to-emerald-500/20 data-[state=active]:text-neon-green data-[state=active]:shadow-[0_0_15px_rgba(0,255,159,0.5)] data-[state=active]:border data-[state=active]:border-neon-green/50 data-[state=inactive]:text-white/50 data-[state=inactive]:hover:text-white/80 rounded-xl transition-all duration-300 flex-shrink-0"
               >
                 TRACKS
               </TabsTrigger>
               <TabsTrigger 
                 value="albums" 
-                className="px-5 py-2.5 font-medium text-sm data-[state=active]:bg-neon-green data-[state=active]:text-black data-[state=active]:shadow-lg data-[state=inactive]:text-white/70 data-[state=inactive]:hover:text-white rounded-xl transition-all"
+                className="px-3 md:px-5 py-2.5 font-medium text-sm font-mono uppercase data-[state=active]:bg-gradient-to-r data-[state=active]:from-neon-green/20 data-[state=active]:to-emerald-500/20 data-[state=active]:text-neon-green data-[state=active]:shadow-[0_0_15px_rgba(0,255,159,0.5)] data-[state=active]:border data-[state=active]:border-neon-green/50 data-[state=inactive]:text-white/50 data-[state=inactive]:hover:text-white/80 rounded-xl transition-all duration-300 flex-shrink-0"
               >
                 ALBUMS
               </TabsTrigger>
               <TabsTrigger 
                 value="playlists" 
-                className="px-5 py-2.5 font-medium text-sm data-[state=active]:bg-neon-green data-[state=active]:text-black data-[state=active]:shadow-lg data-[state=inactive]:text-white/70 data-[state=inactive]:hover:text-white rounded-xl transition-all"
+                className="px-3 md:px-5 py-2.5 font-medium text-sm font-mono uppercase data-[state=active]:bg-gradient-to-r data-[state=active]:from-neon-green/20 data-[state=active]:to-emerald-500/20 data-[state=active]:text-neon-green data-[state=active]:shadow-[0_0_15px_rgba(0,255,159,0.5)] data-[state=active]:border data-[state=active]:border-neon-green/50 data-[state=inactive]:text-white/50 data-[state=inactive]:hover:text-white/80 rounded-xl transition-all duration-300 flex-shrink-0"
               >
                 PLAYLISTS
               </TabsTrigger>
               <TabsTrigger 
                 value="reposts" 
-                className="px-5 py-2.5 font-medium text-sm data-[state=active]:bg-neon-green data-[state=active]:text-black data-[state=active]:shadow-lg data-[state=inactive]:text-white/70 data-[state=inactive]:hover:text-white rounded-xl transition-all"
+                className="px-3 md:px-5 py-2.5 font-medium text-sm font-mono uppercase data-[state=active]:bg-gradient-to-r data-[state=active]:from-neon-green/20 data-[state=active]:to-emerald-500/20 data-[state=active]:text-neon-green data-[state=active]:shadow-[0_0_15px_rgba(0,255,159,0.5)] data-[state=active]:border data-[state=active]:border-neon-green/50 data-[state=inactive]:text-white/50 data-[state=inactive]:hover:text-white/80 rounded-xl transition-all duration-300 flex-shrink-0"
               >
                 REPOSTS
               </TabsTrigger>
@@ -1184,7 +1189,7 @@ const Artist = ({ playSong, currentSong, isPlaying }: ArtistProps) => {
                             className="font-semibold text-sm md:text-base cursor-pointer hover:text-neon-green transition-colors duration-200"
                             onClick={() => navigate(`/artist/${post.wallet_address}`)}
                           >
-                            {post.profiles?.artist_name || `${post.wallet_address.slice(0, 6)}...${post.wallet_address.slice(-4)}`}
+                            {post.profiles?.artist_name || post.profiles?.display_name || `0x...${post.wallet_address.slice(-4)}`}
                           </p>
                           {post.profiles?.verified && (
                             <CircleCheckBig className="h-4 w-4 text-blue-500 flex-shrink-0" aria-label="Verified artist" />
@@ -1408,7 +1413,7 @@ const Artist = ({ playSong, currentSong, isPlaying }: ArtistProps) => {
                                     className="text-sm font-semibold cursor-pointer hover:text-neon-green transition-colors"
                                     onClick={() => navigate(`/artist/${comment.wallet_address}`)}
                                   >
-                                    {comment.profiles?.artist_name || `${comment.wallet_address.slice(0, 6)}...${comment.wallet_address.slice(-4)}`}
+                                    {comment.profiles?.artist_name || comment.profiles?.display_name || `0x...${comment.wallet_address.slice(-4)}`}
                                   </p>
                                   <XRGETierBadge walletAddress={comment.wallet_address} size="sm" />
                                 </div>

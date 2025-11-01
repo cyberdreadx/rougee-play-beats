@@ -31,8 +31,30 @@ const Navigation = ({ activeTab = "DISCOVER", onTabChange }: NavigationProps) =>
     }
   }, [isSidebarCollapsed]);
   
-  // Mobile navigation is always visible - no scroll behavior
-  const isMobileNavVisible = true;
+  // Mobile navigation scroll behavior
+  const [isMobileNavVisible, setIsMobileNavVisible] = useState(true);
+  const [lastScrollY, setLastScrollY] = useState(0);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+      
+      // Only apply scroll behavior on mobile
+      if (window.innerWidth >= 768) return;
+      
+      // Show nav when scrolling up, hide when scrolling down
+      if (currentScrollY < lastScrollY) {
+        setIsMobileNavVisible(true);
+      } else if (currentScrollY > lastScrollY && currentScrollY > 100) {
+        setIsMobileNavVisible(false);
+      }
+      
+      setLastScrollY(currentScrollY);
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [lastScrollY]);
   
   // Desktop tabs - show all (How It Works moved to header)
   const desktopTabs = [
@@ -205,13 +227,13 @@ const Navigation = ({ activeTab = "DISCOVER", onTabChange }: NavigationProps) =>
 
       {/* Mobile Bottom Navigation - Futuristic Cyber Style */}
       <nav 
-        className="md:hidden fixed bottom-0 left-0 right-0 z-50"
+        className={`md:hidden fixed bottom-0 left-0 right-0 z-50 transition-transform duration-300 ${
+          isMobileNavVisible ? 'translate-y-0' : 'translate-y-full'
+        }`}
         style={{ 
           paddingBottom: 'max(env(safe-area-inset-bottom), 0px)',
-          position: 'fixed',
-          bottom: 0,
-          transform: 'translateZ(0)', // Force GPU acceleration for better stability
-          WebkitTransform: 'translateZ(0)', // Safari support
+          transform: isMobileNavVisible ? 'translateY(0) translateZ(0)' : 'translateY(100%) translateZ(0)',
+          WebkitTransform: isMobileNavVisible ? 'translateY(0) translateZ(0)' : 'translateY(100%) translateZ(0)',
         }}
       >
         {/* Glowing top border */}

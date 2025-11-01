@@ -48,6 +48,7 @@ interface AudioPlayerProps {
   onClose?: () => void;
   shuffleEnabled?: boolean;
   repeatMode?: 'off' | 'all' | 'one';
+  initialMinimized?: boolean;
 }
 
 const AudioPlayer = ({ 
@@ -62,7 +63,8 @@ const AudioPlayer = ({
   onRepeat,
   onClose,
   shuffleEnabled = false,
-  repeatMode = 'off'
+  repeatMode = 'off',
+  initialMinimized = false
 }: AudioPlayerProps) => {
   const navigate = useNavigate();
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -77,7 +79,15 @@ const AudioPlayer = ({
   const [coverImageError, setCoverImageError] = useState(false);
   const [coverImageLoaded, setCoverImageLoaded] = useState(false);
   const [currentCoverUrlIndex, setCurrentCoverUrlIndex] = useState(0);
-  const [isMinimized, setIsMinimized] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(initialMinimized);
+  const hasUserInteractedRef = useRef(false); // Track if user has manually toggled minimized state
+  
+  // Update minimized state when initialMinimized changes (e.g., new song on feed page)
+  useEffect(() => {
+    if (initialMinimized && !hasUserInteractedRef.current) {
+      setIsMinimized(true);
+    }
+  }, [initialMinimized]);
   const [isMobileNavVisible, setIsMobileNavVisible] = useState(true);
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
@@ -581,7 +591,10 @@ const AudioPlayer = ({
         <div className="fixed right-0 top-1/2 -translate-y-1/2 z-50 md:right-0">
           <div className="relative">
             <Button
-              onClick={() => setIsMinimized(false)}
+              onClick={() => {
+                hasUserInteractedRef.current = true;
+                setIsMinimized(false);
+              }}
               className="h-32 w-12 rounded-l-xl rounded-r-none bg-black/40 backdrop-blur-xl border border-white/10 border-r-0 hover:bg-black/60 hover:w-14 transition-all duration-300 flex flex-col items-center justify-center gap-2 shadow-2xl group"
             >
               <ChevronLeft className="h-5 w-5 text-neon-green group-hover:animate-pulse" />
@@ -659,7 +672,10 @@ const AudioPlayer = ({
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setIsMinimized(true)}
+            onClick={() => {
+              hasUserInteractedRef.current = true;
+              setIsMinimized(true);
+            }}
             className="h-6 w-6 rounded-full hover:bg-white/10 text-muted-foreground hover:text-foreground"
             title="Minimize player"
           >

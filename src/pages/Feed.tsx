@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { MessageCircle, Share2, Image as ImageIcon, Send, CheckCircle, Check, CircleCheckBig, Music, Loader2, Play, Pause, Lock, ChevronsUpDown, X } from 'lucide-react';
+import { MessageCircle, Share2, Image as ImageIcon, Send, CheckCircle, Check, CircleCheckBig, Music, Loader2, Play, Pause, Lock, ChevronsUpDown, X, Plus } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { getIPFSGatewayUrl } from '@/lib/ipfs';
 import StoriesBar from '@/components/StoriesBar';
@@ -20,12 +20,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SongComments } from '@/components/SongComments';
 import { AiBadge } from '@/components/AiBadge';
 import gltchLogo from '@/assets/gltch-logo.png';
+import gltchTabLogo from '@/assets/gltch-tab-logo.png';
 import { useSongPrice } from '@/hooks/useSongBondingCurve';
 import { useTokenPrices } from '@/hooks/useTokenPrices';
 import { Address } from 'viem';
 import { useReadContract } from 'wagmi';
 import { AudioWaveform } from '@/components/AudioWaveform';
 import { useAudioStateForSong } from '@/hooks/useAudioState';
+import CreatePostModal from '@/components/CreatePostModal';
+import { useMobileNavVisibility } from '@/hooks/useMobileNavVisibility';
 
 const XRGE_TOKEN_ADDRESS = "0x147120faEC9277ec02d957584CFCD92B56A24317" as const;
 
@@ -45,6 +48,7 @@ interface FeedComment {
   created_at: string;
   profiles?: {
     artist_name: string | null;
+    display_name: string | null;
     avatar_cid: string | null;
     verified: boolean | null;
   };
@@ -61,6 +65,7 @@ interface FeedPost {
   comment_count: number;
   profiles?: {
     artist_name: string | null;
+    display_name: string | null;
     avatar_cid: string | null;
     verified: boolean | null;
   };
@@ -86,6 +91,7 @@ interface SongPost {
   ai_usage?: 'none' | 'partial' | 'full' | null;
   profiles?: {
     artist_name: string | null;
+    display_name: string | null;
     avatar_cid: string | null;
     verified: boolean | null;
   };
@@ -107,61 +113,61 @@ const getPostItColors = (postId: string) => {
   const index = Math.abs(hash) % 7;
   
   const colorSchemes = [
-    // Yellow/Amber
+    // Neon Green Cyberpunk
     {
-      bg: 'from-amber-500/10 via-yellow-400/8 to-orange-400/10',
-      layer1: 'from-amber-50/30 via-yellow-50/25 to-orange-50/20',
-      layer2: 'from-yellow-100/40 via-amber-100/35 to-orange-100/30',
-      accent1: 'bg-amber-400/20',
-      accent2: 'bg-yellow-300/15',
+      bg: 'from-neon-green/5 via-emerald-500/10 to-black/20',
+      glass: 'bg-black/40 backdrop-blur-xl border-neon-green/30',
+      circuit: 'border-neon-green/20',
+      glow: 'shadow-[0_0_20px_rgba(0,255,159,0.3)]',
+      text: 'text-neon-green/90',
     },
-    // Pink/Rose
+    // Electric Blue
     {
-      bg: 'from-pink-500/10 via-rose-400/8 to-fuchsia-400/10',
-      layer1: 'from-pink-50/30 via-rose-50/25 to-fuchsia-50/20',
-      layer2: 'from-rose-100/40 via-pink-100/35 to-fuchsia-100/30',
-      accent1: 'bg-pink-400/20',
-      accent2: 'bg-rose-300/15',
+      bg: 'from-blue-500/5 via-cyan-500/10 to-black/20',
+      glass: 'bg-black/40 backdrop-blur-xl border-cyan-500/30',
+      circuit: 'border-cyan-500/20',
+      glow: 'shadow-[0_0_20px_rgba(0,255,255,0.3)]',
+      text: 'text-cyan-400/90',
     },
-    // Blue/Cyan
+    // Hot Pink
     {
-      bg: 'from-blue-500/10 via-cyan-400/8 to-sky-400/10',
-      layer1: 'from-blue-50/30 via-cyan-50/25 to-sky-50/20',
-      layer2: 'from-cyan-100/40 via-blue-100/35 to-sky-100/30',
-      accent1: 'bg-blue-400/20',
-      accent2: 'bg-cyan-300/15',
+      bg: 'from-pink-500/5 via-fuchsia-500/10 to-black/20',
+      glass: 'bg-black/40 backdrop-blur-xl border-pink-500/30',
+      circuit: 'border-pink-500/20',
+      glow: 'shadow-[0_0_20px_rgba(255,0,255,0.3)]',
+      text: 'text-pink-400/90',
     },
-    // Green/Lime
+    // Purple Haze
     {
-      bg: 'from-green-500/10 via-lime-400/8 to-emerald-400/10',
-      layer1: 'from-green-50/30 via-lime-50/25 to-emerald-50/20',
-      layer2: 'from-lime-100/40 via-green-100/35 to-emerald-100/30',
-      accent1: 'bg-green-400/20',
-      accent2: 'bg-lime-300/15',
+      bg: 'from-purple-500/5 via-violet-500/10 to-black/20',
+      glass: 'bg-black/40 backdrop-blur-xl border-purple-500/30',
+      circuit: 'border-purple-500/20',
+      glow: 'shadow-[0_0_20px_rgba(168,85,247,0.3)]',
+      text: 'text-purple-400/90',
     },
-    // Purple/Violet
+    // Orange Flame
     {
-      bg: 'from-purple-500/10 via-violet-400/8 to-indigo-400/10',
-      layer1: 'from-purple-50/30 via-violet-50/25 to-indigo-50/20',
-      layer2: 'from-violet-100/40 via-purple-100/35 to-indigo-100/30',
-      accent1: 'bg-purple-400/20',
-      accent2: 'bg-violet-300/15',
+      bg: 'from-orange-500/5 via-red-500/10 to-black/20',
+      glass: 'bg-black/40 backdrop-blur-xl border-orange-500/30',
+      circuit: 'border-orange-500/20',
+      glow: 'shadow-[0_0_20px_rgba(255,165,0,0.3)]',
+      text: 'text-orange-400/90',
     },
-    // Orange/Red
+    // Teal Matrix
     {
-      bg: 'from-orange-500/10 via-red-400/8 to-amber-400/10',
-      layer1: 'from-orange-50/30 via-red-50/25 to-amber-50/20',
-      layer2: 'from-red-100/40 via-orange-100/35 to-amber-100/30',
-      accent1: 'bg-orange-400/20',
-      accent2: 'bg-red-300/15',
+      bg: 'from-teal-500/5 via-emerald-500/10 to-black/20',
+      glass: 'bg-black/40 backdrop-blur-xl border-teal-500/30',
+      circuit: 'border-teal-500/20',
+      glow: 'shadow-[0_0_20px_rgba(20,184,166,0.3)]',
+      text: 'text-teal-400/90',
     },
-    // Teal/Mint
+    // Yellow Electric
     {
-      bg: 'from-teal-500/10 via-emerald-400/8 to-cyan-400/10',
-      layer1: 'from-teal-50/30 via-emerald-50/25 to-cyan-50/20',
-      layer2: 'from-emerald-100/40 via-teal-100/35 to-cyan-100/30',
-      accent1: 'bg-teal-400/20',
-      accent2: 'bg-emerald-300/15',
+      bg: 'from-yellow-500/5 via-amber-500/10 to-black/20',
+      glass: 'bg-black/40 backdrop-blur-xl border-yellow-500/30',
+      circuit: 'border-yellow-500/20',
+      glow: 'shadow-[0_0_20px_rgba(255,255,0,0.3)]',
+      text: 'text-yellow-400/90',
     },
   ];
   
@@ -214,6 +220,7 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
     isConnected
   } = useWallet();
   const { getAccessToken } = usePrivy();
+  const isMobileNavVisible = useMobileNavVisibility();
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [songs, setSongs] = useState<SongPost[]>([]);
   const [loading, setLoading] = useState(true);
@@ -241,6 +248,13 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
   const [songSearchQuery, setSongSearchQuery] = useState('');
   const [allSongs, setAllSongs] = useState<SongPost[]>([]);
   const [loadingAllSongs, setLoadingAllSongs] = useState(false);
+  const [showCreatePostModal, setShowCreatePostModal] = useState(false);
+  
+  // Dismissible tip for feed page
+  const [showFeedTip, setShowFeedTip] = useState(() => {
+    const dismissed = localStorage.getItem('feed_tip_dismissed');
+    return dismissed !== 'true';
+  });
 
   // Check if user holds XRGE tokens
   const { data: xrgeBalance } = useReadContract({
@@ -320,23 +334,36 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
 
       // Fetch profiles separately (case-insensitive matching)
       const walletAddresses = [...new Set(postsData?.map(p => p.wallet_address) || [])];
-      let profilesData: { wallet_address: string; artist_name: string | null; avatar_cid: string | null; verified: boolean | null }[] = [];
+      console.log('📋 Fetching profiles for wallet addresses:', walletAddresses);
+      
+      let profilesData: { wallet_address: string; artist_name: string | null; display_name: string | null; avatar_cid: string | null; verified: boolean | null }[] = [];
       if (walletAddresses.length) {
         const orFilter = walletAddresses.map((a) => `wallet_address.ilike.${a}`).join(',');
-        const { data } = await supabase
+        const { data, error: profileError } = await supabase
           .from('profiles')
-          .select('wallet_address, artist_name, avatar_cid, verified')
+          .select('wallet_address, artist_name, display_name, avatar_cid, verified')
           .or(orFilter);
+        
+        if (profileError) {
+          console.error('❌ Error fetching profiles:', profileError);
+        } else {
+          console.log('✅ Profiles fetched:', data);
+        }
+        
         profilesData = data || [];
       }
       
-      console.log('Profiles data:', profilesData);
+      console.log('👥 Profiles data for posts:', profilesData);
 
       // Merge data (normalize addresses to lowercase)
-      const postsWithProfiles = postsData?.map(post => ({
-        ...post,
-        profiles: profilesData?.find(p => p.wallet_address?.toLowerCase() === post.wallet_address?.toLowerCase()) || null
-      })) || [];
+      const postsWithProfiles = postsData?.map(post => {
+        const profile = profilesData?.find(p => p.wallet_address?.toLowerCase() === post.wallet_address?.toLowerCase());
+        console.log(`🔗 Post ${post.id} (${post.wallet_address}) -> Profile:`, profile);
+        return {
+          ...post,
+          profiles: profile || null
+        };
+      }) || [];
 
       if (loadMore) {
         setPosts(prev => [...prev, ...(postsWithProfiles as FeedPost[])]);
@@ -389,7 +416,7 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
         const orFilter = walletAddresses.map((a) => `wallet_address.ilike.${a}`).join(',');
         const { data } = await supabase
           .from('profiles')
-          .select('wallet_address, artist_name, avatar_cid, verified')
+          .select('wallet_address, artist_name, display_name, avatar_cid, verified')
           .or(orFilter);
         profilesData = data || [];
       }
@@ -577,7 +604,7 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
         const orFilter = walletAddresses.map((a) => `wallet_address.ilike.${a}`).join(',');
         const { data } = await supabase
           .from('profiles')
-          .select('wallet_address, artist_name, avatar_cid, verified')
+          .select('wallet_address, artist_name, display_name, avatar_cid, verified')
           .or(orFilter);
         profilesData = data || [];
       }
@@ -757,7 +784,7 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
             ) : (
               <div className="w-12 h-12 md:w-14 md:h-14 rounded-full bg-gradient-to-br from-neon-green/20 to-purple-500/20 flex items-center justify-center border-2 border-neon-green/20 group-hover/avatar:border-neon-green/60 transition-all duration-300">
                 <span className="text-neon-green text-base md:text-lg font-bold">
-                  {song.profiles?.artist_name?.[0] || '?'}
+                  {song.profiles?.artist_name?.[0] || song.profiles?.display_name?.[0] || '?'}
                 </span>
               </div>
             )}
@@ -766,11 +793,17 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
           <div className="flex-1 min-w-0">
             {/* Artist Name and Action */}
             <div className="flex items-center gap-2 mb-1">
-              <p 
+              <p
                 className="font-semibold text-sm md:text-base cursor-pointer hover:text-neon-green transition-colors duration-200"
                 onClick={() => navigate(`/artist/${song.wallet_address}`)}
               >
-                {song.profiles?.artist_name || `${song.wallet_address.slice(0, 6)}...${song.wallet_address.slice(-4)}`}
+                {(() => {
+                  const name = song.profiles?.artist_name || song.profiles?.display_name;
+                  // Filter out wallet addresses - they start with 0x and are 42 chars
+                  const isValidName = name && !name.toLowerCase().startsWith('0x') && name.length < 42;
+                  // Never show wallet address - always show Anonymous if no valid name
+                  return isValidName ? name : 'Anonymous';
+                })()}
               </p>
               {song.profiles?.verified && (
                 <CircleCheckBig className="h-4 w-4 text-blue-500 flex-shrink-0 animate-pulse" aria-label="Verified artist" />
@@ -924,8 +957,67 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
             </p>
           </div>
 
-          {/* Post Creator */}
+          {/* Feed Tip Card */}
+          {showFeedTip && (
+            <Card className="mx-4 md:mx-auto md:max-w-2xl mb-6 p-4 bg-gradient-to-r from-blue-500/10 via-purple-500/10 to-pink-500/10 backdrop-blur-xl border border-blue-500/30 rounded-2xl">
+              <div className="flex items-start gap-3">
+                <div className="p-2 rounded-lg bg-blue-500/20 border border-blue-500/30 flex-shrink-0">
+                  <Music className="h-5 w-5 text-blue-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-sm font-bold font-mono text-blue-400 mb-1">💡 Feed Tips</h3>
+                  <p className="text-xs text-muted-foreground leading-relaxed mb-2">
+                    • Click the <span className="text-neon-green font-semibold">+ button</span> to create posts
+                    <br />
+                    • Audio player auto-docks on this page for better scrolling
+                    <br />
+                    • Click the side tab to expand the player anytime
+                  </p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setShowFeedTip(false);
+                    localStorage.setItem('feed_tip_dismissed', 'true');
+                  }}
+                  className="h-6 w-6 p-0 hover:bg-blue-500/20 flex-shrink-0"
+                >
+                  <X className="h-4 w-4 text-blue-400" />
+                </Button>
+              </div>
+            </Card>
+          )}
+
+          {/* Floating Action Button */}
           {isConnected && (
+            <Button
+              onClick={() => setShowCreatePostModal(true)}
+              className={`fixed right-6 md:right-8 h-14 w-14 rounded-full shadow-[0_8px_32px_0_rgba(0,255,159,0.4)] hover:shadow-[0_12px_48px_0_rgba(0,255,159,0.6)] bg-gradient-to-br from-neon-green to-emerald-500 hover:from-neon-green/90 hover:to-emerald-500/90 z-40 hover:scale-110 active:scale-95 ${
+                isMobileNavVisible ? 'bottom-24 md:bottom-8' : 'bottom-6 md:bottom-8'
+              } transition-all duration-300`}
+              size="icon"
+            >
+              <Plus className="h-6 w-6" />
+            </Button>
+          )}
+
+          {/* Create Post Modal */}
+          <CreatePostModal
+            open={showCreatePostModal}
+            onOpenChange={setShowCreatePostModal}
+            hasXRGE={hasXRGE}
+            playSong={playSong}
+            currentSong={currentSong}
+            isPlaying={isPlaying}
+            onPostCreated={() => {
+              loadPosts();
+              loadSongs();
+            }}
+          />
+
+          {/* Old Post Creator - REMOVED */}
+          {false && isConnected && (
             <Card className="relative z-50 p-4 md:p-6 space-y-4 bg-gradient-to-br from-white/5 via-white/3 to-transparent backdrop-blur-xl border border-white/10 shadow-[0_8px_32px_0_rgba(0,255,159,0.1)] hover:shadow-[0_12px_48px_0_rgba(0,255,159,0.2)] hover:border-neon-green/20 w-full md:max-w-2xl md:mx-auto mb-6 md:rounded-2xl rounded-none border-x-0 md:border-x transition-all duration-300">
               {!hasXRGE && (
                 <div className="flex items-start gap-3 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
@@ -1117,9 +1209,19 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
 
           {/* Feed with Tabs */}
           <Tabs defaultValue="songs" className="w-full md:max-w-2xl md:mx-auto">
-            <TabsList className="grid w-full grid-cols-2 mb-4 md:mb-6 mx-auto max-w-xs md:max-w-full md:mx-0 md:rounded-lg rounded-md">
-              <TabsTrigger value="songs">Songs</TabsTrigger>
-              <TabsTrigger value="posts">Posts</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-2 mb-4 md:mb-6 mx-auto max-w-xs md:max-w-full md:mx-0 bg-black/60 backdrop-blur-xl border border-neon-green/20 shadow-[0_0_20px_rgba(0,255,159,0.15)] p-1 rounded-lg">
+              <TabsTrigger 
+                value="songs"
+                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-neon-green/20 data-[state=active]:to-emerald-500/20 data-[state=active]:text-neon-green data-[state=active]:shadow-[0_0_15px_rgba(0,255,159,0.5)] data-[state=active]:border data-[state=active]:border-neon-green/50 data-[state=inactive]:text-white/50 data-[state=inactive]:hover:text-white/80 transition-all duration-300 font-mono font-bold uppercase"
+              >
+                Songs
+              </TabsTrigger>
+              <TabsTrigger 
+                value="posts" 
+                className="flex items-center justify-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-neon-green/20 data-[state=active]:to-emerald-500/20 data-[state=active]:shadow-[0_0_15px_rgba(0,255,159,0.5)] data-[state=active]:border data-[state=active]:border-neon-green/50 data-[state=inactive]:opacity-50 data-[state=inactive]:hover:opacity-80 transition-all duration-300"
+              >
+                <img src={gltchTabLogo} alt="GLTCH" className="h-6 w-auto" />
+              </TabsTrigger>
             </TabsList>
 
             {/* Posts Tab */}
@@ -1137,7 +1239,7 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
               ) : (
                 posts.map(post => (
                   <Card key={post.id} className="p-4 md:p-6 bg-gradient-to-br from-white/5 via-white/3 to-transparent backdrop-blur-xl border border-white/10 shadow-[0_8px_32px_0_rgba(0,255,159,0.1)] hover:shadow-[0_12px_48px_0_rgba(0,255,159,0.2)] hover:border-neon-green/20 flex flex-col w-full md:rounded-2xl rounded-none border-x-0 md:border-x border-b md:border-b mb-0 md:mb-4 hover:bg-white/8 active:bg-white/10 active:scale-[0.98] transition-all duration-300 group">
-                  {/* Post Header */}
+                  {/* Post Header - Updated to hide wallet addresses */}
                   <div className="flex items-center gap-3 mb-4">
                     <div 
                       className="cursor-pointer hover:scale-110 transition-transform duration-200 relative group/avatar"
@@ -1157,7 +1259,7 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
                       ) : (
                         <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-gradient-to-br from-neon-green/20 to-purple-500/20 flex items-center justify-center border-2 border-neon-green/20 group-hover/avatar:border-neon-green/60 transition-all duration-300">
                           <span className="text-neon-green text-sm md:text-base font-bold">
-                            {post.profiles?.artist_name?.[0] || '?'}
+                            {post.profiles?.artist_name?.[0] || post.profiles?.display_name?.[0] || '?'}
                           </span>
                         </div>
                       )}
@@ -1168,7 +1270,13 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
                           className="font-semibold text-sm md:text-base cursor-pointer hover:text-neon-green transition-colors duration-200"
                           onClick={() => navigate(`/artist/${post.wallet_address}`)}
                         >
-                          {post.profiles?.artist_name || `${post.wallet_address.slice(0, 6)}...${post.wallet_address.slice(-4)}`}
+                          {(() => {
+                            const name = post.profiles?.artist_name || post.profiles?.display_name;
+                            // Filter out wallet addresses - they start with 0x and are 42 chars
+                            const isValidName = name && !name.toLowerCase().startsWith('0x') && name.length < 42;
+                            // Never show wallet address - always show Anonymous if no valid name
+                            return isValidName ? name : 'Anonymous';
+                          })()}
                         </p>
                         {post.profiles?.verified && (
                           <CircleCheckBig className="h-4 w-4 text-blue-500 flex-shrink-0 animate-pulse" aria-label="Verified artist" />
@@ -1190,7 +1298,20 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
 
                   {/* Post Media with Song Player Overlay */}
                   {post.media_cid && post.songs && (
-                    <div className="mb-4 rounded-xl overflow-hidden relative group/media">
+                    <div 
+                      className="mb-4 rounded-xl overflow-hidden relative group/media cursor-pointer"
+                      onClick={() => {
+                        if (playSong) {
+                          playSong({
+                            id: post.songs.id,
+                            title: post.songs.title,
+                            artist: post.songs.artist,
+                            audio_cid: post.songs.audio_cid,
+                            cover_cid: post.songs.cover_cid
+                          });
+                        }
+                      }}
+                    >
                       <div className="relative">
                         <img 
                           src={getIPFSGatewayUrl(post.media_cid)} 
@@ -1202,33 +1323,23 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
                         <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover/media:opacity-100 transition-opacity duration-300" />
                       </div>
                       
-                      {/* Enhanced Play/Pause Button Overlay */}
-                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                        <button
-                          onClick={() => {
-                            if (playSong) {
-                              playSong({
-                                id: post.songs.id,
-                                title: post.songs.title,
-                                artist: post.songs.artist,
-                                audio_cid: post.songs.audio_cid,
-                                cover_cid: post.songs.cover_cid
-                              });
-                            }
-                          }}
-                          className="pointer-events-auto bg-black/70 backdrop-blur-md hover:bg-black/90 transition-all duration-300 p-6 md:p-8 rounded-full opacity-0 group-hover/media:opacity-100 hover:scale-110 active:scale-95 border-2 border-white/20 hover:border-neon-green/50 shadow-[0_0_30px_rgba(0,255,159,0.5)]"
-                        >
+                      {/* Small Play/Pause Indicator - Top Right */}
+                      <div className="absolute top-3 right-3">
+                        <div className="bg-black/70 backdrop-blur-md transition-all duration-300 p-2 rounded-full opacity-60 group-hover/media:opacity-100 border border-white/20 group-hover/media:border-neon-green/50 shadow-[0_0_15px_rgba(0,255,159,0.3)]">
                           {currentSong?.id === post.songs.id && isPlaying ? (
-                            <Pause className="w-12 h-12 md:w-16 md:h-16 text-white" />
+                            <Pause className="w-4 h-4 text-white" />
                           ) : (
-                            <Play className="w-12 h-12 md:w-16 md:h-16 text-white ml-1" />
+                            <Play className="w-4 h-4 text-white ml-0.5" />
                           )}
-                        </button>
+                        </div>
                       </div>
 
                       {/* Bottom Song Scroller */}
                       <div 
-                        onClick={() => navigate(`/song/${post.songs.id}`)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/song/${post.songs.id}`);
+                        }}
                         className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/95 via-black/80 to-transparent p-4 cursor-pointer hover:bg-black/98 transition-all duration-300 backdrop-blur-sm"
                       >
                         <div className="flex items-center gap-2">
@@ -1275,51 +1386,67 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
                     </div>
                   )}
 
-                  {/* Text Post with Song - Styled like Post-It Note */}
+                  {/* Text Post with Song - Cyberpunk Glass Effect */}
                   {!post.media_cid && post.content_text && post.songs && (() => {
                     const colors = getPostItColors(post.id);
                     return (
-                      <div className={`mb-4 rounded-xl overflow-hidden relative group/media min-h-[300px] flex items-center justify-center bg-gradient-to-br ${colors.bg}`}>
-                        {/* Post-It Note Styled Text Background - Layered effect */}
-                        <div className={`absolute inset-[2px] bg-gradient-to-br ${colors.layer1} rotate-[-1deg] transform origin-center shadow-[2px_2px_4px_rgba(0,0,0,0.2)] rounded-lg`} />
-                        <div className={`absolute inset-[4px] bg-gradient-to-br ${colors.layer2} rotate-[0.5deg] transform origin-center shadow-[1px_1px_2px_rgba(0,0,0,0.15)] rounded-lg`} />
-                        <div className={`absolute top-2 left-2 w-8 h-8 ${colors.accent1} rotate-[-8deg] rounded-sm blur-sm`} />
-                        <div className={`absolute bottom-2 right-2 w-6 h-6 ${colors.accent2} rotate-[12deg] rounded-sm blur-sm`} />
+                      <div 
+                        className={`mb-4 rounded-xl overflow-hidden relative group/media min-h-[300px] flex items-center justify-center bg-gradient-to-br ${colors.bg} cursor-pointer`}
+                        onClick={() => {
+                          if (playSong) {
+                            playSong({
+                              id: post.songs.id,
+                              title: post.songs.title,
+                              artist: post.songs.artist,
+                              audio_cid: post.songs.audio_cid,
+                              cover_cid: post.songs.cover_cid
+                            });
+                          }
+                        }}
+                      >
+                        {/* Cyberpunk Glass Panel */}
+                        <div className={`absolute inset-0 ${colors.glass} border-2 ${colors.circuit} ${colors.glow}`}>
+                          {/* Circuit Lines - Horizontal */}
+                          <div className={`absolute top-1/4 left-0 right-0 h-[1px] ${colors.circuit} border-t opacity-30`} />
+                          <div className={`absolute top-1/2 left-0 right-0 h-[1px] ${colors.circuit} border-t opacity-20`} />
+                          <div className={`absolute top-3/4 left-0 right-0 h-[1px] ${colors.circuit} border-t opacity-30`} />
+                          
+                          {/* Circuit Lines - Vertical */}
+                          <div className={`absolute left-1/4 top-0 bottom-0 w-[1px] ${colors.circuit} border-l opacity-30`} />
+                          <div className={`absolute left-1/2 top-0 bottom-0 w-[1px] ${colors.circuit} border-l opacity-20`} />
+                          <div className={`absolute left-3/4 top-0 bottom-0 w-[1px] ${colors.circuit} border-l opacity-30`} />
+                          
+                          {/* Corner Accents */}
+                          <div className={`absolute top-2 left-2 w-4 h-4 border-t-2 border-l-2 ${colors.circuit}`} />
+                          <div className={`absolute top-2 right-2 w-4 h-4 border-t-2 border-r-2 ${colors.circuit}`} />
+                          <div className={`absolute bottom-2 left-2 w-4 h-4 border-b-2 border-l-2 ${colors.circuit}`} />
+                          <div className={`absolute bottom-2 right-2 w-4 h-4 border-b-2 border-r-2 ${colors.circuit}`} />
+                        </div>
                       
                       {/* Text Content */}
                       <div className="relative z-10 p-6 md:p-8 w-full">
-                        <div className="text-base md:text-lg whitespace-pre-wrap text-foreground/95 leading-relaxed font-medium drop-shadow-sm">
+                        <div className={`text-base md:text-lg whitespace-pre-wrap leading-relaxed font-mono font-semibold ${colors.text} drop-shadow-[0_0_10px_currentColor]`}>
                           <TaggedText text={post.content_text} />
                         </div>
                       </div>
 
-                      {/* Enhanced Play/Pause Button Overlay */}
-                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
-                        <button
-                          onClick={() => {
-                            if (playSong) {
-                              playSong({
-                                id: post.songs.id,
-                                title: post.songs.title,
-                                artist: post.songs.artist,
-                                audio_cid: post.songs.audio_cid,
-                                cover_cid: post.songs.cover_cid
-                              });
-                            }
-                          }}
-                          className="pointer-events-auto bg-black/70 backdrop-blur-md hover:bg-black/90 transition-all duration-300 p-6 md:p-8 rounded-full opacity-0 group-hover/media:opacity-100 hover:scale-110 active:scale-95 border-2 border-white/20 hover:border-neon-green/50 shadow-[0_0_30px_rgba(0,255,159,0.5)]"
-                        >
+                      {/* Small Play/Pause Indicator - Top Right */}
+                      <div className="absolute top-3 right-3 z-20">
+                        <div className="bg-black/70 backdrop-blur-md transition-all duration-300 p-2 rounded-full opacity-60 group-hover/media:opacity-100 border border-white/20 group-hover/media:border-neon-green/50 shadow-[0_0_15px_rgba(0,255,159,0.3)]">
                           {currentSong?.id === post.songs.id && isPlaying ? (
-                            <Pause className="w-12 h-12 md:w-16 md:h-16 text-white" />
+                            <Pause className="w-4 h-4 text-white" />
                           ) : (
-                            <Play className="w-12 h-12 md:w-16 md:h-16 text-white ml-1" />
+                            <Play className="w-4 h-4 text-white ml-0.5" />
                           )}
-                        </button>
+                        </div>
                       </div>
 
                       {/* Bottom Song Scroller - Same as Image Posts */}
                       <div 
-                        onClick={() => navigate(`/song/${post.songs.id}`)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/song/${post.songs.id}`);
+                        }}
                         className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/95 via-black/80 to-transparent p-4 cursor-pointer hover:bg-black/98 transition-all duration-300 backdrop-blur-sm z-20"
                       >
                         <div className="flex items-center gap-2">
@@ -1423,7 +1550,13 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
                                   className="text-sm font-semibold cursor-pointer hover:text-neon-green transition-colors"
                                   onClick={() => navigate(`/artist/${comment.wallet_address}`)}
                                 >
-                                  {comment.profiles?.artist_name || `${comment.wallet_address.slice(0, 6)}...${comment.wallet_address.slice(-4)}`}
+                                  {(() => {
+                                    const name = comment.profiles?.artist_name || comment.profiles?.display_name;
+                                    // Filter out wallet addresses - they start with 0x and are 42 chars
+                                    const isValidName = name && !name.toLowerCase().startsWith('0x') && name.length < 42;
+                                    // Never show wallet address - always show Anonymous if no valid name
+                                    return isValidName ? name : 'Anonymous';
+                                  })()}
                                 </p>
                                 {comment.profiles?.verified && (
                                   <CircleCheckBig className="h-3 w-3 text-blue-500 flex-shrink-0" aria-label="Verified artist" />

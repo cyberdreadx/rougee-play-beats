@@ -1622,7 +1622,7 @@ const SongTrade = ({ playSong, currentSong, isPlaying }: SongTradeProps) => {
     coverImageUrl = getIPFSGatewayUrl(song.cover_cid, 'https://gateway.lighthouse.storage/ipfs');
   } else {
     // Final fallback to default OG image
-    coverImageUrl = 'https://rougee.app/og-image.png';
+    coverImageUrl = `${window.location.origin}/rougee-new-og.jpg`;
   }
   
   // Ensure absolute URL for social crawlers (they need full URLs)

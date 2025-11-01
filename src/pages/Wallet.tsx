@@ -829,8 +829,8 @@ const Wallet = ({ playSong, currentSong, isPlaying }: WalletProps = {}) => {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-16 md:pb-0">
-      <main className="container mx-auto px-4 py-4 max-w-3xl">
+    <div className="min-h-screen bg-background">
+      <main className="container mx-auto px-4 pb-24 md:pb-4 max-w-3xl">
         {/* Header Section */}
         <div className="mb-6">
           <div className="flex items-center justify-between mb-4">

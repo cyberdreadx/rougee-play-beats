@@ -13,7 +13,7 @@ const Layout = ({ children }: LayoutProps) => {
       <Header />
       {/* Main content with sidebar offset on desktop and padding for fixed header - CSS variable handles the transition */}
       <div 
-        className="pb-20 md:pb-0 pt-14 md:pt-16 transition-all duration-300"
+        className="pb-24 md:pb-0 pt-20 md:pt-16 transition-all duration-300"
         style={{
           paddingLeft: typeof window !== 'undefined' && window.innerWidth >= 768 ? 'var(--sidebar-width, 16rem)' : '0'
         }}

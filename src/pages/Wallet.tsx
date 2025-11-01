@@ -532,7 +532,7 @@ const Wallet = ({ playSong, currentSong, isPlaying }: WalletProps = {}) => {
       // Get all deployed songs with token addresses
       const { data: songs, error } = await supabase
         .from('songs')
-        .select('id, title, artist, ticker, token_address, cover_cid, ai_usage')
+        .select('id, title, artist, ticker, token_address, cover_cid, audio_cid, ai_usage')
         .not('token_address', 'is', null);
         
       if (error) {

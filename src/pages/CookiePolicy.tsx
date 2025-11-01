@@ -11,6 +11,8 @@ const CookiePolicy = () => {
       <Helmet>
         <title>Cookie Policy - ROUGEE</title>
         <meta name="description" content="Cookie Policy for ROUGEE - how and why we use cookies and similar technologies." />
+        <meta property="og:image" content={`${window.location.origin}/rougee-new-og.jpg`} />
+        <meta name="twitter:image" content={`${window.location.origin}/rougee-new-og.jpg`} />
       </Helmet>
 
       <div className="min-h-screen bg-background">

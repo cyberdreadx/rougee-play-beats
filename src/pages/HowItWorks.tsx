@@ -156,6 +156,8 @@ const HowItWorks = () => {
       <Helmet>
         <title>How It Works - ROUGEE</title>
         <meta name="description" content="Learn how ROUGEE works in simple steps. Upload music, trade tokens, and support artists." />
+        <meta property="og:image" content={`${window.location.origin}/rougee-new-og.jpg`} />
+        <meta name="twitter:image" content={`${window.location.origin}/rougee-new-og.jpg`} />
       </Helmet>
       
       <div className="min-h-screen bg-background">

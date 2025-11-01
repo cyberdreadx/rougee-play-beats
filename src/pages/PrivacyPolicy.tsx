@@ -11,6 +11,8 @@ const PrivacyPolicy = () => {
       <Helmet>
         <title>Privacy Policy - ROUGEE</title>
         <meta name="description" content="Privacy Policy for ROUGEE - how we collect, use, and protect your data." />
+        <meta property="og:image" content={`${window.location.origin}/rougee-new-og.jpg`} />
+        <meta name="twitter:image" content={`${window.location.origin}/rougee-new-og.jpg`} />
       </Helmet>
 
       <div className="min-h-screen bg-background">

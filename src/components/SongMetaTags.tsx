@@ -12,7 +12,7 @@ interface SongMetaTagsProps {
 export const SongMetaTags = ({ title, artist, imageUrl, url, description, songId }: SongMetaTagsProps) => {
   const metaTitle = `${title} by ${artist} | ROUGEE.PLAY`;
   const metaDescription = description || `Listen to ${title} by ${artist} on ROUGEE.PLAY - The decentralized music platform`;
-  const defaultImage = `${window.location.origin}/og-image.png`;
+  const defaultImage = `${window.location.origin}/rougee-new-og.jpg`;
   // Use provided image or default
   const metaImage = imageUrl || defaultImage;
 

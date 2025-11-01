@@ -27,6 +27,8 @@ const TermsOfService = () => {
       <Helmet>
         <title>Terms of Service - ROUGEE</title>
         <meta name="description" content="Terms of Service for ROUGEE - Decentralized music platform" />
+        <meta property="og:image" content={`${window.location.origin}/rougee-new-og.jpg`} />
+        <meta name="twitter:image" content={`${window.location.origin}/rougee-new-og.jpg`} />
       </Helmet>
       
       <div className="min-h-screen bg-background">

@@ -753,7 +753,7 @@ const Artist = ({ playSong, currentSong, isPlaying }: ArtistProps) => {
               <div className="flex-1 flex flex-col justify-between min-w-0">
                 <div>
                   <div className="flex items-center gap-3 mb-2 flex-wrap min-w-0">
-                    <h1 className="text-3xl md:text-5xl font-bold bg-gradient-to-r from-white via-white to-white/80 bg-clip-text text-transparent truncate">
+                    <h1 className="text-2xl md:text-5xl font-bold bg-gradient-to-r from-white via-white to-white/80 bg-clip-text text-transparent truncate">
                       {profile.artist_name || profile.display_name || shortWallet}
                     </h1>
                     <XRGETierBadge walletAddress={walletAddress || null} size="md" />
@@ -825,7 +825,7 @@ const Artist = ({ playSong, currentSong, isPlaying }: ArtistProps) => {
                   )}
                   
                   {/* Quick Stats Row */}
-                  <div className="flex items-center gap-6 flex-wrap mt-4">
+                  <div className="grid grid-cols-2 gap-4 mt-4 md:flex md:items-center md:gap-6 md:flex-wrap">
                     <button
                       onClick={() => setShowHoldersModal(true)}
                       className="flex items-center gap-2 text-sm text-white/70 hover:text-neon-green transition-colors cursor-pointer"
@@ -856,13 +856,13 @@ const Artist = ({ playSong, currentSong, isPlaying }: ArtistProps) => {
                 </div>
 
                 {/* Action Buttons */}
-                <div className="flex gap-3 mt-6 flex-wrap">
+                <div className="flex flex-col md:flex-row gap-3 mt-6">
                   {isOwnProfile ? (
                     <>
                       <Button 
                         variant="default" 
                         onClick={() => navigate("/upload")}
-                        className="bg-neon-green hover:bg-neon-green/80 text-black font-semibold"
+                        className="bg-neon-green hover:bg-neon-green/80 text-black font-semibold w-full md:w-auto"
                       >
                         <Upload className="h-4 w-4 mr-2" />
                         UPLOAD
@@ -870,7 +870,7 @@ const Artist = ({ playSong, currentSong, isPlaying }: ArtistProps) => {
                       <Button 
                         variant="outline" 
                         onClick={() => navigate("/profile/edit")}
-                        className="border-white/20 hover:border-neon-green/50"
+                        className="border-white/20 hover:border-neon-green/50 w-full md:w-auto"
                       >
                         <Edit className="h-4 w-4 mr-2" />
                         EDIT PROFILE
@@ -882,7 +882,7 @@ const Artist = ({ playSong, currentSong, isPlaying }: ArtistProps) => {
                         <Button 
                           variant="outline" 
                           onClick={() => navigate(`/messages?to=${walletAddress}`)}
-                          className="border-white/20 hover:border-neon-green/50"
+                          className="border-white/20 hover:border-neon-green/50 w-full md:w-auto"
                         >
                           <MessageSquare className="h-4 w-4 mr-2" />
                           MESSAGE
@@ -988,8 +988,8 @@ const Artist = ({ playSong, currentSong, isPlaying }: ArtistProps) => {
       <div className="max-w-7xl mx-auto px-6 md:px-12 mt-6">
         <Tabs defaultValue="all" className="w-full">
           {/* Modern Navigation Tabs */}
-          <div className="mb-8">
-            <TabsList className="h-auto p-1.5 bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl inline-flex">
+            <div className="mb-8">
+            <TabsList className="h-auto p-1.5 bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl inline-flex overflow-x-auto scrollbar-hide w-full md:w-auto">
               <TabsTrigger 
                 value="all" 
                 className="px-5 py-2.5 font-medium text-sm data-[state=active]:bg-neon-green data-[state=active]:text-black data-[state=active]:shadow-lg data-[state=inactive]:text-white/70 data-[state=inactive]:hover:text-white rounded-xl transition-all"

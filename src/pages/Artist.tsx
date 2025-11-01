@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useState, memo } from "react";
 import NetworkInfo from "@/components/NetworkInfo";
 import { useArtistProfile } from "@/hooks/useArtistProfile";
 import { useWallet } from "@/hooks/useWallet";
@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
-import { Loader2, ExternalLink, Edit, Music, Play, Pause, Calendar, Instagram, Globe, Users, Wallet, MessageSquare, Send, CheckCircle, Upload, CircleCheckBig } from "lucide-react";
+import { Loader2, ExternalLink, Edit, Music, Play, Pause, Calendar, Instagram, Globe, Users, Wallet, MessageSquare, MessageCircle, Share2, Check, Send, CheckCircle, Upload, CircleCheckBig } from "lucide-react";
 import { FaXTwitter } from "react-icons/fa6";
 import { getIPFSGatewayUrl } from "@/lib/ipfs";
 import { supabase } from "@/integrations/supabase/client";
@@ -28,6 +28,7 @@ import { useSongPrice } from "@/hooks/useSongBondingCurve";
 import { AudioWaveform } from "@/components/AudioWaveform";
 import { useAudioStateForSong } from "@/hooks/useAudioState";
 import { TipButton } from "@/components/TipButton";
+import TaggedText from "@/components/TaggedText";
 
 interface Song {
   id: string;
@@ -53,6 +54,25 @@ interface FeedPost {
   like_count: number;
   comment_count: number;
 }
+
+// Generate consistent random colors for post-it notes based on post ID
+const getPostItColors = (postId: string) => {
+  let hash = 0;
+  for (let i = 0; i < postId.length; i++) {
+    hash = postId.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const index = Math.abs(hash) % 7;
+  const colorSchemes = [
+    { bg: 'from-amber-500/10 via-yellow-400/8 to-orange-400/10', layer1: 'from-amber-50/30 via-yellow-50/25 to-orange-50/20', layer2: 'from-yellow-100/40 via-amber-100/35 to-orange-100/30', accent1: 'bg-amber-400/20', accent2: 'bg-yellow-300/15' },
+    { bg: 'from-pink-500/10 via-rose-400/8 to-fuchsia-400/10', layer1: 'from-pink-50/30 via-rose-50/25 to-fuchsia-50/20', layer2: 'from-rose-100/40 via-pink-100/35 to-fuchsia-100/30', accent1: 'bg-rose-400/20', accent2: 'bg-pink-300/15' },
+    { bg: 'from-blue-500/10 via-cyan-400/8 to-teal-400/10', layer1: 'from-blue-50/30 via-cyan-50/25 to-teal-50/20', layer2: 'from-cyan-100/40 via-blue-100/35 to-teal-100/30', accent1: 'bg-cyan-400/20', accent2: 'bg-blue-300/15' },
+    { bg: 'from-green-500/10 via-lime-400/8 to-emerald-400/10', layer1: 'from-green-50/30 via-lime-50/25 to-emerald-50/20', layer2: 'from-lime-100/40 via-green-100/35 to-emerald-100/30', accent1: 'bg-lime-400/20', accent2: 'bg-green-300/15' },
+    { bg: 'from-purple-500/10 via-violet-400/8 to-indigo-400/10', layer1: 'from-purple-50/30 via-violet-50/25 to-indigo-50/20', layer2: 'from-violet-100/40 via-purple-100/35 to-indigo-100/30', accent1: 'bg-violet-400/20', accent2: 'bg-purple-300/15' },
+    { bg: 'from-orange-500/10 via-red-400/8 to-amber-400/10', layer1: 'from-orange-50/30 via-red-50/25 to-amber-50/20', layer2: 'from-red-100/40 via-orange-100/35 to-amber-100/30', accent1: 'bg-orange-400/20', accent2: 'bg-red-300/15' },
+    { bg: 'from-teal-500/10 via-emerald-400/8 to-green-400/10', layer1: 'from-teal-50/30 via-emerald-50/25 to-green-50/20', layer2: 'from-emerald-100/40 via-teal-100/35 to-green-100/30', accent1: 'bg-emerald-400/20', accent2: 'bg-teal-300/15' },
+  ];
+  return colorSchemes[index];
+};
 
 interface FeedComment {
   id: string;
@@ -92,6 +112,42 @@ const ArtistWaveform = ({ songId, audioCid }: { songId: string; audioCid: string
     />
   );
 };
+
+// Skeleton components for Artist page
+const ArtistProfileSkeleton = memo(() => (
+  <div className="bg-gradient-to-br from-white/5 to-white/0 backdrop-blur-2xl rounded-2xl border border-white/20 shadow-[0_8px_32px_0_rgba(0,255,159,0.15)] p-6 md:p-8 mb-6">
+    <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
+      <div className="w-24 h-24 md:w-32 md:h-32 rounded-full bg-white/10 animate-pulse" />
+      <div className="flex-1 space-y-3">
+        <div className="h-8 bg-white/10 rounded w-48 animate-pulse" />
+        <div className="h-4 bg-white/10 rounded w-3/4 animate-pulse" />
+        <div className="flex gap-4">
+          <div className="h-6 bg-white/10 rounded w-20 animate-pulse" />
+          <div className="h-6 bg-white/10 rounded w-20 animate-pulse" />
+          <div className="h-6 bg-white/10 rounded w-20 animate-pulse" />
+        </div>
+      </div>
+    </div>
+  </div>
+));
+ArtistProfileSkeleton.displayName = 'ArtistProfileSkeleton';
+
+const ArtistSongCardSkeleton = memo(() => (
+  <Card className="bg-gradient-to-br from-white/5 via-white/3 to-transparent backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden">
+    <div className="relative aspect-square bg-white/10 animate-pulse" />
+    <div className="p-4 space-y-3">
+      <div className="h-5 bg-white/10 rounded w-3/4 animate-pulse" />
+      <div className="h-4 bg-white/10 rounded w-1/2 animate-pulse" />
+      <div className="h-6 bg-white/5 rounded animate-pulse" />
+      <div className="flex gap-2">
+        <div className="h-8 w-8 rounded-full bg-white/10 animate-pulse" />
+        <div className="h-8 w-8 rounded-full bg-white/10 animate-pulse" />
+        <div className="h-8 w-8 rounded-full bg-white/10 animate-pulse" />
+      </div>
+    </div>
+  </Card>
+));
+ArtistSongCardSkeleton.displayName = 'ArtistSongCardSkeleton';
 
 const ArtistSongCard = ({ song, coverUrl, isThisSongPlaying, navigate, playSong, toggleSongComments, expandedSongComments }: {
   song: Song;
@@ -229,10 +285,29 @@ const Artist = ({ playSong, currentSong, isPlaying }: ArtistProps) => {
   const [comments, setComments] = useState<Record<string, FeedComment[]>>({});
   const [commentText, setCommentText] = useState<Record<string, string>>({});
   const [refreshKey, setRefreshKey] = useState(0);
+  const [copiedPostId, setCopiedPostId] = useState<string | null>(null);
   const [showHoldersModal, setShowHoldersModal] = useState(false);
   const [showHoldingsModal, setShowHoldingsModal] = useState(false);
 
   const isOwnProfile = fullAddress?.toLowerCase() === walletAddress?.toLowerCase();
+
+  const handleSharePost = async (post: FeedPost) => {
+    const url = `https://rougee.app/feed#post-${post.id}`;
+    const text = post.content_text ? post.content_text.slice(0, 140) : 'Check out this post on ROUGEE';
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: 'ROUGEE', text, url });
+        toast({ title: 'Shared', description: 'Post shared successfully' });
+      } else {
+        await navigator.clipboard.writeText(url);
+        setCopiedPostId(post.id);
+        toast({ title: 'Link copied', description: 'Post link copied to clipboard' });
+        setTimeout(() => setCopiedPostId(null), 1200);
+      }
+    } catch (_) {
+      // ignore cancel
+    }
+  };
 
   const fetchArtistSongs = async (loadMore = false) => {
     if (!walletAddress) return;
@@ -594,15 +669,7 @@ const Artist = ({ playSong, currentSong, isPlaying }: ArtistProps) => {
     return `${Math.floor(seconds / 86400)}d ago`;
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background">
-        <div className="flex items-center justify-center min-h-[60vh]">
-          <Loader2 className="h-8 w-8 animate-spin text-neon-green" />
-        </div>
-      </div>
-    );
-  }
+  // Don't show full page loading - show skeleton instead
 
   if (error || !profile) {
     return (
@@ -627,22 +694,34 @@ const Artist = ({ playSong, currentSong, isPlaying }: ArtistProps) => {
 
       {/* Modern Profile Header */}
       <div className="max-w-7xl mx-auto px-6 md:px-12 py-8">
-        <div className="relative">
-          {/* Background with subtle gradient */}
-          <div 
-            className="absolute inset-0 rounded-3xl overflow-hidden opacity-20"
-            style={coverUrl ? {
-              backgroundImage: `url(${coverUrl})`,
-              backgroundSize: 'cover',
-              backgroundPosition: `center ${coverPosition}%`,
-              filter: 'blur(40px)'
-            } : {
-              background: 'linear-gradient(135deg, rgba(0,255,159,0.1) 0%, rgba(147,51,234,0.1) 100%)'
-            }}
-          />
-          
-          {/* Main Content Card */}
-          <Card className="relative bg-gradient-to-br from-white/5 via-white/5 to-white/0 backdrop-blur-2xl border border-white/10 rounded-3xl p-6 md:p-8 shadow-2xl">
+        {loading ? (
+          <ArtistProfileSkeleton />
+        ) : profile ? (
+          <div className="relative">
+            {/* Visible Cover Banner */}
+            {coverUrl && (
+              <div className="mb-6 h-40 md:h-56 rounded-3xl overflow-hidden border border-white/10 relative">
+                <img
+                  src={coverUrl}
+                  alt={`${profile.artist_name || profile.display_name || 'Artist'} cover`}
+                  className="w-full h-full object-cover"
+                />
+                {/* Fade gradient overlay to blend into background */}
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-transparent via-background/20 to-background/80" />
+              </div>
+            )}
+            {/* Background fallback (only when no cover image) */}
+            {!coverUrl && (
+              <div 
+                className="absolute inset-0 rounded-3xl overflow-hidden opacity-60"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(0,255,159,0.1) 0%, rgba(147,51,234,0.1) 100%)'
+                }}
+              />
+            )}
+            
+            {/* Main Content Card */}
+            <Card className="relative bg-gradient-to-br from-white/5 via-white/5 to-white/0 backdrop-blur-2xl border border-white/10 rounded-3xl p-6 md:p-8 shadow-2xl">
             <div className="flex flex-col md:flex-row gap-6 md:gap-8">
               {/* Avatar Section */}
               <div className="flex-shrink-0">
@@ -824,7 +903,8 @@ const Artist = ({ playSong, currentSong, isPlaying }: ArtistProps) => {
               </div>
             )}
           </Card>
-        </div>
+          </div>
+        ) : null}
       </div>
 
       {/* Content Navigation Tabs & Main Content */}
@@ -838,6 +918,12 @@ const Artist = ({ playSong, currentSong, isPlaying }: ArtistProps) => {
                 className="px-5 py-2.5 font-medium text-sm data-[state=active]:bg-neon-green data-[state=active]:text-black data-[state=active]:shadow-lg data-[state=inactive]:text-white/70 data-[state=inactive]:hover:text-white rounded-xl transition-all"
               >
                 ALL
+              </TabsTrigger>
+              <TabsTrigger 
+                value="posts" 
+                className="px-5 py-2.5 font-medium text-sm data-[state=active]:bg-neon-green data-[state=active]:text-black data-[state=active]:shadow-lg data-[state=inactive]:text-white/70 data-[state=inactive]:hover:text-white rounded-xl transition-all"
+              >
+                POSTS
               </TabsTrigger>
               <TabsTrigger 
                 value="popular" 
@@ -876,8 +962,10 @@ const Artist = ({ playSong, currentSong, isPlaying }: ArtistProps) => {
           <div className="pb-6">
             <TabsContent value="all" className="mt-0">
               {loadingSongs ? (
-                <div className="flex justify-center py-12">
-                  <Loader2 className="h-8 w-8 animate-spin text-neon-green" />
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {[...Array(6)].map((_, i) => (
+                    <ArtistSongCardSkeleton key={`skeleton-artist-song-${i}`} />
+                  ))}
                 </div>
               ) : songs.length === 0 ? (
                 <Card className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-8 text-center">
@@ -969,6 +1057,296 @@ const Artist = ({ playSong, currentSong, isPlaying }: ArtistProps) => {
                     );
                   })}
                 </div>
+              )}
+            </TabsContent>
+
+            {/* Posts tab - GLTCH feed posts for this artist (parity with Feed.tsx) */}
+            <TabsContent value="posts" className="mt-0 space-y-4">
+              {loadingPosts ? (
+                <Card className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-8 text-center">
+                  <div className="flex items-center justify-center gap-2 text-white/70">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading posts...
+                  </div>
+                </Card>
+              ) : posts.length === 0 ? (
+                <Card className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-8 text-center">
+                  <p className="text-white/60">No posts yet</p>
+                </Card>
+              ) : (
+                posts.map(post => (
+                  <Card key={post.id} className="p-4 md:p-6 bg-gradient-to-br from-white/5 via-white/3 to-transparent backdrop-blur-xl border border-white/10 shadow-[0_8px_32px_0_rgba(0,255,159,0.1)] hover:shadow-[0_12px_48px_0_rgba(0,255,159,0.2)] hover:border-neon-green/20 flex flex-col w-full md:rounded-2xl rounded-none border-x-0 md:border-x border-b md:border-b mb-0 md:mb-4 hover:bg-white/8 active:bg-white/10 active:scale-[0.98] transition-all duration-300 group">
+                    {/* Post Header */}
+                    <div className="flex items-center gap-3 mb-4">
+                      <div 
+                        className="cursor-pointer hover:scale-110 transition-transform duration-200 relative group/avatar"
+                        onClick={() => navigate(`/artist/${post.wallet_address}`)}
+                      >
+                        {post.profiles?.avatar_cid ? (
+                          <div className="relative">
+                            <img 
+                              src={getIPFSGatewayUrl(post.profiles.avatar_cid)} 
+                              alt="Avatar" 
+                              loading="lazy" 
+                              decoding="async" 
+                              className="w-10 h-10 md:w-12 md:h-12 rounded-full object-cover border-2 border-neon-green/20 group-hover/avatar:border-neon-green/60 transition-all duration-300" 
+                            />
+                            <div className="absolute inset-0 rounded-full bg-neon-green/0 group-hover/avatar:bg-neon-green/10 transition-colors duration-300" />
+                          </div>
+                        ) : (
+                          <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-gradient-to-br from-neon-green/20 to-purple-500/20 flex items-center justify-center border-2 border-neon-green/20 group-hover/avatar:border-neon-green/60 transition-all duration-300">
+                            <span className="text-neon-green text-sm md:text-base font-bold">
+                              {post.profiles?.artist_name?.[0] || '?'}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <p 
+                            className="font-semibold text-sm md:text-base cursor-pointer hover:text-neon-green transition-colors duration-200"
+                            onClick={() => navigate(`/artist/${post.wallet_address}`)}
+                          >
+                            {post.profiles?.artist_name || `${post.wallet_address.slice(0, 6)}...${post.wallet_address.slice(-4)}`}
+                          </p>
+                          {post.profiles?.verified && (
+                            <CircleCheckBig className="h-4 w-4 text-blue-500 flex-shrink-0" aria-label="Verified artist" />
+                          )}
+                          <XRGETierBadge walletAddress={post.wallet_address} size="sm" />
+                        </div>
+                        <p className="text-xs md:text-sm text-muted-foreground">{formatTimeAgo(post.created_at)}</p>
+                      </div>
+                    </div>
+                    {/* Post Content Text - default case (shown unless handled by special layouts) */}
+                    {post.content_text && !(post.songs && !post.media_cid) && (
+                      <div className="mb-4 text-sm md:text-base whitespace-pre-wrap line-clamp-6 text-foreground/90 leading-relaxed">
+                        <TaggedText text={post.content_text} />
+                      </div>
+                    )}
+
+                    {/* Post Media with Song Player Overlay */}
+                    {post.media_cid && post.songs && (
+                      <div className="mb-4 rounded-xl overflow-hidden relative group/media">
+                        <div className="relative">
+                          <img 
+                            src={getIPFSGatewayUrl(post.media_cid)} 
+                            alt="Post media" 
+                            loading="lazy" 
+                            decoding="async" 
+                            className="w-full max-h-[600px] object-contain bg-gradient-to-br from-black/10 to-black/5 rounded-xl group-hover/media:scale-[1.02] transition-transform duration-500" 
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover/media:opacity-100 transition-opacity duration-300" />
+                        </div>
+
+                        {/* Play/Pause Button Overlay */}
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                          <button
+                            onClick={() => {
+                              if (playSong) {
+                                playSong({
+                                  id: post.songs.id,
+                                  title: post.songs.title,
+                                  artist: post.songs.artist,
+                                  audio_cid: post.songs.audio_cid,
+                                  cover_cid: post.songs.cover_cid,
+                                  wallet_address: post.wallet_address,
+                                } as any);
+                              }
+                            }}
+                            className="pointer-events-auto bg-black/70 backdrop-blur-md hover:bg-black/90 transition-all duration-300 p-6 md:p-8 rounded-full opacity-0 group-hover/media:opacity-100 hover:scale-110 active:scale-95 border-2 border-white/20 hover:border-neon-green/50 shadow-[0_0_30px_rgba(0,255,159,0.5)]"
+                          >
+                            {currentSong?.id === post.songs.id && isPlaying ? (
+                              <Pause className="w-12 h-12 md:w-16 md:h-16 text-white" />
+                            ) : (
+                              <Play className="w-12 h-12 md:w-16 md:h-16 text-white ml-1" />
+                            )}
+                          </button>
+                        </div>
+
+                        {/* Bottom Song Scroller */}
+                        <div 
+                          onClick={() => navigate(`/song/${post.songs.id}`)}
+                          className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/95 via-black/80 to-transparent p-4 cursor-pointer hover:bg-black/98 transition-all duration-300 backdrop-blur-sm"
+                        >
+                          <div className="flex items-center gap-2">
+                            {post.songs.cover_cid && (
+                              <img 
+                                src={getIPFSGatewayUrl(post.songs.cover_cid)} 
+                                alt={post.songs.title}
+                                className="w-10 h-10 rounded object-cover flex-shrink-0"
+                              />
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <Music className="w-3 h-3 text-neon-green flex-shrink-0" />
+                                <p className="font-semibold text-white text-sm truncate">
+                                  {post.songs.title}
+                                </p>
+                              </div>
+                              <p className="text-xs text-gray-300 truncate">
+                                {post.songs.artist}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Post Media without Song */}
+                    {post.media_cid && !post.songs && (
+                      <div className="mb-4 rounded-xl overflow-hidden relative">
+                        <img 
+                          src={getIPFSGatewayUrl(post.media_cid)} 
+                          alt="Post media" 
+                          loading="lazy" 
+                          decoding="async" 
+                          className="w-full max-h-[600px] object-contain bg-gradient-to-br from-black/10 to-black/5 rounded-xl" 
+                        />
+                      </div>
+                    )}
+
+                    {/* Text Post with Song - Styled like Post-It Note */}
+                    {!post.media_cid && post.content_text && post.songs && (() => {
+                      const colors = getPostItColors(post.id);
+                      return (
+                        <div className={`mb-4 rounded-xl overflow-hidden relative group/media min-h-[300px] flex items-center justify-center bg-gradient-to-br ${colors.bg}`}>
+                          <div className={`absolute inset-[2px] bg-gradient-to-br ${colors.layer1} rotate-[-1deg] transform origin-center shadow-[2px_2px_4px_rgba(0,0,0,0.2)] rounded-lg`} />
+                          <div className={`absolute inset-[4px] bg-gradient-to-br ${colors.layer2} rotate-[0.5deg] transform origin-center shadow-[1px_1px_2px_rgba(0,0,0,0.15)] rounded-lg`} />
+                          <div className={`absolute top-2 left-2 w-8 h-8 ${colors.accent1} rotate-[-8deg] rounded-sm blur-sm`} />
+                          <div className={`absolute bottom-2 right-2 w-6 h-6 ${colors.accent2} rotate-[12deg] rounded-sm blur-sm`} />
+                          <div className="relative z-10 p-6 md:p-8 w-full">
+                            <div className="text-base md:text-lg whitespace-pre-wrap text-foreground/95 leading-relaxed font-medium drop-shadow-sm">
+                              <TaggedText text={post.content_text!} />
+                            </div>
+                          </div>
+                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
+                            <button
+                              onClick={() => {
+                                if (playSong) {
+                                  playSong({
+                                    id: post.songs!.id,
+                                    title: post.songs!.title,
+                                    artist: post.songs!.artist,
+                                    audio_cid: post.songs!.audio_cid,
+                                    cover_cid: post.songs!.cover_cid,
+                                    wallet_address: post.wallet_address,
+                                  } as any);
+                                }
+                              }}
+                              className="pointer-events-auto bg-black/70 backdrop-blur-md hover:bg-black/90 transition-all duration-300 p-6 md:p-8 rounded-full opacity-0 group-hover/media:opacity-100 hover:scale-110 active:scale-95 border-2 border-white/20 hover:border-neon-green/50 shadow-[0_0_30px_rgba(0,255,159,0.5)]"
+                            >
+                              {currentSong?.id === post.songs!.id && isPlaying ? (
+                                <Pause className="w-12 h-12 md:w-16 md:h-16 text-white" />
+                              ) : (
+                                <Play className="w-12 h-12 md:w-16 md:h-16 text-white ml-1" />
+                              )}
+                            </button>
+                          </div>
+                          <div 
+                            onClick={() => navigate(`/song/${post.songs!.id}`)}
+                            className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/95 via-black/80 to-transparent p-4 cursor-pointer hover:bg-black/98 transition-all duration-300 backdrop-blur-sm z-20"
+                          >
+                            <div className="flex items-center gap-2">
+                              {post.songs!.cover_cid && (
+                                <img 
+                                  src={getIPFSGatewayUrl(post.songs!.cover_cid)} 
+                                  alt={post.songs!.title}
+                                  className="w-10 h-10 rounded object-cover flex-shrink-0"
+                                />
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <Music className="w-3 h-3 text-neon-green flex-shrink-0" />
+                                  <p className="font-semibold text-white text-sm truncate">{post.songs!.title}</p>
+                                </div>
+                                <p className="text-xs text-gray-300 truncate">{post.songs!.artist}</p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Post Actions */}
+                    <div className="flex items-center gap-4 pt-3 mt-auto border-t border-border">
+                      <LikeButton songId={post.id} initialLikeCount={post.like_count} size="sm" showCount={true} entityType="post" />
+
+                      <button onClick={() => toggleComments(post.id)} className="flex items-center gap-1.5 text-xs hover:text-primary transition-colors">
+                        <MessageCircle className="w-4 h-4" />
+                        <span>{comments[post.id]?.length || post.comment_count || 0}</span>
+                      </button>
+
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleSharePost(post)}
+                          title="Share"
+                        >
+                          {copiedPostId === post.id ? <Check className="h-4 w-4" /> : <Share2 className="h-4 w-4" />}
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Comments Section */}
+                    {expandedComments.has(post.id) && (
+                      <div className="pt-4 mt-4 border-t border-border space-y-4">
+                        {/* Add Comment */}
+                        {fullAddress && (
+                          <div className="flex gap-2">
+                            <Input placeholder="Add a comment..." value={commentText[post.id] || ''} onChange={e => setCommentText(prev => ({
+                  ...prev,
+                  [post.id]: e.target.value
+                }))} onKeyPress={e => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleAddComment(post.id);
+                  }
+                }} className="flex-1 text-base" />
+                            <Button size="sm" onClick={() => handleAddComment(post.id)} disabled={!commentText[post.id]?.trim()}>
+                              <Send className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        )}
+
+                        {/* Comments List */}
+                        <div className="space-y-3">
+                          {comments[post.id]?.map(comment => (
+                            <div key={comment.id} className="flex gap-3">
+                              <div 
+                                className="cursor-pointer hover:opacity-80 transition-opacity"
+                                onClick={() => navigate(`/artist/${comment.wallet_address}`)}
+                              >
+                                {comment.profiles?.avatar_cid ? (
+                                  <img src={getIPFSGatewayUrl(comment.profiles.avatar_cid)} alt="Avatar" className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
+                                ) : (
+                                  <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                                    <span className="text-primary text-xs">{comment.profiles?.artist_name?.[0] || '?'}</span>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex-1">
+                                <div className="flex items-center gap-1.5 mb-1">
+                                  <p 
+                                    className="text-sm font-semibold cursor-pointer hover:text-neon-green transition-colors"
+                                    onClick={() => navigate(`/artist/${comment.wallet_address}`)}
+                                  >
+                                    {comment.profiles?.artist_name || `${comment.wallet_address.slice(0, 6)}...${comment.wallet_address.slice(-4)}`}
+                                  </p>
+                                  <XRGETierBadge walletAddress={comment.wallet_address} size="sm" />
+                                </div>
+                                <div className="text-sm text-muted-foreground">
+                                  <TaggedText text={comment.comment_text} />
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-1">{formatTimeAgo(comment.created_at)}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </Card>
+                ))
               )}
             </TabsContent>
             

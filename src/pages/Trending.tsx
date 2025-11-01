@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import NetworkInfo from "@/components/NetworkInfo";
-import { Loader2, TrendingUp, TrendingDown, Flame, Music, Play, Pause, ChevronDown, ChevronUp } from "lucide-react";
+import { Loader2, TrendingUp, TrendingDown, Flame, Music, Play, Pause, ChevronDown, ChevronUp, Clock, Zap, BarChart3, Sparkles } from "lucide-react";
 import { getIPFSGatewayUrl } from "@/lib/ipfs";
 import logo from "@/assets/logo.png";
 import MusicBars from "@/components/MusicBars";
@@ -74,6 +74,160 @@ interface Song {
     );
   });
   TrendingWaveform.displayName = 'TrendingWaveform';
+
+  // Skeleton loader for featured song
+  const FeaturedSongSkeleton = memo(() => {
+    return (
+      <div className="mb-6 relative overflow-hidden rounded-2xl border border-white/20 bg-white/5 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,255,159,0.15)] p-6 pb-8">
+        {/* Faded background */}
+        <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-white/0 opacity-50" />
+        
+        <div className="relative z-10">
+          {/* Badge skeleton */}
+          <div className="absolute top-2 right-2 bg-white/10 rounded-full w-24 h-6 animate-pulse" />
+          
+          <div className="flex flex-col md:flex-row items-start md:items-center gap-4 mb-4">
+            {/* Cover image skeleton */}
+            <div className="relative group">
+              <div className="w-24 h-24 md:w-32 md:h-32 rounded-xl bg-white/10 animate-pulse" />
+              <div className="absolute bottom-2 right-2 w-12 h-12 md:w-14 md:h-14 rounded-full bg-white/10 animate-pulse" />
+            </div>
+            
+            <div className="flex-1 w-full">
+              {/* Title skeleton */}
+              <div className="h-8 bg-white/10 rounded-lg mb-3 w-3/4 animate-pulse" />
+              {/* Artist skeleton */}
+              <div className="h-5 bg-white/10 rounded-lg mb-3 w-1/2 animate-pulse" />
+              
+              {/* Stats skeleton */}
+              <div className="flex flex-wrap gap-3 mb-4">
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="bg-black/40 rounded-lg px-3 py-2 border border-white/5">
+                    <div className="h-3 bg-white/10 rounded mb-2 w-16 animate-pulse" />
+                    <div className="h-5 bg-white/10 rounded w-20 animate-pulse" />
+                  </div>
+                ))}
+              </div>
+              
+              {/* Chart skeleton */}
+              <div className="bg-black/40 rounded-lg px-4 py-3 border border-neon-green/20 mt-3">
+                <div className="h-4 bg-white/10 rounded mb-2 w-24 animate-pulse" />
+                <div className="h-32 bg-white/5 rounded animate-pulse" />
+              </div>
+            </div>
+            
+            {/* Button skeleton */}
+            <div className="bg-neon-green/20 rounded-xl h-12 w-32 mt-4 md:mt-0 md:ml-auto animate-pulse" />
+          </div>
+        </div>
+      </div>
+    );
+  });
+  FeaturedSongSkeleton.displayName = 'FeaturedSongSkeleton';
+
+  // Skeleton for stats cards
+  const StatsCardSkeleton = memo(() => (
+    <div className="group relative bg-gradient-to-br from-white/5 to-white/0 backdrop-blur-xl border border-white/10 rounded-xl p-5">
+      <div className="absolute top-0 right-0 w-20 h-20 bg-white/5 rounded-full blur-2xl" />
+      <div className="h-5 w-5 bg-white/10 rounded mb-2 animate-pulse" />
+      <div className="h-4 bg-white/10 rounded w-20 mb-2 animate-pulse" />
+      <div className="h-8 bg-white/10 rounded w-16 animate-pulse" />
+    </div>
+  ));
+  StatsCardSkeleton.displayName = 'StatsCardSkeleton';
+
+  // Skeleton for table row (desktop)
+  const SongRowSkeleton = memo(() => (
+    <TableRow className="hover:bg-transparent">
+      <TableCell className="w-12">
+        <div className="h-4 w-4 bg-white/10 rounded animate-pulse" />
+      </TableCell>
+      <TableCell>
+        <div className="flex items-center gap-3">
+          <div className="h-8 w-8 rounded-full bg-white/10 animate-pulse" />
+          <div className="w-10 h-10 rounded bg-white/10 animate-pulse" />
+          <div className="flex-1 space-y-2">
+            <div className="h-4 bg-white/10 rounded w-32 animate-pulse" />
+            <div className="h-3 bg-white/10 rounded w-24 animate-pulse" />
+          </div>
+        </div>
+      </TableCell>
+      <TableCell>
+        <div className="w-32 h-10 bg-white/10 rounded animate-pulse" />
+      </TableCell>
+      <TableCell>
+        <div className="w-32 h-4 bg-white/10 rounded animate-pulse" />
+      </TableCell>
+      <TableCell>
+        <div className="space-y-1 text-right">
+          <div className="h-4 bg-white/10 rounded w-20 ml-auto animate-pulse" />
+          <div className="h-3 bg-white/10 rounded w-16 ml-auto animate-pulse" />
+        </div>
+      </TableCell>
+      <TableCell>
+        <div className="h-4 bg-white/10 rounded w-16 ml-auto animate-pulse" />
+      </TableCell>
+      <TableCell>
+        <div className="h-4 bg-white/10 rounded w-20 ml-auto animate-pulse" />
+      </TableCell>
+      <TableCell>
+        <div className="h-4 bg-white/10 rounded w-20 ml-auto animate-pulse" />
+      </TableCell>
+      <TableCell>
+        <div className="h-4 bg-white/10 rounded w-16 ml-auto animate-pulse" />
+      </TableCell>
+    </TableRow>
+  ));
+  SongRowSkeleton.displayName = 'SongRowSkeleton';
+
+  // Skeleton for song card (mobile)
+  const SongCardSkeleton = memo(() => (
+    <div className="bg-gradient-to-br from-white/5 to-white/0 backdrop-blur-xl border border-white/10 rounded-xl p-4 space-y-3">
+      <div className="flex items-center gap-3">
+        <div className="w-12 h-12 rounded bg-white/10 animate-pulse" />
+        <div className="flex-1 space-y-2">
+          <div className="h-4 bg-white/10 rounded w-3/4 animate-pulse" />
+          <div className="h-3 bg-white/10 rounded w-1/2 animate-pulse" />
+        </div>
+        <div className="w-8 h-8 rounded-full bg-white/10 animate-pulse" />
+      </div>
+      <div className="h-24 bg-white/5 rounded-lg animate-pulse" />
+      <div className="flex items-center gap-3">
+        <div className="h-3 bg-white/10 rounded w-12 animate-pulse" />
+        <div className="h-3 bg-white/10 rounded w-16 animate-pulse" />
+        <div className="h-3 bg-white/10 rounded w-20 animate-pulse" />
+      </div>
+    </div>
+  ));
+  SongCardSkeleton.displayName = 'SongCardSkeleton';
+
+  // Skeleton for artist row
+  const ArtistRowSkeleton = memo(() => (
+    <TableRow className="hover:bg-transparent">
+      <TableCell className="w-12">
+        <div className="h-4 w-4 bg-white/10 rounded animate-pulse" />
+      </TableCell>
+      <TableCell>
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-white/10 animate-pulse" />
+          <div className="space-y-2">
+            <div className="h-4 bg-white/10 rounded w-32 animate-pulse" />
+            <div className="h-3 bg-white/10 rounded w-16 animate-pulse" />
+          </div>
+        </div>
+      </TableCell>
+      <TableCell className="hidden md:table-cell">
+        <div className="h-4 bg-white/10 rounded w-16 animate-pulse" />
+      </TableCell>
+      <TableCell className="text-right">
+        <div className="h-4 bg-white/10 rounded w-8 ml-auto animate-pulse" />
+      </TableCell>
+      <TableCell className="text-right">
+        <div className="h-4 bg-white/10 rounded w-12 ml-auto animate-pulse" />
+      </TableCell>
+    </TableRow>
+  ));
+  ArtistRowSkeleton.displayName = 'ArtistRowSkeleton';
 
   // Component for featured banner with real data
   const FeaturedSong = memo(({ song, playSong, currentSong, isPlaying, rank }: { song: Song; playSong?: (song: any) => void; currentSong?: any; isPlaying?: boolean; rank?: number }) => {
@@ -820,6 +974,7 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
   const [sortField, setSortField] = useState<SortField>('trending');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [displayLimit, setDisplayLimit] = useState<number | null>(50); // Start with 50 to load all data, user can change
+  const [timeFilter, setTimeFilter] = useState<'24H' | '7D' | '30D' | 'ALL'>('ALL');
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const searchQuery = searchParams.get('search');
@@ -980,18 +1135,20 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
     return displayLimit ? sortedSongs.slice(0, displayLimit) : sortedSongs;
   }, [sortedSongs, displayLimit]);
   
-  // Get top 5 songs for cycling featured card
+  // Get top 5 songs for cycling featured card - only recalc when songs list or calculation function changes
+  // Note: calculateTrendingScore already depends on songStats, so we don't need songStats here
   const top5Songs = useMemo(() => {
     if (songs.length === 0) return [];
     
     return [...songs]
       .sort((a, b) => calculateTrendingScore(b) - calculateTrendingScore(a))
       .slice(0, 5); // Top 5 songs
-  }, [songs, songStats, calculateTrendingScore]);
+  }, [songs, calculateTrendingScore]);
   
   // State to track which song is currently showing in featured card (cycles through top 5)
   const [featuredSongIndex, setFeaturedSongIndex] = useState(0);
   const [nextSongIndex, setNextSongIndex] = useState<number | null>(null);
+  const [isTransitioning, setIsTransitioning] = useState(false);
   
   // Reset index when top 5 songs change (e.g., new data loaded)
   useEffect(() => {
@@ -1011,13 +1168,18 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
     const interval = setInterval(() => {
       const next = (featuredSongIndex + 1) % top5Songs.length;
       // Start transition: the pre-loaded component will become visible
+      setIsTransitioning(true);
       setNextSongIndex(next);
-      // After transition completes, switch the active song
+      // Show skeleton briefly, then fade in new song
       setTimeout(() => {
         setFeaturedSongIndex(next);
         // Clear nextSong after a brief delay to ensure smooth handoff
         setTimeout(() => {
           setNextSongIndex(null);
+          // Hide skeleton after new song is visible
+          setTimeout(() => {
+            setIsTransitioning(false);
+          }, 200);
         }, 100);
       }, 750); // Match transition duration (700ms) + small buffer
     }, 8000); // Cycle every 8 seconds
@@ -1028,11 +1190,16 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
   // Handle manual navigation
   const handleFeaturedSongChange = (index: number) => {
     if (index === featuredSongIndex) return;
+    setIsTransitioning(true);
     setNextSongIndex(index);
     setTimeout(() => {
       setFeaturedSongIndex(index);
       setTimeout(() => {
         setNextSongIndex(null);
+        // Hide skeleton after new song is visible
+        setTimeout(() => {
+          setIsTransitioning(false);
+        }, 200);
       }, 100);
     }, 750);
   };
@@ -1041,79 +1208,110 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
   const featuredSong = top5Songs[featuredSongIndex] || null;
   const nextSong = nextSongIndex !== null ? top5Songs[nextSongIndex] : null;
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background pb-24 md:pb-20">
-        <NetworkInfo />
-        <main className="container mx-auto px-4 py-8">
-          <div className="flex flex-col items-center justify-center h-64 gap-4">
-            <Loader2 className="h-12 w-12 animate-spin text-neon-green" />
-            <p className="text-muted-foreground font-mono text-sm animate-pulse">
-              Loading trending data...
-            </p>
-          </div>
-        </main>
-      </div>
-    );
-  }
+  // Don't show full page loading - show skeleton instead
 
   return (
     <div className="min-h-screen bg-background pb-24 md:pb-20">
       <AppTutorial />
       <NetworkInfo />
       
-      {/* Compact hero header with logo */}
-      <div className="text-center px-4 md:px-6 pt-2 md:pt-3 pb-4">
-        <div className="mb-2 flex justify-center items-center gap-3">
-          <MusicBars bars={6} className="h-6 md:h-8 flex-shrink-0" />
-          <img src={logo} alt="ROUGEE Logo" className="w-8 h-8 md:w-10 md:h-10 rounded-full object-cover border border-primary/20" />
-          <MusicBars bars={6} className="h-6 md:h-8 flex-shrink-0" />
+      {/* Stunning Hero Section */}
+      <div className="relative overflow-hidden">
+        {/* Animated gradient background */}
+        <div className="absolute inset-0 bg-gradient-to-br from-neon-green/20 via-purple-500/10 to-pink-500/10 blur-3xl opacity-50 animate-pulse" />
+        <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent z-10" />
+        
+        <div className="relative z-20 text-center px-4 md:px-6 pt-8 md:pt-12 pb-8">
+          <div className="mb-4 flex justify-center items-center gap-3">
+            <MusicBars bars={6} className="h-8 md:h-12 flex-shrink-0 animate-pulse" />
+            <div className="relative">
+              <img src={logo} alt="ROUGEE Logo" className="w-12 h-12 md:w-16 md:h-16 rounded-full object-cover border-2 border-neon-green/30 shadow-[0_0_30px_rgba(0,255,159,0.3)] animate-pulse" />
+              <div className="absolute inset-0 bg-neon-green/20 rounded-full animate-ping" />
+            </div>
+            <MusicBars bars={6} className="h-8 md:h-12 flex-shrink-0 animate-pulse" />
+          </div>
+          <h1 className="text-3xl md:text-5xl font-bold mb-3 bg-gradient-to-r from-neon-green via-purple-400 to-pink-500 bg-clip-text text-transparent drop-shadow-[0_0_20px_rgba(0,255,159,0.5)]">
+            TRENDING
+          </h1>
+          <p className="text-sm md:text-base text-muted-foreground max-w-2xl mx-auto">
+            Discover the hottest tracks and rising artists on the decentralized music platform
+          </p>
         </div>
-        <h1 className="text-lg md:text-xl font-bold mb-1 bg-gradient-to-r from-primary via-purple-500 to-pink-500 bg-clip-text text-transparent">
-          ROUGEE
-        </h1>
-        <p className="text-[11px] md:text-sm text-muted-foreground mb-0">
-          The decentralized music platform where artists own their content and fans discover amazing beats
-        </p>
       </div>
       
       <main className="w-full px-0 md:container md:mx-auto md:px-4 py-6 md:py-8" data-tour="trending">
-        {/* Live Stats Ticker */}
-        <div className="mb-6 grid grid-cols-2 md:grid-cols-4 gap-3 px-4 md:px-0">
-          <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-4 shadow-[0_4px_16px_0_rgba(0,255,159,0.1)] hover:bg-white/8 transition-all duration-300">
-            <div className="text-xs text-muted-foreground font-mono mb-1">TOTAL SONGS</div>
-            <div className="text-2xl font-bold font-mono neon-text drop-shadow-[0_0_8px_rgba(0,255,159,0.6)]">{songs.length}</div>
-          </div>
-          <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-4 shadow-[0_4px_16px_0_rgba(168,85,247,0.1)] hover:bg-white/8 transition-all duration-300">
-            <div className="text-xs text-muted-foreground font-mono mb-1">TOTAL VOLUME</div>
-            <div className="text-2xl font-bold font-mono text-purple-400 drop-shadow-[0_0_8px_rgba(168,85,247,0.6)]">
-              ${totalVolume > 0 ? totalVolume.toLocaleString(undefined, {maximumFractionDigits: 0}) : '...'}
-            </div>
-          </div>
-          <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-4 shadow-[0_4px_16px_0_rgba(249,115,22,0.1)] hover:bg-white/8 transition-all duration-300">
-            <div className="text-xs text-muted-foreground font-mono mb-1">TOP GAINER</div>
-            <div className="text-2xl font-bold font-mono text-orange-400 drop-shadow-[0_0_8px_rgba(249,115,22,0.6)]">
-              {loading ? '...' : topGainerPercent > 0 ? `+${topGainerPercent.toFixed(1)}%` : '0%'}
-            </div>
-          </div>
-          <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-4 shadow-[0_4px_16px_0_rgba(59,130,246,0.1)] hover:bg-white/8 transition-all duration-300">
-            <div className="text-xs text-muted-foreground font-mono mb-1">ARTISTS</div>
-            <div className="text-2xl font-bold font-mono text-blue-400 drop-shadow-[0_0_8px_rgba(59,130,246,0.6)]">{artists.length}</div>
-          </div>
+        {/* Enhanced Live Stats Ticker */}
+        <div className="mb-8 grid grid-cols-2 md:grid-cols-4 gap-4 px-4 md:px-0">
+          {loading ? (
+            <>
+              <StatsCardSkeleton />
+              <StatsCardSkeleton />
+              <StatsCardSkeleton />
+              <StatsCardSkeleton />
+            </>
+          ) : (
+            <>
+              <div className="group relative bg-gradient-to-br from-white/5 to-white/0 backdrop-blur-xl border border-white/10 rounded-xl p-5 shadow-[0_4px_16px_0_rgba(0,255,159,0.1)] hover:bg-white/10 hover:border-neon-green/30 hover:shadow-[0_8px_32px_0_rgba(0,255,159,0.25)] transition-all duration-300 overflow-hidden">
+                <div className="absolute top-0 right-0 w-20 h-20 bg-neon-green/10 rounded-full blur-2xl group-hover:bg-neon-green/20 transition-all" />
+                <Music className="w-5 h-5 text-neon-green/70 mb-2" />
+                <div className="text-xs text-muted-foreground font-mono mb-1">TOTAL SONGS</div>
+                <div className="text-3xl font-bold font-mono neon-text drop-shadow-[0_0_8px_rgba(0,255,159,0.6)]">{songs.length}</div>
+              </div>
+              <div className="group relative bg-gradient-to-br from-white/5 to-white/0 backdrop-blur-xl border border-white/10 rounded-xl p-5 shadow-[0_4px_16px_0_rgba(168,85,247,0.1)] hover:bg-white/10 hover:border-purple-400/30 hover:shadow-[0_8px_32px_0_rgba(168,85,247,0.25)] transition-all duration-300 overflow-hidden">
+                <div className="absolute top-0 right-0 w-20 h-20 bg-purple-500/10 rounded-full blur-2xl group-hover:bg-purple-500/20 transition-all" />
+                <BarChart3 className="w-5 h-5 text-purple-400/70 mb-2" />
+                <div className="text-xs text-muted-foreground font-mono mb-1">TOTAL VOLUME</div>
+                <div className="text-3xl font-bold font-mono text-purple-400 drop-shadow-[0_0_8px_rgba(168,85,247,0.6)]">
+                  ${totalVolume > 0 ? totalVolume.toLocaleString(undefined, {maximumFractionDigits: 0}) : '...'}
+                </div>
+              </div>
+              <div className="group relative bg-gradient-to-br from-white/5 to-white/0 backdrop-blur-xl border border-white/10 rounded-xl p-5 shadow-[0_4px_16px_0_rgba(249,115,22,0.1)] hover:bg-white/10 hover:border-orange-400/30 hover:shadow-[0_8px_32px_0_rgba(249,115,22,0.25)] transition-all duration-300 overflow-hidden">
+                <div className="absolute top-0 right-0 w-20 h-20 bg-orange-500/10 rounded-full blur-2xl group-hover:bg-orange-500/20 transition-all" />
+                <Zap className="w-5 h-5 text-orange-400/70 mb-2" />
+                <div className="text-xs text-muted-foreground font-mono mb-1">TOP GAINER</div>
+                <div className="text-3xl font-bold font-mono text-orange-400 drop-shadow-[0_0_8px_rgba(249,115,22,0.6)]">
+                  {topGainerPercent > 0 ? `+${topGainerPercent.toFixed(1)}%` : '0%'}
+                </div>
+              </div>
+              <div className="group relative bg-gradient-to-br from-white/5 to-white/0 backdrop-blur-xl border border-white/10 rounded-xl p-5 shadow-[0_4px_16px_0_rgba(59,130,246,0.1)] hover:bg-white/10 hover:border-blue-400/30 hover:shadow-[0_8px_32px_0_rgba(59,130,246,0.25)] transition-all duration-300 overflow-hidden">
+                <div className="absolute top-0 right-0 w-20 h-20 bg-blue-500/10 rounded-full blur-2xl group-hover:bg-blue-500/20 transition-all" />
+                <Sparkles className="w-5 h-5 text-blue-400/70 mb-2" />
+                <div className="text-xs text-muted-foreground font-mono mb-1">ARTISTS</div>
+                <div className="text-3xl font-bold font-mono text-blue-400 drop-shadow-[0_0_8px_rgba(59,130,246,0.6)]">{artists.length}</div>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Featured/Promoted Banner with Real Data - Cycles through top 5 songs */}
-        {featuredSong && top5Songs.length > 0 && (
+        {loading ? (
+          <div className="mb-20 px-4 md:px-0">
+            <FeaturedSongSkeleton />
+          </div>
+        ) : featuredSong && top5Songs.length > 0 ? (
           <div className="relative mb-20 px-4 md:px-0" style={{ zIndex: 1 }}>
             {/* Container for both cards during transition - ensures proper height */}
-            <div className="relative w-full">
-              {/* Current song - always mounted */}
+            <div className="relative w-full" style={{ minHeight: '450px' }}>
+              {/* Skeleton loader - shows during transition */}
+              {isTransitioning && (
+                <div
+                  className="absolute top-0 left-0 right-0 w-full transition-opacity duration-300 ease-in-out"
+                  style={{
+                    zIndex: 4,
+                    opacity: 1
+                  }}
+                >
+                  <FeaturedSongSkeleton />
+                </div>
+              )}
+              
+              {/* Current song - always mounted with stable key */}
               {featuredSong && (
                 <div
-                  key={`current-${featuredSong.id}`}
+                  key={`featured-${featuredSongIndex}`}
                   className={`w-full transition-all duration-[700ms] ease-in-out ${nextSong ? 'absolute top-0 left-0 right-0' : 'relative'}`}
                   style={{
-                    zIndex: nextSong ? 2 : 3,
+                    zIndex: nextSong ? (isTransitioning ? 0 : 2) : 3,
                     opacity: nextSong ? 0 : 1,
                     transform: nextSong ? 'translateX(-32px) scale(0.98)' : 'translateX(0) scale(1)',
                     filter: nextSong ? 'blur(4px)' : 'blur(0)',
@@ -1121,6 +1319,7 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
                   }}
                 >
                   <FeaturedSong 
+                    key={featuredSong.id}
                     song={featuredSong} 
                     playSong={playSong} 
                     currentSong={currentSong} 
@@ -1133,17 +1332,18 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
               {/* Next song - always mounted (pre-loaded) but hidden until transition */}
               {nextSongForPreload && nextSongForPreload.id !== featuredSong?.id && (
                 <div
-                  key={`preload-${nextSongForPreload.id}`}
+                  key={`preload-${nextSongIndexForPreload}`}
                   className={`absolute top-0 left-0 right-0 w-full transition-all duration-[700ms] ease-in-out ${nextSong?.id === nextSongForPreload.id ? '' : 'pointer-events-none'}`}
                   style={{
-                    zIndex: nextSong?.id === nextSongForPreload.id ? 3 : 1,
-                    opacity: nextSong?.id === nextSongForPreload.id ? 1 : 0,
+                    zIndex: nextSong?.id === nextSongForPreload.id ? (isTransitioning ? 0 : 3) : 1,
+                    opacity: nextSong?.id === nextSongForPreload.id ? (isTransitioning ? 0 : 1) : 0,
                     transform: nextSong?.id === nextSongForPreload.id ? 'translateX(0) scale(1)' : 'translateX(30px) scale(0.98)',
                     filter: nextSong?.id === nextSongForPreload.id ? 'blur(0)' : 'blur(4px)',
                     pointerEvents: nextSong?.id === nextSongForPreload.id ? 'auto' : 'none'
                   }}
                 >
                   <FeaturedSong 
+                    key={nextSongForPreload.id}
                     song={nextSongForPreload} 
                     playSong={playSong} 
                     currentSong={currentSong} 
@@ -1171,19 +1371,69 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
               </div>
             )}
           </div>
-        )}
+        ) : null}
 
-        <div className="mb-8 px-4 md:px-0 relative mt-16" style={{ zIndex: 10 }}>
-          <h1 className="text-3xl md:text-4xl font-bold font-mono mb-2 neon-text flex items-center gap-3">
-            <Flame className="w-8 h-8 text-orange-500 animate-pulse" />
-            {searchQuery ? `SEARCH RESULTS` : `TRENDING`}
-          </h1>
-          <p className="text-muted-foreground font-mono text-sm mb-4">
-            {searchQuery 
-              ? `Search results for "${searchQuery}"` 
-              : `Top artists and songs ranked by trading activity & plays`
-            }
-          </p>
+        {/* Time Filter & Section Header */}
+        <div className="mb-8 px-4 md:px-0 relative" style={{ zIndex: 10 }}>
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+            <div>
+              <h1 className="text-3xl md:text-4xl font-bold font-mono mb-2 neon-text flex items-center gap-3">
+                <Flame className="w-8 h-8 text-orange-500 animate-pulse" />
+                {searchQuery ? `SEARCH RESULTS` : `TRENDING`}
+              </h1>
+              <p className="text-muted-foreground font-mono text-sm">
+                {searchQuery 
+                  ? `Search results for "${searchQuery}"` 
+                  : `Top artists and songs ranked by trading activity & plays`
+                }
+              </p>
+            </div>
+            
+            {/* Time Filter Buttons */}
+            <div className="flex items-center gap-2 bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-1">
+              <Clock className="w-4 h-4 text-muted-foreground mr-1" />
+              <button
+                onClick={() => setTimeFilter('24H')}
+                className={`px-4 py-2 rounded-lg text-xs font-mono transition-all ${
+                  timeFilter === '24H'
+                    ? 'bg-neon-green text-black shadow-[0_0_12px_rgba(0,255,159,0.5)]'
+                    : 'text-muted-foreground hover:text-neon-green hover:bg-white/5'
+                }`}
+              >
+                24H
+              </button>
+              <button
+                onClick={() => setTimeFilter('7D')}
+                className={`px-4 py-2 rounded-lg text-xs font-mono transition-all ${
+                  timeFilter === '7D'
+                    ? 'bg-neon-green text-black shadow-[0_0_12px_rgba(0,255,159,0.5)]'
+                    : 'text-muted-foreground hover:text-neon-green hover:bg-white/5'
+                }`}
+              >
+                7D
+              </button>
+              <button
+                onClick={() => setTimeFilter('30D')}
+                className={`px-4 py-2 rounded-lg text-xs font-mono transition-all ${
+                  timeFilter === '30D'
+                    ? 'bg-neon-green text-black shadow-[0_0_12px_rgba(0,255,159,0.5)]'
+                    : 'text-muted-foreground hover:text-neon-green hover:bg-white/5'
+                }`}
+              >
+                30D
+              </button>
+              <button
+                onClick={() => setTimeFilter('ALL')}
+                className={`px-4 py-2 rounded-lg text-xs font-mono transition-all ${
+                  timeFilter === 'ALL'
+                    ? 'bg-neon-green text-black shadow-[0_0_12px_rgba(0,255,159,0.5)]'
+                    : 'text-muted-foreground hover:text-neon-green hover:bg-white/5'
+                }`}
+              >
+                ALL
+              </button>
+            </div>
+          </div>
         </div>
 
         <Tabs defaultValue="songs" className="w-full px-4 md:px-0 relative" style={{ zIndex: 10 }}>
@@ -1203,61 +1453,62 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
           </TabsList>
 
           <TabsContent value="songs" className="space-y-4">
-            {/* Sort & Filter Controls */}
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-3">
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground font-mono">SORT BY:</span>
-                <button
-                  onClick={() => handleSort('trending')}
-                  className={`px-3 py-1 rounded-lg text-xs font-mono transition-all ${
-                    sortField === 'trending' 
-                      ? 'bg-neon-green/20 text-neon-green border border-neon-green/50' 
-                      : 'bg-background/50 text-muted-foreground border border-border hover:border-neon-green/30'
-                  }`}
-                >
-                  🔥 TRENDING {sortField === 'trending' && (sortDirection === 'desc' ? '↓' : '↑')}
-                </button>
+            {/* Enhanced Sort & Filter Controls */}
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4 bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-4">
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="text-xs text-muted-foreground font-mono flex items-center gap-1">
+                  <TrendingUp className="w-3 h-3" />
+                  SORT BY:
+                </span>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {[
+                    { field: 'trending' as SortField, label: '🔥 TRENDING', icon: Flame },
+                    { field: 'price' as SortField, label: 'PRICE', icon: TrendingUp },
+                    { field: 'change' as SortField, label: '24H%', icon: TrendingUp },
+                    { field: 'volume' as SortField, label: 'VOLUME', icon: BarChart3 },
+                    { field: 'plays' as SortField, label: 'PLAYS', icon: Music },
+                  ].map(({ field, label, icon: Icon }) => (
+                    <button
+                      key={field}
+                      onClick={() => handleSort(field)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-mono transition-all flex items-center gap-1 ${
+                        sortField === field 
+                          ? 'bg-neon-green/20 text-neon-green border border-neon-green/50 shadow-[0_0_8px_rgba(0,255,159,0.3)]' 
+                          : 'bg-background/50 text-muted-foreground border border-border hover:border-neon-green/30 hover:text-neon-green'
+                      }`}
+                    >
+                      <Icon className="w-3 h-3" />
+                      {label} {sortField === field && (sortDirection === 'desc' ? '↓' : '↑')}
+                    </button>
+                  ))}
+                </div>
               </div>
               
               {/* Display Limit Filter */}
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground font-mono">SHOW:</span>
-                <button
-                  onClick={() => setDisplayLimit(10)}
-                  className={`px-3 py-1 rounded-lg text-xs font-mono transition-all ${
-                    displayLimit === 10
-                      ? 'bg-neon-green/20 text-neon-green border border-neon-green/50' 
-                      : 'bg-background/50 text-muted-foreground border border-border hover:border-neon-green/30'
-                  }`}
-                >
-                  TOP 10
-                </button>
-                <button
-                  onClick={() => setDisplayLimit(20)}
-                  className={`px-3 py-1 rounded-lg text-xs font-mono transition-all ${
-                    displayLimit === 20
-                      ? 'bg-neon-green/20 text-neon-green border border-neon-green/50' 
-                      : 'bg-background/50 text-muted-foreground border border-border hover:border-neon-green/30'
-                  }`}
-                >
-                  TOP 20
-                </button>
-                <button
-                  onClick={() => setDisplayLimit(50)}
-                  className={`px-3 py-1 rounded-lg text-xs font-mono transition-all ${
-                    displayLimit === 50
-                      ? 'bg-neon-green/20 text-neon-green border border-neon-green/50' 
-                      : 'bg-background/50 text-muted-foreground border border-border hover:border-neon-green/30'
-                  }`}
-                >
-                  TOP 50
-                </button>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs text-muted-foreground font-mono flex items-center gap-1">
+                  <BarChart3 className="w-3 h-3" />
+                  SHOW:
+                </span>
+                {[10, 20, 50].map((limit) => (
+                  <button
+                    key={limit}
+                    onClick={() => setDisplayLimit(limit)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-mono transition-all ${
+                      displayLimit === limit
+                        ? 'bg-neon-green/20 text-neon-green border border-neon-green/50 shadow-[0_0_8px_rgba(0,255,159,0.3)]' 
+                        : 'bg-background/50 text-muted-foreground border border-border hover:border-neon-green/30 hover:text-neon-green'
+                    }`}
+                  >
+                    TOP {limit}
+                  </button>
+                ))}
                 <button
                   onClick={() => setDisplayLimit(null)}
-                  className={`px-3 py-1 rounded-lg text-xs font-mono transition-all ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-mono transition-all ${
                     displayLimit === null
-                      ? 'bg-neon-green/20 text-neon-green border border-neon-green/50' 
-                      : 'bg-background/50 text-muted-foreground border border-border hover:border-neon-green/30'
+                      ? 'bg-neon-green/20 text-neon-green border border-neon-green/50 shadow-[0_0_8px_rgba(0,255,159,0.3)]' 
+                      : 'bg-background/50 text-muted-foreground border border-border hover:border-neon-green/30 hover:text-neon-green'
                   }`}
                 >
                   ALL
@@ -1265,8 +1516,8 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
               </div>
             </div>
             
-            {/* Desktop Table View */}
-            <div className="hidden md:block md:rounded-xl border border-border bg-card/50 backdrop-blur-sm overflow-hidden">
+            {/* Enhanced Desktop Table View */}
+            <div className="hidden md:block md:rounded-xl border border-white/20 bg-gradient-to-br from-white/5 to-white/0 backdrop-blur-xl overflow-hidden shadow-[0_8px_32px_0_rgba(0,255,159,0.1)]">
               <Table>
                 <TableHeader>
                   <TableRow className="border-b border-border hover:bg-transparent">
@@ -1332,7 +1583,13 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {displayedSongs.length === 0 ? (
+                  {loading ? (
+                    <>
+                      {[...Array(10)].map((_, i) => (
+                        <SongRowSkeleton key={`skeleton-row-${i}`} />
+                      ))}
+                    </>
+                  ) : displayedSongs.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={9} className="text-center py-16">
                         <div className="flex flex-col items-center gap-3">
@@ -1349,25 +1606,17 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    <>
-                      {/* Render displayed songs */}
-                      {displayedSongs.map((song, index) => (
-                        <SongRow key={song.id} song={song} index={index} onStatsUpdate={handleStatsUpdate} playSong={playSong} currentSong={currentSong} isPlaying={isPlaying} />
-                      ))}
-                      {/* Hidden section to pre-load data for all songs (rendered but not visible) */}
-                      {sortedSongs.length > displayedSongs.length && sortedSongs.slice(displayedSongs.length).map((song, index) => (
-                        <SongRow 
-                          key={`preload-${song.id}`} 
-                          song={song} 
-                          index={displayedSongs.length + index} 
-                          onStatsUpdate={handleStatsUpdate} 
-                          playSong={playSong} 
-                          currentSong={currentSong} 
-                          isPlaying={isPlaying} 
-                          style={{ display: 'none' }}
-                        />
-                      ))}
-                    </>
+                    displayedSongs.map((song, index) => (
+                      <SongRow 
+                        key={song.id} 
+                        song={song} 
+                        index={index} 
+                        onStatsUpdate={handleStatsUpdate} 
+                        playSong={playSong} 
+                        currentSong={currentSong} 
+                        isPlaying={isPlaying} 
+                      />
+                    ))
                   )}
                 </TableBody>
               </Table>
@@ -1375,7 +1624,13 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
             
             {/* Mobile Card View */}
             <div className="md:hidden space-y-2">
-              {displayedSongs.length === 0 ? (
+              {loading ? (
+                <>
+                  {[...Array(5)].map((_, i) => (
+                    <SongCardSkeleton key={`skeleton-card-${i}`} />
+                  ))}
+                </>
+              ) : displayedSongs.length === 0 ? (
                 <div className="text-center py-16">
                   <div className="flex flex-col items-center gap-3">
                     <Music className="w-12 h-12 text-muted-foreground/50" />
@@ -1390,28 +1645,17 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
                   </div>
                 </div>
               ) : (
-                <>
-                  {/* Render displayed songs */}
-                  {displayedSongs.map((song, index) => (
-                    <SongCard key={song.id} song={song} index={index} onStatsUpdate={handleStatsUpdate} playSong={playSong} currentSong={currentSong} isPlaying={isPlaying} />
-                  ))}
-                  {/* Hidden section to pre-load data for all songs (but not displayed) */}
-                  {sortedSongs.length > displayedSongs.length && (
-                    <div style={{ display: 'none' }}>
-                      {sortedSongs.slice(displayedSongs.length).map((song, index) => (
-                        <SongCard 
-                          key={`preload-${song.id}`} 
-                          song={song} 
-                          index={displayedSongs.length + index} 
-                          onStatsUpdate={handleStatsUpdate} 
-                          playSong={playSong} 
-                          currentSong={currentSong} 
-                          isPlaying={isPlaying} 
-                        />
-                      ))}
-                    </div>
-                  )}
-                </>
+                displayedSongs.map((song, index) => (
+                  <SongCard 
+                    key={song.id} 
+                    song={song} 
+                    index={index} 
+                    onStatsUpdate={handleStatsUpdate} 
+                    playSong={playSong} 
+                    currentSong={currentSong} 
+                    isPlaying={isPlaying} 
+                  />
+                ))
               )}
             </div>
           </TabsContent>
@@ -1474,7 +1718,13 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {artists.length === 0 ? (
+                  {loading ? (
+                    <>
+                      {[...Array(10)].map((_, i) => (
+                        <ArtistRowSkeleton key={`skeleton-artist-${i}`} />
+                      ))}
+                    </>
+                  ) : artists.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={5} className="text-center py-16">
                         <div className="flex flex-col items-center gap-3">

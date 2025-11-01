@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useWallet } from '@/hooks/useWallet';
 import { supabase } from '@/integrations/supabase/client';
@@ -96,6 +96,116 @@ interface FeedProps {
   currentSong?: any;
   isPlaying?: boolean;
 }
+
+// Generate consistent random colors for post-it notes based on post ID
+const getPostItColors = (postId: string) => {
+  // Simple hash function to convert post ID to a number
+  let hash = 0;
+  for (let i = 0; i < postId.length; i++) {
+    hash = postId.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const index = Math.abs(hash) % 7;
+  
+  const colorSchemes = [
+    // Yellow/Amber
+    {
+      bg: 'from-amber-500/10 via-yellow-400/8 to-orange-400/10',
+      layer1: 'from-amber-50/30 via-yellow-50/25 to-orange-50/20',
+      layer2: 'from-yellow-100/40 via-amber-100/35 to-orange-100/30',
+      accent1: 'bg-amber-400/20',
+      accent2: 'bg-yellow-300/15',
+    },
+    // Pink/Rose
+    {
+      bg: 'from-pink-500/10 via-rose-400/8 to-fuchsia-400/10',
+      layer1: 'from-pink-50/30 via-rose-50/25 to-fuchsia-50/20',
+      layer2: 'from-rose-100/40 via-pink-100/35 to-fuchsia-100/30',
+      accent1: 'bg-pink-400/20',
+      accent2: 'bg-rose-300/15',
+    },
+    // Blue/Cyan
+    {
+      bg: 'from-blue-500/10 via-cyan-400/8 to-sky-400/10',
+      layer1: 'from-blue-50/30 via-cyan-50/25 to-sky-50/20',
+      layer2: 'from-cyan-100/40 via-blue-100/35 to-sky-100/30',
+      accent1: 'bg-blue-400/20',
+      accent2: 'bg-cyan-300/15',
+    },
+    // Green/Lime
+    {
+      bg: 'from-green-500/10 via-lime-400/8 to-emerald-400/10',
+      layer1: 'from-green-50/30 via-lime-50/25 to-emerald-50/20',
+      layer2: 'from-lime-100/40 via-green-100/35 to-emerald-100/30',
+      accent1: 'bg-green-400/20',
+      accent2: 'bg-lime-300/15',
+    },
+    // Purple/Violet
+    {
+      bg: 'from-purple-500/10 via-violet-400/8 to-indigo-400/10',
+      layer1: 'from-purple-50/30 via-violet-50/25 to-indigo-50/20',
+      layer2: 'from-violet-100/40 via-purple-100/35 to-indigo-100/30',
+      accent1: 'bg-purple-400/20',
+      accent2: 'bg-violet-300/15',
+    },
+    // Orange/Red
+    {
+      bg: 'from-orange-500/10 via-red-400/8 to-amber-400/10',
+      layer1: 'from-orange-50/30 via-red-50/25 to-amber-50/20',
+      layer2: 'from-red-100/40 via-orange-100/35 to-amber-100/30',
+      accent1: 'bg-orange-400/20',
+      accent2: 'bg-red-300/15',
+    },
+    // Teal/Mint
+    {
+      bg: 'from-teal-500/10 via-emerald-400/8 to-cyan-400/10',
+      layer1: 'from-teal-50/30 via-emerald-50/25 to-cyan-50/20',
+      layer2: 'from-emerald-100/40 via-teal-100/35 to-cyan-100/30',
+      accent1: 'bg-teal-400/20',
+      accent2: 'bg-emerald-300/15',
+    },
+  ];
+  
+  return colorSchemes[index];
+};
+
+// Skeleton components for Feed page
+const PostCardSkeleton = memo(() => (
+  <Card className="p-4 md:p-6 bg-gradient-to-br from-white/5 via-white/3 to-transparent backdrop-blur-xl border border-white/10 rounded-2xl mb-4">
+    <div className="flex items-center gap-3 mb-4">
+      <div className="w-12 h-12 rounded-full bg-white/10 animate-pulse" />
+      <div className="flex-1 space-y-2">
+        <div className="h-4 bg-white/10 rounded w-32 animate-pulse" />
+        <div className="h-3 bg-white/10 rounded w-24 animate-pulse" />
+      </div>
+    </div>
+    <div className="space-y-3">
+      <div className="h-24 bg-white/10 rounded-lg animate-pulse" />
+      <div className="h-4 bg-white/10 rounded w-full animate-pulse" />
+      <div className="h-4 bg-white/10 rounded w-3/4 animate-pulse" />
+    </div>
+    <div className="flex items-center gap-4 mt-4">
+      <div className="h-8 w-8 rounded-full bg-white/10 animate-pulse" />
+      <div className="h-8 w-8 rounded-full bg-white/10 animate-pulse" />
+      <div className="h-8 w-8 rounded-full bg-white/10 animate-pulse" />
+    </div>
+  </Card>
+));
+PostCardSkeleton.displayName = 'PostCardSkeleton';
+
+const SongCardFeedSkeleton = memo(() => (
+  <Card className="p-4 bg-gradient-to-br from-white/5 via-white/3 to-transparent backdrop-blur-xl border border-white/10 rounded-xl mb-4">
+    <div className="flex items-center gap-4">
+      <div className="w-16 h-16 rounded bg-white/10 animate-pulse" />
+      <div className="flex-1 space-y-2">
+        <div className="h-5 bg-white/10 rounded w-3/4 animate-pulse" />
+        <div className="h-4 bg-white/10 rounded w-1/2 animate-pulse" />
+        <div className="h-3 bg-white/10 rounded w-1/3 animate-pulse" />
+      </div>
+      <div className="w-10 h-10 rounded-full bg-white/10 animate-pulse" />
+    </div>
+  </Card>
+));
+SongCardFeedSkeleton.displayName = 'SongCardFeedSkeleton';
 
 export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {}) {
   const navigate = useNavigate();
@@ -625,25 +735,28 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
     const priceUSD = (parseFloat(priceInXRGE) || 0) * (prices.xrge || 0);
 
     return (
-      <Card className="p-4 bg-white/5 backdrop-blur-xl border border-white/10 shadow-[0_8px_32px_0_rgba(0,255,159,0.1)] w-full md:rounded-2xl rounded-none border-x-0 md:border-x border-b md:border-b mb-0 md:mb-4 hover:bg-white/8 active:bg-white/10 active:scale-[0.99] transition-all duration-300">
+      <Card className="p-4 md:p-6 bg-gradient-to-br from-white/5 via-white/3 to-transparent backdrop-blur-xl border border-white/10 shadow-[0_8px_32px_0_rgba(0,255,159,0.1)] hover:shadow-[0_12px_48px_0_rgba(0,255,159,0.2)] hover:border-neon-green/20 w-full md:rounded-2xl rounded-none border-x-0 md:border-x border-b md:border-b mb-0 md:mb-4 hover:bg-white/8 active:bg-white/10 active:scale-[0.98] transition-all duration-300 group">
         {/* Song Post Header */}
-        <div className="flex items-start gap-3 mb-3">
+        <div className="flex items-start gap-3 mb-4">
           {/* Artist Avatar */}
           <div 
-            className="flex-shrink-0 cursor-pointer"
+            className="flex-shrink-0 cursor-pointer hover:scale-110 transition-transform duration-200 relative group/avatar"
             onClick={() => navigate(`/artist/${song.wallet_address}`)}
           >
             {song.profiles?.avatar_cid ? (
-              <img
-                src={getIPFSGatewayUrl(song.profiles.avatar_cid)}
-                alt="Avatar"
-                loading="lazy"
-                decoding="async"
-                className="w-10 h-10 rounded-full object-cover"
-              />
+              <div className="relative">
+                <img
+                  src={getIPFSGatewayUrl(song.profiles.avatar_cid)}
+                  alt="Avatar"
+                  loading="lazy"
+                  decoding="async"
+                  className="w-12 h-12 md:w-14 md:h-14 rounded-full object-cover border-2 border-neon-green/20 group-hover/avatar:border-neon-green/60 transition-all duration-300"
+                />
+                <div className="absolute inset-0 rounded-full bg-neon-green/0 group-hover/avatar:bg-neon-green/10 transition-colors duration-300" />
+              </div>
             ) : (
-              <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-                <span className="text-primary text-sm">
+              <div className="w-12 h-12 md:w-14 md:h-14 rounded-full bg-gradient-to-br from-neon-green/20 to-purple-500/20 flex items-center justify-center border-2 border-neon-green/20 group-hover/avatar:border-neon-green/60 transition-all duration-300">
+                <span className="text-neon-green text-base md:text-lg font-bold">
                   {song.profiles?.artist_name?.[0] || '?'}
                 </span>
               </div>
@@ -652,20 +765,20 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
 
           <div className="flex-1 min-w-0">
             {/* Artist Name and Action */}
-            <div className="flex items-center gap-1.5 mb-1">
+            <div className="flex items-center gap-2 mb-1">
               <p 
-                className="font-semibold text-sm cursor-pointer hover:text-neon-green transition-colors"
+                className="font-semibold text-sm md:text-base cursor-pointer hover:text-neon-green transition-colors duration-200"
                 onClick={() => navigate(`/artist/${song.wallet_address}`)}
               >
                 {song.profiles?.artist_name || `${song.wallet_address.slice(0, 6)}...${song.wallet_address.slice(-4)}`}
               </p>
               {song.profiles?.verified && (
-                <CircleCheckBig className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" aria-label="Verified artist" />
+                <CircleCheckBig className="h-4 w-4 text-blue-500 flex-shrink-0 animate-pulse" aria-label="Verified artist" />
               )}
               <XRGETierBadge walletAddress={song.wallet_address} size="sm" />
-              <span className="text-xs text-muted-foreground">posted a track</span>
+              <span className="text-xs md:text-sm text-muted-foreground ml-1">posted a track</span>
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs md:text-sm text-muted-foreground">
               {formatTimeAgo(song.created_at)}
             </p>
           </div>
@@ -674,38 +787,41 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
         {/* Song Content */}
         <div className="flex gap-3 mb-3">
           {/* Album Cover with Play Button */}
-          <div className="relative group flex-shrink-0">
+          <div className="relative group/cover flex-shrink-0">
             {song.cover_cid ? (
-              <img
-                src={getIPFSGatewayUrl(song.cover_cid)}
-                alt={song.title}
-                loading="lazy"
-                decoding="async"
-                className="w-20 h-20 rounded-lg object-cover cursor-pointer hover:opacity-90 transition-opacity"
-                onClick={() => song.token_address ? navigate(`/song/${song.id}`) : null}
-              />
+              <div className="relative">
+                <img
+                  src={getIPFSGatewayUrl(song.cover_cid)}
+                  alt={song.title}
+                  loading="lazy"
+                  decoding="async"
+                  className="w-24 h-24 md:w-28 md:h-28 rounded-xl object-cover cursor-pointer border-2 border-neon-green/20 group-hover/cover:border-neon-green/60 transition-all duration-300 shadow-lg group-hover/cover:scale-105"
+                  onClick={() => song.token_address ? navigate(`/song/${song.id}`) : null}
+                />
+                <div className="absolute inset-0 rounded-xl bg-neon-green/0 group-hover/cover:bg-neon-green/10 transition-colors duration-300" />
+              </div>
             ) : (
               <div 
-                className="w-20 h-20 rounded-lg bg-primary/20 flex items-center justify-center cursor-pointer hover:opacity-90 transition-opacity"
+                className="w-24 h-24 md:w-28 md:h-28 rounded-xl bg-gradient-to-br from-neon-green/20 to-purple-500/20 flex items-center justify-center cursor-pointer border-2 border-neon-green/20 group-hover/cover:border-neon-green/60 transition-all duration-300 shadow-lg"
                 onClick={() => song.token_address ? navigate(`/song/${song.id}`) : null}
               >
-                <Music className="w-8 h-8 text-primary" />
+                <Music className="w-10 h-10 md:w-12 md:h-12 text-neon-green" />
               </div>
             )}
             
-            {/* Play Button Overlay */}
+            {/* Enhanced Play Button Overlay */}
             {playSong && song.audio_cid && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   playSong(song);
                 }}
-                className="absolute bottom-1 right-1 w-8 h-8 rounded-full bg-neon-green hover:bg-neon-green/80 active:bg-neon-green/70 flex items-center justify-center transition-all hover:scale-110 active:scale-95 shadow-lg shadow-neon-green/50 z-10"
+                className="absolute bottom-2 right-2 w-10 h-10 md:w-12 md:h-12 rounded-full bg-neon-green hover:bg-neon-green/90 active:bg-neon-green/80 flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 shadow-[0_0_20px_rgba(0,255,159,0.6)] hover:shadow-[0_0_30px_rgba(0,255,159,0.8)] z-10 border-2 border-white/20"
               >
                 {currentSong?.id === song.id && isPlaying ? (
-                  <Pause className="w-4 h-4 text-black fill-black" />
+                  <Pause className="w-5 h-5 md:w-6 md:h-6 text-black fill-black" />
                 ) : (
-                  <Play className="w-4 h-4 text-black fill-black ml-0.5" />
+                  <Play className="w-5 h-5 md:w-6 md:h-6 text-black fill-black ml-0.5" />
                 )}
               </button>
             )}
@@ -716,15 +832,15 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
             className="flex-1 min-w-0 cursor-pointer hover:opacity-90 transition-opacity"
             onClick={() => song.token_address ? navigate(`/song/${song.id}`) : null}
           >
-            <h3 className="font-bold text-base mb-1 truncate flex items-center gap-2">
-              <span className="truncate">{song.title}</span>
+            <h3 className="font-bold text-base md:text-lg mb-2 truncate flex items-center gap-2">
+              <span className="truncate text-foreground">{song.title}</span>
               <AiBadge aiUsage={song.ai_usage} size="sm" />
             </h3>
-            <p className="text-sm text-muted-foreground mb-1">
+            <p className="text-sm md:text-base text-muted-foreground mb-2">
               {song.artist}
             </p>
             {song.ticker && (
-              <p className="text-xs text-neon-green font-mono mb-1">
+              <p className="text-xs md:text-sm text-neon-green font-mono mb-2 font-semibold">
                 ${song.ticker}
               </p>
             )}
@@ -747,7 +863,7 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
         )}
 
         {/* Song Actions */}
-        <div className="flex items-center gap-4 pt-3 border-t border-border">
+        <div className="flex items-center gap-4 pt-4 border-t border-border/50">
           <LikeButton 
             songId={song.id} 
             size="sm" 
@@ -756,9 +872,9 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
 
           <button 
             onClick={() => toggleSongComments(song.id)} 
-            className="flex items-center gap-1.5 text-xs hover:text-primary transition-colors"
+            className="flex items-center gap-1.5 text-sm hover:text-neon-green transition-colors duration-200"
           >
-            <MessageCircle className="w-4 h-4" />
+            <MessageCircle className="w-4 h-4 md:w-5 md:h-5" />
             <span>{songCommentCounts[song.id] || 0}</span>
           </button>
 
@@ -767,7 +883,7 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
               variant="outline"
               size="sm"
               onClick={() => navigate(`/song/${song.id}`)}
-              className="ml-auto"
+              className="ml-auto border-neon-green/30 hover:border-neon-green/60 hover:bg-neon-green/10 transition-all duration-200"
             >
               Trade
             </Button>
@@ -792,21 +908,25 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
       <StoriesBar hasXRGE={hasXRGE} />
       <div className="min-h-screen bg-background pt-0 pb-24 md:pb-32 px-0 md:px-4">
         <div className="w-full md:max-w-7xl md:mx-auto">
-          <div className="text-center mb-8 md:mb-12 px-4 pt-0 pb-8 md:pb-12">
-            <div className="flex justify-center items-center mb-6">
+          <div className="text-center mb-8 md:mb-12 px-4 pt-4 md:pt-8 pb-8 md:pb-12">
+            <div className="relative flex justify-center items-center mb-6">
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-40 h-40 md:w-60 md:h-60 bg-neon-green/10 rounded-full blur-3xl animate-pulse" />
+              </div>
               <img 
                 src={gltchLogo} 
                 alt="GLTCH" 
-                className="h-32 md:h-48 w-auto drop-shadow-[0_0_40px_rgba(0,255,159,0.8)] hover:drop-shadow-[0_0_60px_rgba(0,255,159,1)] transition-all duration-300 hover:scale-105"
+                className="relative h-32 md:h-48 w-auto drop-shadow-[0_0_40px_rgba(0,255,159,0.8)] hover:drop-shadow-[0_0_60px_rgba(0,255,159,1)] transition-all duration-500 hover:scale-110"
               />
             </div>
-            <p className="text-base md:text-lg text-muted-foreground font-mono tracking-wide">
+            <p className="text-base md:text-lg text-muted-foreground font-mono tracking-wide animate-fade-in">
               Decentralized social feed on IPFS
             </p>
           </div>
 
           {/* Post Creator */}
-          {isConnected && <Card className="relative z-50 p-4 md:p-6 space-y-4 bg-white/5 backdrop-blur-xl border border-white/10 shadow-[0_8px_32px_0_rgba(0,255,159,0.1)] w-full md:max-w-2xl md:mx-auto mb-6 md:rounded-2xl rounded-none border-x-0 md:border-x">
+          {isConnected && (
+            <Card className="relative z-50 p-4 md:p-6 space-y-4 bg-gradient-to-br from-white/5 via-white/3 to-transparent backdrop-blur-xl border border-white/10 shadow-[0_8px_32px_0_rgba(0,255,159,0.1)] hover:shadow-[0_12px_48px_0_rgba(0,255,159,0.2)] hover:border-neon-green/20 w-full md:max-w-2xl md:mx-auto mb-6 md:rounded-2xl rounded-none border-x-0 md:border-x transition-all duration-300">
               {!hasXRGE && (
                 <div className="flex items-start gap-3 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
                   <Lock className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
@@ -835,15 +955,17 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
                 disabled={!hasXRGE}
               />
 
-              {mediaPreview && <div className="relative">
+              {mediaPreview && (
+                <div className="relative">
                   <img src={mediaPreview} alt="Preview" className="max-h-64 rounded-lg mx-auto" />
                   <Button variant="ghost" size="sm" className="absolute top-2 right-2" onClick={() => {
-              setMediaFile(null);
-              setMediaPreview(null);
-            }}>
+                    setMediaFile(null);
+                    setMediaPreview(null);
+                  }}>
                     Remove
                   </Button>
-                </div>}
+                </div>
+              )}
 
               {/* Song Selection - MANDATORY */}
               <div className="space-y-2">
@@ -990,7 +1112,8 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
                   {posting ? 'Posting to IPFS...' : 'Post'}
                 </Button>
               </div>
-            </Card>}
+            </Card>
+          )}
 
           {/* Feed with Tabs */}
           <Tabs defaultValue="songs" className="w-full md:max-w-2xl md:mx-auto">
@@ -1001,59 +1124,85 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
 
             {/* Posts Tab */}
             <TabsContent value="posts" className="space-y-0 md:space-y-4">
-              {loading ? <div className="text-center py-8 text-muted-foreground px-4">Loading feed...</div> : posts.length === 0 ? <div className="text-center py-8 text-muted-foreground px-4">
+              {loading ? (
+                <>
+                  {[...Array(3)].map((_, i) => (
+                    <PostCardSkeleton key={`skeleton-post-${i}`} />
+                  ))}
+                </>
+              ) : posts.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground px-4">
                   No posts yet. Be the first to post!
-                </div> : posts.map(post => <Card key={post.id} className="p-4 bg-white/5 backdrop-blur-xl border border-white/10 shadow-[0_8px_32px_0_rgba(0,255,159,0.1)] flex flex-col w-full md:rounded-2xl rounded-none border-x-0 md:border-x border-b md:border-b mb-0 md:mb-4 hover:bg-white/8 active:bg-white/10 active:scale-[0.99] transition-all duration-300">
+                </div>
+              ) : (
+                posts.map(post => (
+                  <Card key={post.id} className="p-4 md:p-6 bg-gradient-to-br from-white/5 via-white/3 to-transparent backdrop-blur-xl border border-white/10 shadow-[0_8px_32px_0_rgba(0,255,159,0.1)] hover:shadow-[0_12px_48px_0_rgba(0,255,159,0.2)] hover:border-neon-green/20 flex flex-col w-full md:rounded-2xl rounded-none border-x-0 md:border-x border-b md:border-b mb-0 md:mb-4 hover:bg-white/8 active:bg-white/10 active:scale-[0.98] transition-all duration-300 group">
                   {/* Post Header */}
-                  <div className="flex items-center gap-2 mb-3">
+                  <div className="flex items-center gap-3 mb-4">
                     <div 
-                      className="cursor-pointer hover:opacity-80 transition-opacity"
+                      className="cursor-pointer hover:scale-110 transition-transform duration-200 relative group/avatar"
                       onClick={() => navigate(`/artist/${post.wallet_address}`)}
                     >
-                      {post.profiles?.avatar_cid ? <img src={getIPFSGatewayUrl(post.profiles.avatar_cid)} alt="Avatar" loading="lazy" decoding="async" className="w-8 h-8 rounded-full object-cover" /> : <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
-                          <span className="text-primary text-xs">
+                      {post.profiles?.avatar_cid ? (
+                        <div className="relative">
+                          <img 
+                            src={getIPFSGatewayUrl(post.profiles.avatar_cid)} 
+                            alt="Avatar" 
+                            loading="lazy" 
+                            decoding="async" 
+                            className="w-10 h-10 md:w-12 md:h-12 rounded-full object-cover border-2 border-neon-green/20 group-hover/avatar:border-neon-green/60 transition-all duration-300" 
+                          />
+                          <div className="absolute inset-0 rounded-full bg-neon-green/0 group-hover/avatar:bg-neon-green/10 transition-colors duration-300" />
+                        </div>
+                      ) : (
+                        <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-gradient-to-br from-neon-green/20 to-purple-500/20 flex items-center justify-center border-2 border-neon-green/20 group-hover/avatar:border-neon-green/60 transition-all duration-300">
+                          <span className="text-neon-green text-sm md:text-base font-bold">
                             {post.profiles?.artist_name?.[0] || '?'}
                           </span>
-                        </div>}
+                        </div>
+                      )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5 mb-0.5">
+                      <div className="flex items-center gap-2 mb-1">
                         <p 
-                          className="font-semibold text-sm cursor-pointer hover:text-neon-green transition-colors"
+                          className="font-semibold text-sm md:text-base cursor-pointer hover:text-neon-green transition-colors duration-200"
                           onClick={() => navigate(`/artist/${post.wallet_address}`)}
                         >
                           {post.profiles?.artist_name || `${post.wallet_address.slice(0, 6)}...${post.wallet_address.slice(-4)}`}
                         </p>
                         {post.profiles?.verified && (
-                          <CircleCheckBig className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" aria-label="Verified artist" />
+                          <CircleCheckBig className="h-4 w-4 text-blue-500 flex-shrink-0 animate-pulse" aria-label="Verified artist" />
                         )}
                         <XRGETierBadge walletAddress={post.wallet_address} size="sm" />
                       </div>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs md:text-sm text-muted-foreground">
                         {formatTimeAgo(post.created_at)}
                       </p>
                     </div>
                   </div>
 
-                  {/* Post Content */}
-                  {post.content_text && (
-                    <div className="mb-3 text-sm whitespace-pre-wrap line-clamp-6">
+                  {/* Post Content Text - Shows for posts with text but not the styled version */}
+                  {post.content_text && !(!post.media_cid && post.songs) && (
+                    <div className="mb-4 text-sm md:text-base whitespace-pre-wrap line-clamp-6 text-foreground/90 leading-relaxed">
                       <TaggedText text={post.content_text} />
                     </div>
                   )}
 
                   {/* Post Media with Song Player Overlay */}
                   {post.media_cid && post.songs && (
-                    <div className="mb-3 rounded-lg overflow-hidden relative group">
-                      <img 
-                        src={getIPFSGatewayUrl(post.media_cid)} 
-                        alt="Post media" 
-                        loading="lazy" 
-                        decoding="async" 
-                        className="w-full max-h-[600px] object-contain bg-black/5 rounded-lg" 
-                      />
+                    <div className="mb-4 rounded-xl overflow-hidden relative group/media">
+                      <div className="relative">
+                        <img 
+                          src={getIPFSGatewayUrl(post.media_cid)} 
+                          alt="Post media" 
+                          loading="lazy" 
+                          decoding="async" 
+                          className="w-full max-h-[600px] object-contain bg-gradient-to-br from-black/10 to-black/5 rounded-xl group-hover/media:scale-[1.02] transition-transform duration-500" 
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover/media:opacity-100 transition-opacity duration-300" />
+                      </div>
                       
-                      {/* Opaque Play/Pause Button Overlay */}
+                      {/* Enhanced Play/Pause Button Overlay */}
                       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                         <button
                           onClick={() => {
@@ -1067,12 +1216,12 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
                               });
                             }
                           }}
-                          className="pointer-events-auto bg-black/60 backdrop-blur-sm hover:bg-black/80 transition-all p-6 rounded-full opacity-0 group-hover:opacity-100"
+                          className="pointer-events-auto bg-black/70 backdrop-blur-md hover:bg-black/90 transition-all duration-300 p-6 md:p-8 rounded-full opacity-0 group-hover/media:opacity-100 hover:scale-110 active:scale-95 border-2 border-white/20 hover:border-neon-green/50 shadow-[0_0_30px_rgba(0,255,159,0.5)]"
                         >
                           {currentSong?.id === post.songs.id && isPlaying ? (
-                            <Pause className="w-12 h-12 text-white" />
+                            <Pause className="w-12 h-12 md:w-16 md:h-16 text-white" />
                           ) : (
-                            <Play className="w-12 h-12 text-white" />
+                            <Play className="w-12 h-12 md:w-16 md:h-16 text-white ml-1" />
                           )}
                         </button>
                       </div>
@@ -1080,7 +1229,7 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
                       {/* Bottom Song Scroller */}
                       <div 
                         onClick={() => navigate(`/song/${post.songs.id}`)}
-                        className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/70 to-transparent p-3 cursor-pointer hover:bg-black/95 transition-all"
+                        className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/95 via-black/80 to-transparent p-4 cursor-pointer hover:bg-black/98 transition-all duration-300 backdrop-blur-sm"
                       >
                         <div className="flex items-center gap-2">
                           {post.songs.cover_cid && (
@@ -1113,67 +1262,102 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
                     </div>
                   )}
 
-                  {/* Song Player Card for Text-Only Posts */}
-                  {!post.media_cid && post.songs && (
-                    <div 
-                      className="mb-3 rounded-lg overflow-hidden bg-gradient-to-br from-neon-green/5 to-purple-500/5 border border-neon-green/10 p-4 cursor-pointer hover:border-neon-green/30 transition-all group"
-                      onClick={() => {
-                        if (playSong) {
-                          playSong({
-                            id: post.songs.id,
-                            title: post.songs.title,
-                            artist: post.songs.artist,
-                            audio_cid: post.songs.audio_cid,
-                            cover_cid: post.songs.cover_cid
-                          });
-                        }
-                      }}
-                    >
-                      <div className="flex items-center gap-3">
-                        {/* Song Cover */}
-                        {post.songs.cover_cid && (
-                          <div className="relative flex-shrink-0">
+                  {/* Post Media without Song */}
+                  {post.media_cid && !post.songs && (
+                    <div className="mb-4 rounded-xl overflow-hidden relative">
+                      <img 
+                        src={getIPFSGatewayUrl(post.media_cid)} 
+                        alt="Post media" 
+                        loading="lazy" 
+                        decoding="async" 
+                        className="w-full max-h-[600px] object-contain bg-gradient-to-br from-black/10 to-black/5 rounded-xl" 
+                      />
+                    </div>
+                  )}
+
+                  {/* Text Post with Song - Styled like Post-It Note */}
+                  {!post.media_cid && post.content_text && post.songs && (() => {
+                    const colors = getPostItColors(post.id);
+                    return (
+                      <div className={`mb-4 rounded-xl overflow-hidden relative group/media min-h-[300px] flex items-center justify-center bg-gradient-to-br ${colors.bg}`}>
+                        {/* Post-It Note Styled Text Background - Layered effect */}
+                        <div className={`absolute inset-[2px] bg-gradient-to-br ${colors.layer1} rotate-[-1deg] transform origin-center shadow-[2px_2px_4px_rgba(0,0,0,0.2)] rounded-lg`} />
+                        <div className={`absolute inset-[4px] bg-gradient-to-br ${colors.layer2} rotate-[0.5deg] transform origin-center shadow-[1px_1px_2px_rgba(0,0,0,0.15)] rounded-lg`} />
+                        <div className={`absolute top-2 left-2 w-8 h-8 ${colors.accent1} rotate-[-8deg] rounded-sm blur-sm`} />
+                        <div className={`absolute bottom-2 right-2 w-6 h-6 ${colors.accent2} rotate-[12deg] rounded-sm blur-sm`} />
+                      
+                      {/* Text Content */}
+                      <div className="relative z-10 p-6 md:p-8 w-full">
+                        <div className="text-base md:text-lg whitespace-pre-wrap text-foreground/95 leading-relaxed font-medium drop-shadow-sm">
+                          <TaggedText text={post.content_text} />
+                        </div>
+                      </div>
+
+                      {/* Enhanced Play/Pause Button Overlay */}
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
+                        <button
+                          onClick={() => {
+                            if (playSong) {
+                              playSong({
+                                id: post.songs.id,
+                                title: post.songs.title,
+                                artist: post.songs.artist,
+                                audio_cid: post.songs.audio_cid,
+                                cover_cid: post.songs.cover_cid
+                              });
+                            }
+                          }}
+                          className="pointer-events-auto bg-black/70 backdrop-blur-md hover:bg-black/90 transition-all duration-300 p-6 md:p-8 rounded-full opacity-0 group-hover/media:opacity-100 hover:scale-110 active:scale-95 border-2 border-white/20 hover:border-neon-green/50 shadow-[0_0_30px_rgba(0,255,159,0.5)]"
+                        >
+                          {currentSong?.id === post.songs.id && isPlaying ? (
+                            <Pause className="w-12 h-12 md:w-16 md:h-16 text-white" />
+                          ) : (
+                            <Play className="w-12 h-12 md:w-16 md:h-16 text-white ml-1" />
+                          )}
+                        </button>
+                      </div>
+
+                      {/* Bottom Song Scroller - Same as Image Posts */}
+                      <div 
+                        onClick={() => navigate(`/song/${post.songs.id}`)}
+                        className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/95 via-black/80 to-transparent p-4 cursor-pointer hover:bg-black/98 transition-all duration-300 backdrop-blur-sm z-20"
+                      >
+                        <div className="flex items-center gap-2">
+                          {post.songs.cover_cid && (
                             <img 
                               src={getIPFSGatewayUrl(post.songs.cover_cid)} 
                               alt={post.songs.title}
-                              className="w-16 h-16 rounded object-cover"
+                              className="w-10 h-10 rounded object-cover flex-shrink-0"
                             />
-                            {/* Play/Pause Overlay on Cover */}
-                            <div className="absolute inset-0 flex items-center justify-center bg-black/40 group-hover:bg-black/60 transition-all rounded">
-                              {currentSong?.id === post.songs.id && isPlaying ? (
-                                <Pause className="w-8 h-8 text-white" />
-                              ) : (
-                                <Play className="w-8 h-8 text-white" />
-                              )}
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <Music className="w-3 h-3 text-neon-green flex-shrink-0" />
+                              <p className="font-semibold text-white text-sm truncate">
+                                {post.songs.title}
+                              </p>
                             </div>
-                          </div>
-                        )}
-                        
-                        {/* Song Info */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <Music className="w-4 h-4 text-neon-green flex-shrink-0" />
-                            <p className="font-semibold text-base truncate">
-                              {post.songs.title}
+                            <p className="text-xs text-gray-300 truncate">
+                              {post.songs.artist}
                             </p>
                           </div>
-                          <p className="text-sm text-muted-foreground truncate">
-                            {post.songs.artist}
-                          </p>
-                          <p className="text-xs text-neon-green/70 mt-1">
-                            {currentSong?.id === post.songs.id && isPlaying ? 'Now Playing' : 'Click to play'}
-                          </p>
+                          {currentSong?.id === post.songs.id && isPlaying && (
+                            <div className="flex gap-0.5 items-end h-4">
+                              <div className="w-0.5 bg-neon-green animate-pulse" style={{ height: '60%' }}></div>
+                              <div className="w-0.5 bg-neon-green animate-pulse" style={{ height: '100%', animationDelay: '0.2s' }}></div>
+                              <div className="w-0.5 bg-neon-green animate-pulse" style={{ height: '80%', animationDelay: '0.4s' }}></div>
+                            </div>
+                          )}
                         </div>
-
-                        {/* Playing Animation */}
-                        {currentSong?.id === post.songs.id && isPlaying && (
-                          <div className="flex gap-0.5 items-end h-6 flex-shrink-0">
-                            <div className="w-1 bg-neon-green animate-pulse rounded-full" style={{ height: '60%' }}></div>
-                            <div className="w-1 bg-neon-green animate-pulse rounded-full" style={{ height: '100%', animationDelay: '0.2s' }}></div>
-                            <div className="w-1 bg-neon-green animate-pulse rounded-full" style={{ height: '80%', animationDelay: '0.4s' }}></div>
-                          </div>
-                        )}
                       </div>
+                    </div>
+                    );
+                  })()}
+
+                  {/* Text Only Post (No Song) */}
+                  {!post.media_cid && !post.songs && post.content_text && (
+                    <div className="mb-4 text-sm md:text-base whitespace-pre-wrap line-clamp-6 text-foreground/90 leading-relaxed">
+                      <TaggedText text={post.content_text} />
                     </div>
                   )}
 
@@ -1199,9 +1383,11 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
                   </div>
 
                   {/* Comments Section */}
-                  {expandedComments.has(post.id) && <div className="pt-4 mt-4 border-t border-border space-y-4">
+                  {expandedComments.has(post.id) && (
+                    <div className="pt-4 mt-4 border-t border-border space-y-4">
                       {/* Add Comment */}
-                      {isConnected && <div className="flex gap-2">
+                      {isConnected && (
+                        <div className="flex gap-2">
                           <Input placeholder="Add a comment..." value={commentText[post.id] || ''} onChange={e => setCommentText(prev => ({
                   ...prev,
                   [post.id]: e.target.value
@@ -1214,11 +1400,13 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
                           <Button size="sm" onClick={() => handleAddComment(post.id)} disabled={!commentText[post.id]?.trim()}>
                             <Send className="w-4 h-4" />
                           </Button>
-                        </div>}
+                        </div>
+                      )}
 
                       {/* Comments List */}
                       <div className="space-y-3">
-                        {comments[post.id]?.map(comment => <div key={comment.id} className="flex gap-3">
+                        {comments[post.id]?.map(comment => (
+                          <div key={comment.id} className="flex gap-3">
                             <div 
                               className="cursor-pointer hover:opacity-80 transition-opacity"
                               onClick={() => navigate(`/artist/${comment.wallet_address}`)}
@@ -1248,12 +1436,14 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
                               <p className="text-xs text-muted-foreground mt-1">
                                 {formatTimeAgo(comment.created_at)}
                               </p>
-                        </div>
-                      </div>)}
-                  </div>
-                </div>}
-            </Card>)}
-
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </Card>
+              )))}
               {/* Load More Posts Button */}
               {!loading && posts.length > 0 && hasMorePosts && (
                 <div className="flex justify-center py-4 px-4 md:px-0 md:pt-4">
@@ -1284,7 +1474,11 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
             {/* Songs Tab */}
             <TabsContent value="songs" className="space-y-0 md:space-y-4">
               {loadingSongs ? (
-                <div className="text-center py-8 text-muted-foreground px-4">Loading songs...</div>
+                <>
+                  {[...Array(5)].map((_, i) => (
+                    <SongCardFeedSkeleton key={`skeleton-song-feed-${i}`} />
+                  ))}
+                </>
               ) : songs.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground px-4">
                   No songs uploaded yet.

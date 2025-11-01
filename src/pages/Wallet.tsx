@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, memo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useWallet } from "@/hooks/useWallet";
 import { usePrivy } from "@privy-io/react-auth";
@@ -320,6 +320,24 @@ interface WalletProps {
   currentSong?: any;
   isPlaying?: boolean;
 }
+
+// Skeleton for Wallet song card
+const WalletSongCardSkeleton = memo(() => (
+  <Card className="bg-gradient-to-br from-white/5 to-white/0 backdrop-blur-xl border border-white/10 rounded-xl overflow-hidden">
+    <div className="flex flex-col md:flex-row">
+      <div className="w-full md:w-32 h-32 md:h-auto bg-white/10 animate-pulse" />
+      <div className="flex-1 p-4 space-y-3">
+        <div className="h-5 bg-white/10 rounded w-3/4 animate-pulse" />
+        <div className="h-4 bg-white/10 rounded w-1/2 animate-pulse" />
+        <div className="flex gap-2">
+          <div className="h-6 bg-white/10 rounded w-16 animate-pulse" />
+          <div className="h-6 bg-white/10 rounded w-20 animate-pulse" />
+        </div>
+      </div>
+    </div>
+  </Card>
+));
+WalletSongCardSkeleton.displayName = 'WalletSongCardSkeleton';
 
 const Wallet = ({ playSong, currentSong, isPlaying }: WalletProps = {}) => {
   const navigate = useNavigate();
@@ -1192,9 +1210,10 @@ const Wallet = ({ playSong, currentSong, isPlaying }: WalletProps = {}) => {
           </div>
           
           {loadingSongs ? (
-            <div className="text-center py-6">
-              <Loader2 className="h-6 w-6 animate-spin text-neon-green mx-auto mb-2" />
-              <p className="text-sm text-muted-foreground font-mono">Loading your music collection...</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {[...Array(4)].map((_, i) => (
+                <WalletSongCardSkeleton key={`skeleton-wallet-${i}`} />
+              ))}
             </div>
           ) : allSongs.length === 0 ? (
             <div className="text-center py-6">

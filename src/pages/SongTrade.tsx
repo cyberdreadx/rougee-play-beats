@@ -1636,11 +1636,11 @@ const SongTrade = ({ playSong, currentSong, isPlaying }: SongTradeProps) => {
     <NetworkGuard>
       <div className="min-h-screen bg-background pb-20 md:pb-8">
         <Helmet>
-          <title>{song.title} - {song.artist || 'Unknown Artist'} | ROUGEE</title>
-        <meta name="description" content={`Listen to ${song.title} by ${song.artist || 'Unknown Artist'} on ROUGEE. Stream and trade music NFTs on the blockchain.`} />
+          <title>{song.title} - {song.artist || 'Unknown Artist'} | RouGee.app</title>
+        <meta name="description" content={`Listen to ${song.title} by ${song.artist || 'Unknown Artist'} on RouGee.app. Stream and trade music NFTs on the blockchain.`} />
         
         <meta property="og:title" content={`${song.title} - ${song.artist || 'Unknown Artist'}`} />
-        <meta property="og:description" content={`Listen to ${song.title} by ${song.artist || 'Unknown Artist'} on ROUGEE`} />
+        <meta property="og:description" content={`Listen to ${song.title} by ${song.artist || 'Unknown Artist'} on RouGee.app`} />
         <meta property="og:image" content={coverImageUrl} />
         <meta property="og:image:secure_url" content={coverImageUrl} />
         <meta property="og:image:type" content="image/jpeg" />
@@ -1651,7 +1651,7 @@ const SongTrade = ({ playSong, currentSong, isPlaying }: SongTradeProps) => {
         
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content={`${song.title} - ${song.artist || 'Unknown Artist'}`} />
-        <meta name="twitter:description" content={`Listen to ${song.title} by ${song.artist || 'Unknown Artist'} on ROUGEE`} />
+        <meta name="twitter:description" content={`Listen to ${song.title} by ${song.artist || 'Unknown Artist'} on RouGee.app`} />
         <meta name="twitter:image" content={coverImageUrl} />
         <meta name="twitter:image:src" content={coverImageUrl} />
       </Helmet>

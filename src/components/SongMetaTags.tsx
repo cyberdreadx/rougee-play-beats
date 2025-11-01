@@ -10,8 +10,8 @@ interface SongMetaTagsProps {
 }
 
 export const SongMetaTags = ({ title, artist, imageUrl, url, description, songId }: SongMetaTagsProps) => {
-  const metaTitle = `${title} by ${artist} | ROUGEE.PLAY`;
-  const metaDescription = description || `Listen to ${title} by ${artist} on ROUGEE.PLAY - The decentralized music platform`;
+  const metaTitle = `${title} by ${artist} | RouGee.app`;
+  const metaDescription = description || `Listen to ${title} by ${artist} on RouGee.app - The decentralized music platform`;
   const defaultImage = `${window.location.origin}/rougee-new-og.jpg`;
   // Use provided image or default
   const metaImage = imageUrl || defaultImage;
@@ -29,7 +29,7 @@ export const SongMetaTags = ({ title, artist, imageUrl, url, description, songId
       <meta property="og:title" content={metaTitle} />
       <meta property="og:description" content={metaDescription} />
       <meta property="og:image" content={metaImage} />
-      <meta property="og:site_name" content="ROUGEE.PLAY" />
+      <meta property="og:site_name" content="RouGee.app" />
       <meta property="music:musician" content={artist} />
 
       {/* Twitter */}

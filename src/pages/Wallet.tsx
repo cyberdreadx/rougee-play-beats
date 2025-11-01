@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, memo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, memo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useWallet } from "@/hooks/useWallet";
 import { usePrivy } from "@privy-io/react-auth";
@@ -9,7 +9,7 @@ import { useSongPrice } from "@/hooks/useSongBondingCurve";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Wallet as WalletIcon, Copy, Check, CreditCard, ArrowDownToLine, RefreshCw, Send, Music2, ArrowLeftRight, Plus, Network, Trash2, QrCode, Settings, Download } from "lucide-react";
+import { Loader2, Wallet as WalletIcon, Copy, Check, CreditCard, ArrowDownToLine, RefreshCw, Send, Music2, ArrowLeftRight, Plus, Network, Trash2, QrCode, Settings, Download, X, ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useBalance, useReadContract, useSendTransaction, useWriteContract, useWaitForTransactionReceipt, useAccount } from "wagmi";
 import { supabase } from "@/integrations/supabase/client";
@@ -64,9 +64,10 @@ interface SongTokenItemProps {
   playSong?: (song: any) => void;
   currentSong?: any;
   isPlaying?: boolean;
+  onValueUpdate?: (songId: string, valueUSD: number) => void;
 }
 
-  const SongTokenItem = ({ song, userAddress, xrgeUsdPrice, onClick, onBalanceLoaded, onSendClick, playSong, currentSong, isPlaying }: SongTokenItemProps) => {
+  const SongTokenItem = ({ song, userAddress, xrgeUsdPrice, onClick, onBalanceLoaded, onSendClick, playSong, currentSong, isPlaying, onValueUpdate }: SongTokenItemProps) => {
   const navigate = useNavigate();
   
   // Check if this song is currently playing
@@ -96,6 +97,13 @@ interface SongTokenItemProps {
   const priceXRGE = parseFloat(priceInXRGE) || 0;
   const priceUSD = priceXRGE * xrgeUsdPrice;
   const valueUSD = balance * priceUSD;
+  
+  // Notify parent about value update
+  useEffect(() => {
+    if (onValueUpdate && balanceData !== undefined) {
+      onValueUpdate(song.id, valueUSD);
+    }
+  }, [song.id, valueUSD, balanceData, onValueUpdate]);
   
   // Log loading state
   useEffect(() => {
@@ -378,21 +386,21 @@ const Wallet = ({ playSong, currentSong, isPlaying }: WalletProps = {}) => {
     }
   };
 
-  // Format KEETA balance with correct decimal places (18 decimals)
+  // Format KEETA balance with correct decimal places (3 decimals)
   const formatKeetaBalance = (balance: string) => {
-    if (!balance || balance === '0') return '0.000000000000000000';
+    if (!balance || balance === '0') return '0.000';
     const balanceNum = parseFloat(balance);
     
     // If the balance is already in human-readable format (less than 1), return as is
     if (balanceNum < 1) {
-      return balanceNum.toFixed(18);
+      return balanceNum.toFixed(3);
     }
     
     // If the balance is >= 1, it's likely in base units, so divide by 10^18
     // This handles both small base units (500000 -> 0.000000000000000500) and large ones
     const divisor = Math.pow(10, 18);
     const divided = balanceNum / divisor;
-    return divided.toFixed(7); // Show 7 decimal places for readability
+    return divided.toFixed(3); // Show 3 decimal places for readability
   };
 
   // Format token balance with proper decimal handling
@@ -437,6 +445,7 @@ const Wallet = ({ playSong, currentSong, isPlaying }: WalletProps = {}) => {
   const [loadingSongs, setLoadingSongs] = useState(false);
   const [ownedSongsMap, setOwnedSongsMap] = useState<Map<string, boolean>>(new Map());
   const [activeTab, setActiveTab] = useState<'balances' | 'music'>('balances');
+  const [songValuesMap, setSongValuesMap] = useState<Map<string, number>>(new Map()); // Track song values in USD
   
   // Song token send dialog state
   const [sendSongDialog, setSendSongDialog] = useState(false);
@@ -450,6 +459,15 @@ const Wallet = ({ playSong, currentSong, isPlaying }: WalletProps = {}) => {
   const [showKeetaSettingsDialog, setShowKeetaSettingsDialog] = useState(false);
   const [showBaseSettingsDialog, setShowBaseSettingsDialog] = useState(false);
   const [deletingWallet, setDeletingWallet] = useState(false);
+  
+  // UI state for collapsible sections
+  const [showBeginnerTip, setShowBeginnerTip] = useState(() => {
+    const dismissed = localStorage.getItem('wallet_beginner_tip_dismissed');
+    return dismissed !== 'true';
+  });
+  const [networkSelectorExpanded, setNetworkSelectorExpanded] = useState(true);
+  const [walletAddressExpanded, setWalletAddressExpanded] = useState(true);
+  const [quickActionsExpanded, setQuickActionsExpanded] = useState(true);
 
   const { data: balance, isLoading: balanceLoading, refetch: refetchBalance } = useBalance({
     address: fullAddress as `0x${string}`,
@@ -528,6 +546,7 @@ const Wallet = ({ playSong, currentSong, isPlaying }: WalletProps = {}) => {
     
     setLoadingSongs(true);
     setOwnedSongsMap(new Map()); // Reset map when fetching
+    setSongValuesMap(new Map()); // Reset song values when fetching
     try {
       // Get all deployed songs with token addresses
       const { data: songs, error } = await supabase
@@ -570,7 +589,6 @@ const Wallet = ({ playSong, currentSong, isPlaying }: WalletProps = {}) => {
   // Calculate owned songs count from map
   const ownedSongsCount = Array.from(ownedSongsMap.values()).filter(Boolean).length;
 
-
   const copyAddress = async () => {
     const addressToCopy = currentWallet.fullAddress;
     if (addressToCopy) {
@@ -608,6 +626,62 @@ const Wallet = ({ playSong, currentSong, isPlaying }: WalletProps = {}) => {
     const balance = Number(usdcBalance) / Math.pow(10, decimals);
     return balance.toFixed(4);
   };
+
+  // Calculate total coin balance in USD (must be after format functions)
+  const totalCoinBalance = useMemo(() => {
+    if (activeNetwork === 'keeta') {
+      // For Keeta, calculate KTA value
+      const ktaBalance = parseFloat(formatTokenBalance(keetaWallet.balance || '0', 18));
+      return calculateUsdValue(ktaBalance, 'kta');
+    } else {
+      // For Base network, sum all token values
+      const ethValue = balance ? calculateUsdValue(parseFloat(balance.formatted), 'eth') : 0;
+      
+      // Format and calculate XRGE value
+      let xrgeValue = 0;
+      if (xrgeBalance && xrgeDecimals) {
+        const decimals = Number(xrgeDecimals);
+        const xrgeBalanceFormatted = (Number(xrgeBalance) / Math.pow(10, decimals)).toFixed(4);
+        xrgeValue = calculateUsdValue(parseFloat(xrgeBalanceFormatted), 'xrge');
+      }
+      
+      // Format and calculate KTA value
+      let ktaValue = 0;
+      if (ktaBalance && ktaDecimals) {
+        const decimals = Number(ktaDecimals);
+        const ktaBalanceFormatted = (Number(ktaBalance) / Math.pow(10, decimals)).toFixed(4);
+        ktaValue = calculateUsdValue(parseFloat(ktaBalanceFormatted), 'kta');
+      }
+      
+      // Format and calculate USDC value
+      let usdcValue = 0;
+      if (usdcBalance && usdcDecimals) {
+        const decimals = Number(usdcDecimals);
+        const usdcBalanceFormatted = (Number(usdcBalance) / Math.pow(10, decimals)).toFixed(4);
+        usdcValue = calculateUsdValue(parseFloat(usdcBalanceFormatted), 'usdc');
+      }
+      
+      return ethValue + xrgeValue + ktaValue + usdcValue;
+    }
+  }, [activeNetwork, balance, xrgeBalance, xrgeDecimals, ktaBalance, ktaDecimals, usdcBalance, usdcDecimals, keetaWallet.balance, calculateUsdValue, formatTokenBalance]);
+  
+  // Calculate total music tokens value
+  const totalMusicValue = useMemo(() => {
+    return Array.from(songValuesMap.values()).reduce((sum, value) => sum + value, 0);
+  }, [songValuesMap]);
+  
+  // Callback to update song value when it's calculated
+  const handleSongValueUpdate = useCallback((songId: string, valueUSD: number) => {
+    setSongValuesMap(prev => {
+      const newMap = new Map(prev);
+      if (valueUSD > 0) {
+        newMap.set(songId, valueUSD);
+      } else {
+        newMap.delete(songId);
+      }
+      return newMap;
+    });
+  }, []);
 
   const handleFundWallet = () => {
     if (fullAddress) {
@@ -757,212 +831,327 @@ const Wallet = ({ playSong, currentSong, isPlaying }: WalletProps = {}) => {
   return (
     <div className="min-h-screen bg-background pb-16 md:pb-0">
       <main className="container mx-auto px-4 py-4 max-w-3xl">
-        <div className="mb-4 flex items-start justify-between gap-2">
-          <div className="flex-1 min-w-0">
-            <h1 className="text-xl md:text-2xl font-bold font-mono mb-1 text-neon-green">MY WALLET</h1>
-            <p className="text-xs md:text-sm text-muted-foreground font-mono hidden sm:block">Manage your crypto assets and music collection</p>
-          </div>
-          <div className="flex gap-2">
+        {/* Header Section */}
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h1 className="text-2xl md:text-3xl font-bold font-mono mb-1 text-neon-green">MY WALLET</h1>
+              <p className="text-xs md:text-sm text-muted-foreground font-mono">Your balance and music collection</p>
+            </div>
             <Button
               variant="outline"
               size="sm"
               onClick={handleRefresh}
               disabled={refreshing}
-              className="font-mono border-neon-green/50 shrink-0"
+              className="font-mono border-neon-green/50 hover:border-neon-green hover:bg-neon-green/10 shrink-0"
             >
-              <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-              <span className="ml-1.5 hidden sm:inline">REFRESH</span>
+              <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+              REFRESH
             </Button>
           </div>
-        </div>
-
-        {/* Network Selector */}
-        <Card className="p-3 mb-3 bg-white/5 backdrop-blur-xl border border-white/10 shadow-[0_4px_16px_0_rgba(0,255,159,0.1)] rounded-2xl">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Network className="h-4 w-4 text-neon-green" />
-              <span className="text-xs text-muted-foreground font-mono">Active Network</span>
-            </div>
-            <div className="flex gap-2">
-              <Button
-                variant={activeNetwork === 'base' ? 'neon' : 'outline'}
-                size="sm"
-                onClick={() => {
-                  setActiveNetwork('base');
-                }}
-                className="font-mono text-xs"
-              >
-                Base
-                {baseWallet.isConnected && (
-                  <Badge variant="outline" className="ml-1 text-[10px] border-green-500 text-green-500">
-                    ✓
-                  </Badge>
-                )}
-              </Button>
-              <Button
-                variant={activeNetwork === 'keeta' ? 'neon' : 'outline'}
-                size="sm"
-                onClick={() => {
-                  setActiveNetwork('keeta');
-                }}
-                className="font-mono text-xs"
-              >
-                <img src={keetaLogo} alt="Keeta" className="h-3 w-3 mr-1" />
-                Keeta
-                {keetaWallet.isConnected && (
-                  <Badge variant="outline" className="ml-1 text-[10px] border-purple-500 text-purple-500">
-                    ✓
-                  </Badge>
-                )}
-              </Button>
-              {!keetaWallet.isConnected && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowKeetaDialog(true)}
-                  className="font-mono text-xs border-purple-500/50 text-purple-400 hover:bg-purple-500/10"
-                >
-                  <Plus className="h-3 w-3 mr-1" />
-                  Create Keeta
-                </Button>
-              )}
-            </div>
-          </div>
-        </Card>
-
-        {/* Connected Wallet Card */}
-        <Card className="p-3 mb-3 bg-white/5 backdrop-blur-xl border border-white/10 shadow-[0_4px_16px_0_rgba(0,255,159,0.1)] rounded-2xl">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs text-muted-foreground font-mono mb-1">
-                {activeNetwork === 'base' ? 'Base Wallet' : 'Keeta Wallet'}
-              </p>
-              <div className="flex items-center gap-2">
-                <p className="text-sm font-mono font-bold text-neon-green">
-                  {formatAddress(currentWallet.fullAddress || "")}
-                </p>
+          
+          {/* Beginner Tip Card */}
+          {showBeginnerTip && (
+            <Card className="p-4 mb-4 bg-gradient-to-r from-blue-500/10 via-purple-500/10 to-pink-500/10 backdrop-blur-xl border border-blue-500/30 rounded-2xl">
+              <div className="flex items-start gap-3">
+                <div className="p-2 rounded-lg bg-blue-500/20 border border-blue-500/30 flex-shrink-0">
+                  <WalletIcon className="h-5 w-5 text-blue-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-sm font-bold font-mono text-blue-400 mb-1">💡 New to crypto?</h3>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Your wallet is like a digital bank account. Use it to buy music, collect songs, and support artists. 
+                    <span className="text-blue-400 font-semibold"> Base</span> is the main network (like Visa), 
+                    <span className="text-purple-400 font-semibold"> Keeta</span> is faster for small transactions (like Venmo).
+                  </p>
+                </div>
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={copyAddress}
-                  className="h-6 w-6 p-0"
+                  onClick={() => {
+                    setShowBeginnerTip(false);
+                    localStorage.setItem('wallet_beginner_tip_dismissed', 'true');
+                  }}
+                  className="h-6 w-6 p-0 hover:bg-blue-500/20 flex-shrink-0"
                 >
-                  {copied ? (
-                    <Check className="h-3 w-3 text-neon-green" />
-                  ) : (
-                    <Copy className="h-3 w-3" />
-                  )}
+                  <X className="h-4 w-4 text-blue-400" />
                 </Button>
-                {activeNetwork === 'keeta' && keetaWallet.isConnected && (
-                  <>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setShowKeetaQRDialog(true)}
-                      className="h-6 w-6 p-0"
-                      title="Show QR Code"
-                    >
-                      <QrCode className="h-3 w-3" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setShowKeetaSettingsDialog(true)}
-                      className="h-6 w-6 p-0"
-                      title="Keeta Wallet Settings"
-                    >
-                      <Settings className="h-3 w-3" />
-                    </Button>
-                  </>
-                )}
-                {activeNetwork === 'base' && currentWallet.isConnected && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowBaseSettingsDialog(true)}
-                    className="h-6 w-6 p-0"
-                    title="Base Wallet Settings"
-                  >
-                    <Settings className="h-3 w-3" />
-                  </Button>
-                )}
               </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Badge 
-                variant="outline" 
-                className={`text-xs ${
-                  activeNetwork === 'base' 
-                    ? 'border-green-500/50 text-green-400' 
-                    : 'border-purple-500/50 text-purple-400'
-                }`}
+            </Card>
+          )}
+
+          {/* Network Selector */}
+          <Card className="p-4 mb-3 bg-gradient-to-br from-white/5 via-white/3 to-transparent backdrop-blur-xl border border-white/10 shadow-[0_4px_16px_0_rgba(0,255,159,0.1)] rounded-2xl">
+            <div className="flex items-center justify-between flex-wrap gap-3 mb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-lg bg-neon-green/10 border border-neon-green/20">
+                  <Network className="h-4 w-4 text-neon-green" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-foreground font-mono">Choose Network</p>
+                  <p className="text-[10px] text-muted-foreground font-mono">Switch between Base (main) or Keeta (fast)</p>
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setNetworkSelectorExpanded(!networkSelectorExpanded)}
+                className="h-7 w-7 p-0 hover:bg-white/10"
               >
-                {activeNetwork === 'base' ? 'Base' : 'Keeta'}
-              </Badge>
-              <Badge variant="outline" className="border-neon-green/50 text-neon-green text-xs">
-                Connected
-              </Badge>
+                {networkSelectorExpanded ? (
+                  <ChevronUp className="h-4 w-4" />
+                ) : (
+                  <ChevronDown className="h-4 w-4" />
+                )}
+              </Button>
             </div>
-          </div>
-        </Card>
+            {networkSelectorExpanded && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <Button
+                  variant={activeNetwork === 'base' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => {
+                    setActiveNetwork('base');
+                  }}
+                  className={`font-mono text-xs h-10 px-4 transition-all ${
+                    activeNetwork === 'base' 
+                      ? 'bg-gradient-to-r from-green-500/20 to-emerald-500/20 border-green-500/50 text-green-400 hover:from-green-500/30 hover:to-emerald-500/30 shadow-[0_0_12px_rgba(34,197,94,0.2)]' 
+                      : 'border-white/20 text-muted-foreground hover:border-white/30 hover:bg-white/5'
+                  }`}
+                >
+                  <span className="flex items-center gap-1.5">
+                    Base
+                    {baseWallet.isConnected && (
+                      <Badge variant="outline" className="ml-0.5 h-4 px-1 text-[9px] border-green-500/50 bg-green-500/10 text-green-400">
+                        ✓
+                      </Badge>
+                    )}
+                  </span>
+                </Button>
+                <Button
+                  variant={activeNetwork === 'keeta' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => {
+                    setActiveNetwork('keeta');
+                  }}
+                  className={`font-mono text-xs h-10 px-4 transition-all ${
+                    activeNetwork === 'keeta' 
+                      ? 'bg-gradient-to-r from-purple-500/20 to-violet-500/20 border-purple-500/50 text-purple-400 hover:from-purple-500/30 hover:to-violet-500/30 shadow-[0_0_12px_rgba(168,85,247,0.2)]' 
+                      : 'border-white/20 text-muted-foreground hover:border-white/30 hover:bg-white/5'
+                  }`}
+                >
+                  <span className="flex items-center gap-1.5">
+                    <img src={keetaLogo} alt="Keeta" className="h-3.5 w-3.5" />
+                    Keeta
+                    {keetaWallet.isConnected && (
+                      <Badge variant="outline" className="ml-0.5 h-4 px-1 text-[9px] border-purple-500/50 bg-purple-500/10 text-purple-400">
+                        ✓
+                      </Badge>
+                    )}
+                  </span>
+                </Button>
+              </div>
+            )}
+          </Card>
+
+          {/* Connected Wallet Card */}
+          <Card className="p-4 bg-gradient-to-br from-white/5 via-white/3 to-transparent backdrop-blur-xl border border-white/10 shadow-[0_4px_16px_0_rgba(0,255,159,0.1)] rounded-2xl">
+            <div className="flex items-center justify-between flex-wrap gap-4 mb-3">
+              <div className="flex items-center gap-2.5">
+                <div className={`p-2 rounded-lg ${
+                  activeNetwork === 'base' 
+                    ? 'bg-green-500/10 border border-green-500/20' 
+                    : 'bg-purple-500/10 border border-purple-500/20'
+                }`}>
+                  <WalletIcon className={`h-4 w-4 ${
+                    activeNetwork === 'base' ? 'text-green-400' : 'text-purple-400'
+                  }`} />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-foreground font-mono">
+                    Your {activeNetwork === 'base' ? 'Base' : 'Keeta'} Address
+                  </p>
+                  <p className="text-[10px] text-muted-foreground font-mono">Share this to receive payments</p>
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setWalletAddressExpanded(!walletAddressExpanded)}
+                className="h-7 w-7 p-0 hover:bg-white/10"
+              >
+                {walletAddressExpanded ? (
+                  <ChevronUp className="h-4 w-4" />
+                ) : (
+                  <ChevronDown className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
+            {walletAddressExpanded && (
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="flex items-center gap-2 px-3 py-2 bg-black/30 rounded-lg border border-white/10">
+                    <p className="text-sm md:text-base font-mono font-bold text-neon-green tracking-wider">
+                      {formatAddress(currentWallet.fullAddress || "")}
+                    </p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={copyAddress}
+                      className="h-7 w-7 p-0 hover:bg-white/10 hover:text-neon-green transition-colors"
+                      title="Copy address"
+                    >
+                      {copied ? (
+                        <Check className="h-3.5 w-3.5 text-neon-green" />
+                      ) : (
+                        <Copy className="h-3.5 w-3.5" />
+                      )}
+                    </Button>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {activeNetwork === 'keeta' && keetaWallet.isConnected && (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowKeetaQRDialog(true)}
+                          className="h-8 px-3 hover:bg-white/10 hover:text-purple-400 hover:border-purple-400/50 transition-colors"
+                          title="Show QR Code"
+                        >
+                          <QrCode className="h-3.5 w-3.5 mr-1.5" />
+                          <span className="text-xs">QR</span>
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowKeetaSettingsDialog(true)}
+                          className="h-8 w-8 p-0 hover:bg-white/10 hover:text-purple-400 hover:border-purple-400/50 transition-colors"
+                          title="Settings"
+                        >
+                          <Settings className="h-3.5 w-3.5" />
+                        </Button>
+                      </>
+                    )}
+                    {activeNetwork === 'base' && currentWallet.isConnected && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowBaseSettingsDialog(true)}
+                        className="h-8 w-8 p-0 hover:bg-white/10 hover:text-neon-green hover:border-neon-green/50 transition-colors"
+                        title="Settings"
+                      >
+                        <Settings className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </Card>
+        </div>
 
         {/* Tab Navigation */}
-        <div className="flex gap-2 mb-3">
+        <div className="flex gap-2 mb-4">
           <Button
             variant={activeTab === 'balances' ? 'neon' : 'outline'}
-            size="sm"
+            size="lg"
             onClick={() => setActiveTab('balances')}
-            className="flex-1 font-mono"
+            className="flex-1 font-mono h-12"
           >
-            <WalletIcon className="h-4 w-4 mr-2" />
-            Balances
+            <WalletIcon className="h-5 w-5 mr-2" />
+            <div className="flex flex-col items-start">
+              <span className="text-sm font-bold">My Balance</span>
+              <span className="text-[10px] opacity-70">Coins & tokens</span>
+            </div>
           </Button>
           <Button
             variant={activeTab === 'music' ? 'neon' : 'outline'}
-            size="sm"
+            size="lg"
             onClick={() => setActiveTab('music')}
-            className="flex-1 font-mono relative"
+            className="flex-1 font-mono relative h-12"
           >
-            <Music2 className="h-4 w-4 mr-2" />
-            My Music
-            {ownedSongsCount > 0 && (
-              <span className="ml-2 bg-neon-green/20 text-neon-green text-xs font-bold px-1.5 py-0.5 rounded">
-                {ownedSongsCount}
+            <Music2 className="h-5 w-5 mr-2" />
+            <div className="flex flex-col items-start">
+              <span className="text-sm font-bold flex items-center gap-1.5">
+                My Music
+                {ownedSongsCount > 0 && (
+                  <span className="bg-neon-green/20 text-neon-green text-[10px] font-bold px-1.5 py-0.5 rounded">
+                    {ownedSongsCount}
+                  </span>
+                )}
               </span>
-            )}
+              <span className="text-[10px] opacity-70">Songs I own</span>
+            </div>
           </Button>
         </div>
 
         {/* Balances Tab Content */}
         {activeTab === 'balances' && (
           <>
+            {/* Total Balance Card */}
+            <Card className="p-4 mb-3 bg-gradient-to-br from-neon-green/20 via-neon-green/10 to-transparent backdrop-blur-xl border border-neon-green/30 shadow-[0_4px_16px_0_rgba(0,255,159,0.2)] rounded-2xl">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground font-mono mb-1">Total Balance</p>
+                  <p className="text-2xl md:text-3xl font-bold font-mono text-neon-green">
+                    ${totalCoinBalance.toLocaleString(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 2 })}
+                  </p>
+                  <p className="text-xs text-muted-foreground/70 font-mono mt-1">
+                    {activeNetwork === 'keeta' ? 'Keeta Network' : 'Base Network'}
+                  </p>
+                </div>
+                <WalletIcon className="h-8 w-8 md:h-10 md:w-10 text-neon-green/50" />
+              </div>
+            </Card>
+
             {/* Quick Actions */}
-            <Card className="p-3 mb-3 bg-white/5 backdrop-blur-xl border border-white/10 shadow-[0_4px_16px_0_rgba(0,255,159,0.1)] rounded-2xl">
-              <p className="text-xs text-muted-foreground font-mono mb-2">Quick Actions</p>
-              <div className="grid grid-cols-4 gap-2">
+            <Card className="p-4 mb-4 bg-white/5 backdrop-blur-xl border border-white/10 shadow-[0_4px_16px_0_rgba(0,255,159,0.1)] rounded-2xl">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-sm font-semibold text-foreground font-mono">What would you like to do?</p>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setQuickActionsExpanded(!quickActionsExpanded)}
+                  className="h-7 w-7 p-0 hover:bg-white/10"
+                >
+                  {quickActionsExpanded ? (
+                    <ChevronUp className="h-4 w-4" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+              {quickActionsExpanded && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <Button
                   variant="neon"
-                  size="sm"
+                  size="lg"
                   onClick={handleFundWallet}
-                  className="font-mono text-xs h-auto py-3 flex-col gap-1"
+                  className="font-mono h-20 flex-col gap-2 shadow-lg"
                   disabled={activeNetwork === 'keeta'}
                 >
-                  <CreditCard className="h-4 w-4" />
-                  <span className="text-[10px]">BUY</span>
+                  <CreditCard className="h-6 w-6" />
+                  <div className="flex flex-col items-center">
+                    <span className="text-xs font-bold">BUY CRYPTO</span>
+                    <span className="text-[9px] opacity-70">Add funds</span>
+                  </div>
                 </Button>
                 <Button
                   variant="outline"
-                  size="sm"
+                  size="lg"
                   onClick={() => navigate('/swap')}
-                  className="font-mono text-xs h-auto py-3 flex-col gap-1 border-neon-green/50"
+                  className="font-mono h-20 flex-col gap-2 border-neon-green/50 hover:bg-neon-green/10 hover:border-neon-green"
                   disabled={activeNetwork === 'keeta'}
                 >
-                  <ArrowLeftRight className="h-4 w-4" />
-                  <span className="text-[10px]">SWAP</span>
+                  <ArrowLeftRight className="h-6 w-6" />
+                  <div className="flex flex-col items-center">
+                    <span className="text-xs font-bold">SWAP</span>
+                    <span className="text-[9px] opacity-70">Exchange coins</span>
+                  </div>
                 </Button>
                 <Button
                   variant="outline"
-                  size="sm"
+                  size="lg"
                   onClick={() => {
                     if (activeNetwork === 'keeta') {
                       setShowKeetaQRDialog(true);
@@ -970,79 +1159,113 @@ const Wallet = ({ playSong, currentSong, isPlaying }: WalletProps = {}) => {
                       handleFundWallet();
                     }
                   }}
-                  className="font-mono text-xs h-auto py-3 flex-col gap-1 border-neon-green/50"
+                  className="font-mono h-20 flex-col gap-2 border-neon-green/50 hover:bg-neon-green/10 hover:border-neon-green"
                 >
-                  <ArrowDownToLine className="h-4 w-4" />
-                  <span className="text-[10px]">RECEIVE</span>
+                  <ArrowDownToLine className="h-6 w-6" />
+                  <div className="flex flex-col items-center">
+                    <span className="text-xs font-bold">RECEIVE</span>
+                    <span className="text-[9px] opacity-70">Get paid</span>
+                  </div>
                 </Button>
                 <Button
                   variant="outline"
-                  size="sm"
+                  size="lg"
                   onClick={() => setShowSendDialog(true)}
-                  className="font-mono text-xs h-auto py-3 flex-col gap-1 border-neon-green/50"
+                  className="font-mono h-20 flex-col gap-2 border-neon-green/50 hover:bg-neon-green/10 hover:border-neon-green"
                 >
-                  <Send className="h-4 w-4" />
-                  <span className="text-[10px]">SEND</span>
+                  <Send className="h-6 w-6" />
+                  <div className="flex flex-col items-center">
+                    <span className="text-xs font-bold">SEND</span>
+                    <span className="text-[9px] opacity-70">Pay someone</span>
+                  </div>
                 </Button>
               </div>
+              )}
             </Card>
 
             {/* Token Balances Grid - Mobile Optimized */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
               {activeNetwork === 'keeta' ? (
-                <>
-                  {/* Keeta Native Token */}
-                  <Card className="p-4 bg-white/5 backdrop-blur-xl border border-white/10 shadow-[0_4px_16px_0_rgba(168,85,247,0.1)] rounded-2xl hover:bg-white/8 active:bg-white/10 active:scale-[0.99] transition-all duration-300">
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center">
-                        <img src={keetaLogo} alt="Keeta" className="h-6 w-6" />
-                      </div>
-                    </div>
-                    <p className="text-xs text-muted-foreground font-mono mb-1">KTA</p>
-                    {keetaWallet.isConnecting ? (
-                      <Loader2 className="h-5 w-5 animate-spin text-purple-400" />
-                    ) : (
-                      <>
-                        <div className="mb-1">
-                          <span className="text-2xl font-bold font-mono text-purple-400 block">
-                            {formatKeetaBalance(keetaWallet.balance)}
-                          </span>
-                          <span className="text-xs text-muted-foreground/70 font-mono">KTA</span>
-                        </div>
-                        <p className="text-sm font-mono text-muted-foreground">
-                          Native Keeta Token
-                        </p>
-                      </>
-                    )}
-                  </Card>
-
-                  {/* Keeta Tokens */}
-                  {keetaWallet.tokens.map((token, index) => (
-                    <Card key={index} className="p-4 bg-white/5 backdrop-blur-xl border border-white/10 shadow-[0_4px_16px_0_rgba(168,85,247,0.1)] rounded-2xl hover:bg-white/8 active:bg-white/10 active:scale-[0.99] transition-all duration-300">
+                keetaWallet.isConnected ? (
+                  <>
+                    {/* Keeta Native Token */}
+                    <Card className="p-4 bg-white/5 backdrop-blur-xl border border-white/10 shadow-[0_4px_16px_0_rgba(168,85,247,0.1)] rounded-2xl hover:bg-white/8 active:bg-white/10 active:scale-[0.99] transition-all duration-300">
                       <div className="flex items-start justify-between mb-2">
                         <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center">
-                          {token.symbol === 'KTA' ? (
-                            <img src={keetaLogo} alt="KTA" className="w-6 h-6" />
-                          ) : (
-                            <span className="text-lg font-bold text-purple-400">
-                              {token.symbol?.[0] || 'T'}
-                            </span>
-                          )}
+                          <img src={keetaLogo} alt="Keeta" className="h-6 w-6" />
                         </div>
                       </div>
-                      <p className="text-xs text-muted-foreground font-mono mb-1">{token.symbol}</p>
-                      <div className="mb-1">
-                        <span className="text-2xl font-bold font-mono text-purple-400 block">
-                          {formatTokenBalance(token.balance, token.decimals)}
-                        </span>
-                        <span className="text-xs text-muted-foreground/70 font-mono">{token.symbol}</span>
-                      </div>
-                      <p className="text-sm font-mono text-muted-foreground">
-                        {token.name}
-                      </p>
+                      <p className="text-xs text-muted-foreground font-mono mb-1">KTA</p>
+                      {keetaWallet.isConnecting ? (
+                        <Loader2 className="h-5 w-5 animate-spin text-purple-400" />
+                      ) : (
+                        <>
+                          <div className="mb-1">
+                            <span className="text-2xl font-bold font-mono text-purple-400 block">
+                              {formatKeetaBalance(keetaWallet.balance)}
+                            </span>
+                            <span className="text-xs text-muted-foreground/70 font-mono">KTA</span>
+                          </div>
+                          <p className="text-sm font-mono text-muted-foreground">
+                            Native Keeta Token
+                          </p>
+                        </>
+                      )}
                     </Card>
-                  ))}
-                </>
+
+                    {/* Keeta Tokens */}
+                    {keetaWallet.tokens.map((token, index) => (
+                      <Card key={index} className="p-4 bg-white/5 backdrop-blur-xl border border-white/10 shadow-[0_4px_16px_0_rgba(168,85,247,0.1)] rounded-2xl hover:bg-white/8 active:bg-white/10 active:scale-[0.99] transition-all duration-300">
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center">
+                            {token.symbol === 'KTA' ? (
+                              <img src={keetaLogo} alt="KTA" className="w-6 h-6" />
+                            ) : (
+                              <span className="text-lg font-bold text-purple-400">
+                                {token.symbol?.[0] || 'T'}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <p className="text-xs text-muted-foreground font-mono mb-1">{token.symbol}</p>
+                        <div className="mb-1">
+                          <span className="text-2xl font-bold font-mono text-purple-400 block">
+                            {formatTokenBalance(token.balance, token.decimals)}
+                          </span>
+                          <span className="text-xs text-muted-foreground/70 font-mono">{token.symbol}</span>
+                        </div>
+                        <p className="text-sm font-mono text-muted-foreground">
+                          {token.name}
+                        </p>
+                      </Card>
+                    ))}
+                  </>
+                ) : (
+                  /* Add Keeta Wallet Card */
+                  <Card className="p-6 bg-gradient-to-br from-purple-500/10 via-violet-500/5 to-transparent backdrop-blur-xl border border-purple-500/30 shadow-[0_4px_16px_0_rgba(168,85,247,0.2)] rounded-2xl hover:border-purple-500/50 hover:shadow-[0_8px_24px_0_rgba(168,85,247,0.3)] transition-all duration-300 cursor-pointer group"
+                    onClick={() => setShowKeetaDialog(true)}
+                  >
+                    <div className="flex flex-col items-center justify-center text-center gap-4">
+                      <div className="w-16 h-16 rounded-full bg-purple-500/20 border-2 border-purple-500/40 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                        <Plus className="h-8 w-8 text-purple-400" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-bold font-mono text-purple-400 mb-2">Add Keeta Wallet</h3>
+                        <p className="text-sm text-muted-foreground font-mono leading-relaxed">
+                          Create a Keeta wallet for faster transactions and lower fees
+                        </p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="lg"
+                        className="font-mono border-purple-500/50 bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 hover:border-purple-500/70 shadow-lg"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Create Keeta Wallet
+                      </Button>
+                    </div>
+                  </Card>
+                )
               ) : (
                 <>
           {/* XRGE Token */}
@@ -1191,6 +1414,22 @@ const Wallet = ({ playSong, currentSong, isPlaying }: WalletProps = {}) => {
         {/* My Music Tab Content */}
         {activeTab === 'music' && (
           <>
+            {/* Total Music Value Card */}
+            <Card className="p-4 mb-3 bg-gradient-to-br from-neon-green/20 via-neon-green/10 to-transparent backdrop-blur-xl border border-neon-green/30 shadow-[0_4px_16px_0_rgba(0,255,159,0.2)] rounded-2xl">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground font-mono mb-1">Total Music Value</p>
+                  <p className="text-2xl md:text-3xl font-bold font-mono text-neon-green">
+                    ${totalMusicValue.toLocaleString(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 2 })}
+                  </p>
+                  <p className="text-xs text-muted-foreground/70 font-mono mt-1">
+                    {ownedSongsCount} {ownedSongsCount === 1 ? 'song' : 'songs'} • Real-time prices
+                  </p>
+                </div>
+                <Music2 className="h-8 w-8 md:h-10 md:w-10 text-neon-green/50" />
+              </div>
+            </Card>
+
             {/* Purchased Songs */}
         <Card className="p-4 bg-white/5 backdrop-blur-xl border border-white/10 shadow-[0_4px_16px_0_rgba(0,255,159,0.1)] rounded-2xl">
           <div className="flex items-center justify-between mb-3">
@@ -1246,6 +1485,7 @@ const Wallet = ({ playSong, currentSong, isPlaying }: WalletProps = {}) => {
                     playSong={playSong}
                     currentSong={currentSong}
                     isPlaying={isPlaying}
+                    onValueUpdate={handleSongValueUpdate}
                   />
                 ))}
               </div>

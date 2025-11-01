@@ -54,9 +54,15 @@ const Header = () => {
 
   return (
     <header 
-      className="w-full glass sticky top-0 z-30 border-b border-neon-green/10 pt-safe px-4 transition-all duration-300"
+      className="w-full glass z-30 border-b border-neon-green/10 pt-safe px-4 transition-all duration-300"
       style={{
-        paddingLeft: typeof window !== 'undefined' && window.innerWidth >= 768 ? 'var(--sidebar-width, 16rem)' : '1rem'
+        paddingLeft: typeof window !== 'undefined' && window.innerWidth >= 768 ? 'var(--sidebar-width, 16rem)' : '1rem',
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        transform: 'translateZ(0)', // Force GPU acceleration for better stability
+        WebkitTransform: 'translateZ(0)', // Safari support
       }}
     >
       <div className="flex items-center justify-between h-14 md:h-16">

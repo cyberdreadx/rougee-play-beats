@@ -31,11 +31,42 @@
   .marquee:hover {
     animation-play-state: paused;
   }
+  
+  /* Fade in animation for featured card cycling */
+  .animate-fade-in {
+    animation: fadeInSlide 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
 }
 
 @keyframes marquee {
   0% { transform: translateX(0); }
   100% { transform: translateX(-100%); }
+}
+
+@keyframes fadeInSlide {
+  0% { 
+    opacity: 0; 
+    transform: translateX(30px) scale(0.98);
+    filter: blur(4px);
+  }
+  100% { 
+    opacity: 1; 
+    transform: translateX(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes fadeOutSlide {
+  0% { 
+    opacity: 1; 
+    transform: translateX(0) scale(1);
+    filter: blur(0);
+  }
+  100% { 
+    opacity: 0; 
+    transform: translateX(-30px) scale(0.98);
+    filter: blur(4px);
+  }
 }
 
 /* ROUGEE - Blockchain Music DApp Design System */

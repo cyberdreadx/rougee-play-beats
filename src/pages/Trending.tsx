@@ -76,7 +76,7 @@ interface Song {
   TrendingWaveform.displayName = 'TrendingWaveform';
 
   // Component for featured banner with real data
-  const FeaturedSong = memo(({ song, playSong, currentSong, isPlaying }: { song: Song; playSong?: (song: any) => void; currentSong?: any; isPlaying?: boolean }) => {
+  const FeaturedSong = memo(({ song, playSong, currentSong, isPlaying, rank }: { song: Song; playSong?: (song: any) => void; currentSong?: any; isPlaying?: boolean; rank?: number }) => {
   const navigate = useNavigate();
   const { prices } = useTokenPrices();
   const publicClient = usePublicClient();
@@ -158,7 +158,7 @@ interface Song {
   const marketCap = marketCapUSD;
   
   return (
-      <div className="mb-6 relative overflow-hidden md:rounded-2xl border border-white/20 bg-white/5 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,255,159,0.15)] p-6 hover:bg-white/8 hover:border-white/30 hover:shadow-[0_8px_32px_0_rgba(0,255,159,0.25)] transition-all duration-300">
+      <div className="mb-6 relative overflow-hidden rounded-2xl border border-white/20 bg-white/5 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,255,159,0.15)] p-6 pb-8 hover:bg-white/8 hover:border-white/30 hover:shadow-[0_8px_32px_0_rgba(0,255,159,0.25)] transition-all duration-300">
       {/* Faded background album cover */}
       {song.cover_cid && (
         <div 
@@ -171,9 +171,9 @@ interface Song {
       <div className="relative z-10">
         <div className="absolute top-2 right-2 bg-orange-500 text-white text-xs font-mono font-bold px-3 py-1 rounded-full flex items-center gap-1">
           <Flame className="w-3 h-3" />
-          #1 TRENDING
+          #{rank || 1} TRENDING
         </div>
-      <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
+      <div className="flex flex-col md:flex-row items-start md:items-center gap-4 mb-4">
         <div className="relative group">
           {song.cover_cid ? (
             <img
@@ -307,7 +307,7 @@ interface Song {
         </div>
         <button 
           onClick={() => navigate(`/song/${song.id}`)}
-          className="bg-neon-green hover:bg-neon-green/80 text-black font-mono font-bold px-6 py-3 rounded-xl transition-all hover:scale-105 shadow-lg shadow-neon-green/20"
+          className="bg-neon-green hover:bg-neon-green/80 text-black font-mono font-bold px-6 py-3 rounded-xl transition-all hover:scale-105 shadow-lg shadow-neon-green/20 mt-4 md:mt-0 md:ml-auto"
         >
           TRADE NOW →
         </button>
@@ -980,12 +980,66 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
     return displayLimit ? sortedSongs.slice(0, displayLimit) : sortedSongs;
   }, [sortedSongs, displayLimit]);
   
-  // Featured song is always the top trending song (by trending score)
-  const featuredSong = useMemo(() => {
-    if (songs.length === 0) return null;
+  // Get top 5 songs for cycling featured card
+  const top5Songs = useMemo(() => {
+    if (songs.length === 0) return [];
     
-    return [...songs].sort((a, b) => calculateTrendingScore(b) - calculateTrendingScore(a))[0];
+    return [...songs]
+      .sort((a, b) => calculateTrendingScore(b) - calculateTrendingScore(a))
+      .slice(0, 5); // Top 5 songs
   }, [songs, songStats, calculateTrendingScore]);
+  
+  // State to track which song is currently showing in featured card (cycles through top 5)
+  const [featuredSongIndex, setFeaturedSongIndex] = useState(0);
+  const [nextSongIndex, setNextSongIndex] = useState<number | null>(null);
+  
+  // Reset index when top 5 songs change (e.g., new data loaded)
+  useEffect(() => {
+    if (top5Songs.length > 0 && featuredSongIndex >= top5Songs.length) {
+      setFeaturedSongIndex(0);
+    }
+  }, [top5Songs, featuredSongIndex]);
+  
+  // Pre-load next song index (for pre-rendering)
+  const nextSongIndexForPreload = top5Songs.length > 0 ? (featuredSongIndex + 1) % top5Songs.length : null;
+  const nextSongForPreload = nextSongIndexForPreload !== null ? top5Songs[nextSongIndexForPreload] : null;
+  
+  // Cycle through top 5 songs every 8 seconds
+  useEffect(() => {
+    if (top5Songs.length === 0) return;
+    
+    const interval = setInterval(() => {
+      const next = (featuredSongIndex + 1) % top5Songs.length;
+      // Start transition: the pre-loaded component will become visible
+      setNextSongIndex(next);
+      // After transition completes, switch the active song
+      setTimeout(() => {
+        setFeaturedSongIndex(next);
+        // Clear nextSong after a brief delay to ensure smooth handoff
+        setTimeout(() => {
+          setNextSongIndex(null);
+        }, 100);
+      }, 750); // Match transition duration (700ms) + small buffer
+    }, 8000); // Cycle every 8 seconds
+    
+    return () => clearInterval(interval);
+  }, [top5Songs.length, featuredSongIndex]);
+  
+  // Handle manual navigation
+  const handleFeaturedSongChange = (index: number) => {
+    if (index === featuredSongIndex) return;
+    setNextSongIndex(index);
+    setTimeout(() => {
+      setFeaturedSongIndex(index);
+      setTimeout(() => {
+        setNextSongIndex(null);
+      }, 100);
+    }, 750);
+  };
+  
+  // Current featured song (cycles through top 5)
+  const featuredSong = top5Songs[featuredSongIndex] || null;
+  const nextSong = nextSongIndex !== null ? top5Songs[nextSongIndex] : null;
 
   if (loading) {
     return (
@@ -1048,15 +1102,83 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
           </div>
         </div>
 
-        {/* Featured/Promoted Banner with Real Data */}
-        {featuredSong && <FeaturedSong song={featuredSong} playSong={playSong} currentSong={currentSong} isPlaying={isPlaying} />}
+        {/* Featured/Promoted Banner with Real Data - Cycles through top 5 songs */}
+        {featuredSong && top5Songs.length > 0 && (
+          <div className="relative mb-20 px-4 md:px-0" style={{ zIndex: 1 }}>
+            {/* Container for both cards during transition - ensures proper height */}
+            <div className="relative w-full">
+              {/* Current song - always mounted */}
+              {featuredSong && (
+                <div
+                  key={`current-${featuredSong.id}`}
+                  className={`w-full transition-all duration-[700ms] ease-in-out ${nextSong ? 'absolute top-0 left-0 right-0' : 'relative'}`}
+                  style={{
+                    zIndex: nextSong ? 2 : 3,
+                    opacity: nextSong ? 0 : 1,
+                    transform: nextSong ? 'translateX(-32px) scale(0.98)' : 'translateX(0) scale(1)',
+                    filter: nextSong ? 'blur(4px)' : 'blur(0)',
+                    pointerEvents: nextSong ? 'none' : 'auto'
+                  }}
+                >
+                  <FeaturedSong 
+                    song={featuredSong} 
+                    playSong={playSong} 
+                    currentSong={currentSong} 
+                    isPlaying={isPlaying}
+                    rank={featuredSongIndex + 1}
+                  />
+                </div>
+              )}
+              
+              {/* Next song - always mounted (pre-loaded) but hidden until transition */}
+              {nextSongForPreload && nextSongForPreload.id !== featuredSong?.id && (
+                <div
+                  key={`preload-${nextSongForPreload.id}`}
+                  className={`absolute top-0 left-0 right-0 w-full transition-all duration-[700ms] ease-in-out ${nextSong?.id === nextSongForPreload.id ? '' : 'pointer-events-none'}`}
+                  style={{
+                    zIndex: nextSong?.id === nextSongForPreload.id ? 3 : 1,
+                    opacity: nextSong?.id === nextSongForPreload.id ? 1 : 0,
+                    transform: nextSong?.id === nextSongForPreload.id ? 'translateX(0) scale(1)' : 'translateX(30px) scale(0.98)',
+                    filter: nextSong?.id === nextSongForPreload.id ? 'blur(0)' : 'blur(4px)',
+                    pointerEvents: nextSong?.id === nextSongForPreload.id ? 'auto' : 'none'
+                  }}
+                >
+                  <FeaturedSong 
+                    song={nextSongForPreload} 
+                    playSong={playSong} 
+                    currentSong={currentSong} 
+                    isPlaying={isPlaying}
+                    rank={(nextSongIndexForPreload ?? 0) + 1}
+                  />
+                </div>
+              )}
+            </div>
+            
+            {top5Songs.length > 1 && (
+              <div className="absolute top-4 left-6 md:left-4 flex gap-1.5 z-50 bg-black/60 backdrop-blur-md px-2 py-1.5 rounded-full border border-white/10">
+                {top5Songs.map((_, index) => (
+                  <button
+                    key={index}
+                    onClick={() => handleFeaturedSongChange(index)}
+                    className={`h-2 rounded-full transition-all duration-300 ${
+                      index === featuredSongIndex 
+                        ? 'w-8 bg-neon-green shadow-[0_0_8px_rgba(0,255,159,0.6)]' 
+                        : 'w-2 bg-white/30 hover:bg-white/50 hover:w-3'
+                    }`}
+                    aria-label={`Show featured song ${index + 1}`}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
-        <div className="mb-6 px-4 md:px-0">
+        <div className="mb-8 px-4 md:px-0 relative mt-16" style={{ zIndex: 10 }}>
           <h1 className="text-3xl md:text-4xl font-bold font-mono mb-2 neon-text flex items-center gap-3">
             <Flame className="w-8 h-8 text-orange-500 animate-pulse" />
             {searchQuery ? `SEARCH RESULTS` : `TRENDING`}
           </h1>
-          <p className="text-muted-foreground font-mono text-sm">
+          <p className="text-muted-foreground font-mono text-sm mb-4">
             {searchQuery 
               ? `Search results for "${searchQuery}"` 
               : `Top artists and songs ranked by trading activity & plays`
@@ -1064,8 +1186,8 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
           </p>
         </div>
 
-        <Tabs defaultValue="songs" className="w-full px-4 md:px-0">
-          <TabsList className="grid w-full max-w-md grid-cols-2 mb-6 bg-black/20 backdrop-blur-xl border border-white/10 rounded-xl p-1">
+        <Tabs defaultValue="songs" className="w-full px-4 md:px-0 relative" style={{ zIndex: 10 }}>
+          <TabsList className="grid w-full max-w-md grid-cols-2 mb-6 bg-black/20 backdrop-blur-xl border border-white/10 rounded-xl p-1 relative" style={{ zIndex: 10 }}>
             <TabsTrigger 
               value="songs"
               className="data-[state=active]:bg-neon-green/20 data-[state=active]:text-neon-green font-mono rounded-lg transition-all"

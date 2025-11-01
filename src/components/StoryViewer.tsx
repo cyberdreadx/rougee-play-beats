@@ -300,7 +300,7 @@ const StoryViewer = ({
       </div>
 
       {/* Header */}
-      <div className="absolute left-4 right-4 flex items-center justify-between z-10" style={{
+      <div className="absolute left-4 right-4 flex items-center justify-between z-40 pointer-events-auto" style={{
         top: 'calc(1rem + env(safe-area-inset-top, 0px) + 0.5rem)'
       }}>
         <div 
@@ -334,8 +334,8 @@ const StoryViewer = ({
           </div>
         </div>
         <button 
-          onClick={onClose} 
-          className="text-white bg-transparent hover:bg-black/20 rounded-full p-2 transition-all z-30"
+          onClick={(e) => { e.stopPropagation(); onClose(); }} 
+          className="text-white bg-transparent hover:bg-black/20 rounded-full p-2 transition-all z-50"
         >
           <X className="w-6 h-6" />
         </button>
@@ -451,7 +451,7 @@ const StoryViewer = ({
       )}
 
       {/* Instagram-style Navigation - tap left/right to navigate */}
-      <div className="absolute inset-0 flex z-10">
+      <div className="absolute inset-0 flex z-10 pointer-events-auto">
         {/* Left tap zone - 1/3 of screen */}
         <div 
           className="w-1/3 cursor-pointer" 

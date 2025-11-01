@@ -290,6 +290,12 @@ const Artist = ({ playSong, currentSong, isPlaying }: ArtistProps) => {
   const [showHoldingsModal, setShowHoldingsModal] = useState(false);
 
   const isOwnProfile = fullAddress?.toLowerCase() === walletAddress?.toLowerCase();
+  const shortWallet = walletAddress ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : '';
+  const isNewProfile = !!profile && (
+    (!profile.avatar_cid) &&
+    !(profile.artist_name || profile.display_name) &&
+    (profile.total_songs === 0)
+  );
 
   const handleSharePost = async (post: FeedPost) => {
     const url = `https://rougee.app/post/${post.id}`;
@@ -746,17 +752,70 @@ const Artist = ({ playSong, currentSong, isPlaying }: ArtistProps) => {
               {/* Info Section */}
               <div className="flex-1 flex flex-col justify-between min-w-0">
                 <div>
-                  <div className="flex items-center gap-3 mb-2 flex-wrap">
-                    <h1 className="text-3xl md:text-5xl font-bold bg-gradient-to-r from-white via-white to-white/80 bg-clip-text text-transparent">
-                      {profile.artist_name || profile.display_name}
+                  <div className="flex items-center gap-3 mb-2 flex-wrap min-w-0">
+                    <h1 className="text-3xl md:text-5xl font-bold bg-gradient-to-r from-white via-white to-white/80 bg-clip-text text-transparent truncate">
+                      {profile.artist_name || profile.display_name || shortWallet}
                     </h1>
                     <XRGETierBadge walletAddress={walletAddress || null} size="md" />
+                    {/* Social icons in header */}
+                    {(profile.social_links?.website || profile.social_links?.twitter || profile.social_links?.instagram || profile.social_links?.soundcloud) && (
+                      <div className="flex items-center gap-3 ml-2">
+                        {profile.social_links?.website && (
+                          <a
+                            href={profile.social_links.website}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-white/70 hover:text-neon-green transition-colors"
+                            aria-label="Website"
+                          >
+                            <Globe className="h-4 w-4" />
+                          </a>
+                        )}
+                        {profile.social_links?.twitter && (
+                          <a
+                            href={profile.social_links.twitter}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-white/70 hover:text-neon-green transition-colors"
+                            aria-label="Twitter"
+                          >
+                            <FaXTwitter className="h-4 w-4" />
+                          </a>
+                        )}
+                        {profile.social_links?.instagram && (
+                          <a
+                            href={profile.social_links.instagram}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-white/70 hover:text-neon-green transition-colors"
+                            aria-label="Instagram"
+                          >
+                            <Instagram className="h-4 w-4" />
+                          </a>
+                        )}
+                        {profile.social_links?.soundcloud && (
+                          <a
+                            href={profile.social_links.soundcloud}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-white/70 hover:text-neon-green transition-colors"
+                            aria-label="SoundCloud"
+                          >
+                            <Music className="h-4 w-4" />
+                          </a>
+                        )}
+                      </div>
+                    )}
                   </div>
-                  {profile.display_name && profile.display_name !== profile.artist_name && (
-                    <p className="text-base md:text-lg text-white/70 mb-2 font-medium">
+                  {(profile.artist_name && profile.display_name && profile.display_name !== profile.artist_name && !/^0x[0-9a-fA-F]{6,}$/i.test(profile.display_name)) ? (
+                    <p className="text-base md:text-lg text-white/70 mb-2 font-medium truncate">
                       aka {profile.display_name}
                     </p>
-                  )}
+                  ) : profile.artist_name && walletAddress ? (
+                    <p className="text-base md:text-lg text-white/60 mb-2 font-mono truncate">
+                      {shortWallet}
+                    </p>
+                  ) : null}
                   {profile.artist_ticker && (
                     <div className="flex items-center gap-2 mb-3">
                       <span className="text-2xl font-mono text-neon-green font-bold">
@@ -906,6 +965,24 @@ const Artist = ({ playSong, currentSong, isPlaying }: ArtistProps) => {
           </div>
         ) : null}
       </div>
+
+      {/* New Profile Onboarding (only for owner's fresh profiles) */}
+      {isOwnProfile && isNewProfile && (
+        <div className="max-w-7xl mx-auto px-6 md:px-12 mt-2">
+          <Card className="bg-gradient-to-br from-white/5 via-white/3 to-transparent backdrop-blur-xl border border-white/10 rounded-2xl p-5 md:p-6">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div>
+                <h3 className="text-xl md:text-2xl font-bold mb-1">Welcome! Let's set up your artist profile</h3>
+                <p className="text-white/70 text-sm md:text-base">Add a display name and avatar, then upload your first track to get discovered.</p>
+              </div>
+              <div className="flex gap-2 md:gap-3">
+                <Button onClick={() => navigate('/profile/edit')} className="bg-neon-green text-black hover:bg-neon-green/90">Edit Profile</Button>
+                <Button variant="outline" onClick={() => navigate('/upload')} className="border-neon-green/40 hover:border-neon-green/60 hover:bg-neon-green/10">Upload Song</Button>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
 
       {/* Content Navigation Tabs & Main Content */}
       <div className="max-w-7xl mx-auto px-6 md:px-12 mt-6">

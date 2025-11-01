@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { X, ChevronLeft, ChevronRight, Heart, Eye } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, Heart, Eye, MessageCircle, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { formatDistanceToNow } from "date-fns";
@@ -44,10 +44,16 @@ const StoryViewer = ({
   const [progress, setProgress] = useState(0);
   const [hasLiked, setHasLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
+  const [viewCount, setViewCount] = useState(0);
+  const [showComments, setShowComments] = useState(false);
+  const [comments, setComments] = useState<Array<{ id: string; wallet_address: string; comment_text: string; created_at: string; profiles?: { artist_name: string | null; avatar_cid: string | null } | null }>>([]);
+  const [commentText, setCommentText] = useState("");
   const [videoDuration, setVideoDuration] = useState<number | null>(null);
   const [isMuted, setIsMuted] = useState(true);
   const { fullAddress } = useWallet();
   const { toast } = useToast();
+  const [showViewers, setShowViewers] = useState(false);
+  const [viewers, setViewers] = useState<Array<{ wallet_address: string; profiles?: { artist_name: string | null; avatar_cid: string | null } | null }>>([]);
 
   const walletAddresses = Object.keys(allStories);
   const currentWalletIndex = walletAddresses.indexOf(currentWalletAddress);
@@ -55,41 +61,59 @@ const StoryViewer = ({
   const currentStory = currentStories[currentStoryIndex];
   const currentProfile = profiles[currentWalletAddress];
 
-  // Record view when story changes
+  // Load counts and comments when story changes
   useEffect(() => {
-    const recordView = async () => {
-      if (!fullAddress || !currentStory) return;
-      
+    const recordAndLoad = async () => {
+      if (!currentStory) return;
+      setViewCount(currentStory.view_count || 0);
+      // load comments
+      await loadComments(currentStory.id);
+
+      if (!fullAddress) return;
       try {
-        await supabase
+        // Check if already viewed
+        const { data: existing } = await supabase
           .from('story_views')
-          .insert({
-            story_id: currentStory.id,
-            viewer_wallet_address: fullAddress.toLowerCase()
-          });
-      } catch (error) {
-        // Ignore duplicate errors (user already viewed this story)
-        console.log('View already recorded');
-      }
+          .select('id')
+          .eq('story_id', currentStory.id)
+          .eq('viewer_wallet_address', fullAddress.toLowerCase())
+          .maybeSingle();
+        if (!existing) {
+          const { error } = await supabase
+            .from('story_views')
+            .insert({ story_id: currentStory.id, viewer_wallet_address: fullAddress.toLowerCase() });
+          if (!error) {
+            setViewCount(prev => prev + 1);
+          }
+        }
+      } catch {}
     };
 
-    recordView();
+    recordAndLoad();
   }, [currentStory?.id, fullAddress]);
 
   // Check if user liked current story and get like count
   useEffect(() => {
     const checkLikeStatus = async () => {
-      if (!fullAddress || !currentStory) return;
-      
-      const { data } = await supabase
+      if (!currentStory) return;
+      // Has current user liked?
+      if (fullAddress) {
+        const { data } = await supabase
+          .from('story_likes')
+          .select('id')
+          .eq('story_id', currentStory.id)
+          .eq('wallet_address', fullAddress.toLowerCase())
+          .maybeSingle();
+        setHasLiked(!!data);
+      } else {
+        setHasLiked(false);
+      }
+      // Always fetch persisted like count
+      const { count } = await supabase
         .from('story_likes')
-        .select('id')
-        .eq('story_id', currentStory.id)
-        .eq('wallet_address', fullAddress.toLowerCase())
-        .maybeSingle();
-      
-      setHasLiked(!!data);
-      setLikeCount(currentStory.like_count || 0);
+        .select('id', { count: 'exact', head: true })
+        .eq('story_id', currentStory.id);
+      setLikeCount(count || 0);
     };
 
     checkLikeStatus();
@@ -127,6 +151,65 @@ const StoryViewer = ({
     }
   };
 
+  const loadComments = async (storyId: string) => {
+    const { data: commentsData } = await supabase
+      .from('story_comments')
+      .select('*')
+      .eq('story_id', storyId)
+      .order('created_at', { ascending: true });
+    const addrs = Array.from(new Set((commentsData || []).map(c => c.wallet_address)));
+    let profiles: any[] = [];
+    if (addrs.length) {
+      const { data } = await supabase
+        .from('profiles')
+        .select('wallet_address, artist_name, avatar_cid')
+        .in('wallet_address', addrs);
+      profiles = data || [];
+    }
+    const withProfiles = (commentsData || []).map(c => ({
+      ...c,
+      profiles: profiles.find(p => p.wallet_address?.toLowerCase() === c.wallet_address?.toLowerCase()) || null,
+    }));
+    setComments(withProfiles as any);
+  };
+
+  const handleAddComment = async () => {
+    if (!fullAddress || !currentStory) {
+      toast({ title: 'Connect wallet', description: 'Please connect to comment', variant: 'destructive' });
+      return;
+    }
+    const text = commentText.trim();
+    if (!text) return;
+    await supabase
+      .from('story_comments')
+      .insert({ story_id: currentStory.id, wallet_address: fullAddress.toLowerCase(), comment_text: text });
+    setCommentText("");
+    await loadComments(currentStory.id);
+  };
+
+  const loadViewers = async (storyId: string) => {
+    const { data: viewRows } = await supabase
+      .from('story_views')
+      .select('viewer_wallet_address')
+      .eq('story_id', storyId)
+      .order('created_at', { ascending: false })
+      .limit(200);
+    const addrs = Array.from(new Set((viewRows || []).map(v => v.viewer_wallet_address)));
+    let profiles: any[] = [];
+    if (addrs.length) {
+      const { data } = await supabase
+        .from('profiles')
+        .select('wallet_address, artist_name, avatar_cid')
+        .in('wallet_address', addrs);
+      profiles = data || [];
+    }
+    const items = (viewRows || []).map(v => ({
+      wallet_address: v.viewer_wallet_address,
+      profiles: profiles.find(p => p.wallet_address?.toLowerCase() === v.viewer_wallet_address?.toLowerCase()) || null,
+    }));
+    setViewers(items as any);
+  };
+
   const toggleMute = () => {
     setIsMuted(!isMuted);
   };
@@ -161,7 +244,12 @@ const StoryViewer = ({
           .eq('wallet_address', fullAddress.toLowerCase());
         
         setHasLiked(false);
-        setLikeCount(prev => Math.max(0, prev - 1));
+        // Refresh from DB to keep consistent
+        const { count } = await supabase
+          .from('story_likes')
+          .select('id', { count: 'exact', head: true })
+          .eq('story_id', currentStory.id);
+        setLikeCount(count || 0);
       } else {
         // Like
         await supabase
@@ -172,7 +260,11 @@ const StoryViewer = ({
           });
         
         setHasLiked(true);
-        setLikeCount(prev => prev + 1);
+        const { count } = await supabase
+          .from('story_likes')
+          .select('id', { count: 'exact', head: true })
+          .eq('story_id', currentStory.id);
+        setLikeCount(count || 1);
       }
     } catch (error) {
       console.error('Error toggling like:', error);
@@ -185,7 +277,7 @@ const StoryViewer = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black flex items-center justify-center" style={{
+    <div className="fixed inset-0 z-[200] bg-black flex items-center justify-center" style={{
       paddingTop: 'env(safe-area-inset-top, 0px)',
       paddingBottom: 'env(safe-area-inset-bottom, 0px)',
       paddingLeft: 'env(safe-area-inset-left, 0px)',
@@ -310,16 +402,23 @@ const StoryViewer = ({
             </p>
           )}
           
-          {/* View and Like counts */}
+          {/* View, Like and Comment counts */}
           <div className="flex items-center gap-4 justify-center text-white">
             <div className="flex items-center gap-1 bg-black/50 px-3 py-1 rounded-full">
               <Eye className="w-4 h-4" />
-              <span className="text-sm font-medium">{currentStory.view_count || 0}</span>
+              <span className="text-sm font-medium">{viewCount}</span>
             </div>
             <div className="flex items-center gap-1 bg-black/50 px-3 py-1 rounded-full">
               <Heart className={`w-4 h-4 ${hasLiked ? 'fill-red-500 text-red-500' : ''}`} />
               <span className="text-sm font-medium">{likeCount}</span>
             </div>
+            <button
+              className="flex items-center gap-1 bg-black/50 px-3 py-1 rounded-full hover:bg-black/60"
+              onClick={(e) => { e.stopPropagation(); setShowComments(true); }}
+            >
+              <MessageCircle className="w-4 h-4" />
+              <span className="text-sm font-medium">{comments.length}</span>
+            </button>
           </div>
         </div>
       </div>
@@ -339,6 +438,18 @@ const StoryViewer = ({
         </button>
       </div>
 
+      {/* Owner-only Viewers Button */}
+      {currentProfile?.wallet_address?.toLowerCase?.() === fullAddress?.toLowerCase?.() && (
+        <div className="absolute bottom-32 left-8 z-20">
+          <button
+            className="w-12 h-12 rounded-full flex items-center justify-center bg-black/30 hover:bg-black/50 transition-all"
+            onClick={(e) => { e.stopPropagation(); loadViewers(currentStory.id); setShowViewers(true); }}
+          >
+            <Eye className="w-6 h-6 text-white" />
+          </button>
+        </div>
+      )}
+
       {/* Instagram-style Navigation - tap left/right to navigate */}
       <div className="absolute inset-0 flex z-10">
         {/* Left tap zone - 1/3 of screen */}
@@ -352,6 +463,87 @@ const StoryViewer = ({
           onClick={handleNext}
         />
       </div>
+
+      {/* Comments Drawer */}
+      {showComments && (
+        <div className="absolute inset-x-0 bottom-0 z-30 bg-black/80 backdrop-blur-md border-t border-white/10 max-h-[55%] overflow-y-auto">
+          <div className="p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-white/90 font-semibold">Comments</p>
+              <button className="text-white/60 hover:text-white" onClick={() => setShowComments(false)}>Close</button>
+            </div>
+            {/* Add comment */}
+            <div className="flex gap-2">
+              <Input 
+                placeholder="Add a comment..."
+                value={commentText}
+                onChange={(e) => setCommentText(e.target.value)}
+                onKeyPress={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAddComment(); } }}
+                className="flex-1"
+              />
+              <Button size="sm" onClick={handleAddComment} disabled={!commentText.trim()}>
+                <Send className="w-4 h-4" />
+              </Button>
+            </div>
+            {/* Comments list */}
+            <div className="space-y-3">
+              {comments.map((c) => (
+                <div key={c.id} className="flex gap-3">
+                  <div className="cursor-pointer" onClick={() => { onClose(); navigate(`/artist/${c.wallet_address}`); }}>
+                    {c.profiles?.avatar_cid ? (
+                      <img src={getIPFSGatewayUrl(c.profiles.avatar_cid)} alt="Avatar" className="w-8 h-8 rounded-full object-cover" />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+                        <span className="text-primary text-xs">{c.profiles?.artist_name?.[0] || '?'}</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <p className="text-sm font-semibold cursor-pointer hover:text-neon-green" onClick={() => { onClose(); navigate(`/artist/${c.wallet_address}`); }}>
+                        {c.profiles?.artist_name || `${c.wallet_address.slice(0, 6)}...${c.wallet_address.slice(-4)}`}
+                      </p>
+                    </div>
+                    <div className="text-sm text-white/80">
+                      <TaggedText text={c.comment_text} />
+                    </div>
+                    <p className="text-xs text-white/60 mt-1">{formatDistanceToNow(new Date(c.created_at), { addSuffix: true })}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Viewers Drawer (owner only) */}
+      {showViewers && (
+        <div className="absolute inset-x-0 bottom-0 z-30 bg-black/80 backdrop-blur-md border-t border-white/10 max-h-[55%] overflow-y-auto">
+          <div className="p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-white/90 font-semibold">Viewers</p>
+              <button className="text-white/60 hover:text-white" onClick={() => setShowViewers(false)}>Close</button>
+            </div>
+            <div className="space-y-3">
+              {viewers.length === 0 && <p className="text-white/60 text-sm">No viewers yet</p>}
+              {viewers.map(v => (
+                <div key={v.wallet_address} className="flex items-center gap-3">
+                  {v.profiles?.avatar_cid ? (
+                    <img src={getIPFSGatewayUrl(v.profiles.avatar_cid)} alt="Avatar" className="w-8 h-8 rounded-full object-cover" />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+                      <span className="text-primary text-xs">{v.profiles?.artist_name?.[0] || v.wallet_address.slice(0,1)}</span>
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <p className="text-white truncate text-sm">{v.profiles?.artist_name || `${v.wallet_address.slice(0,6)}...${v.wallet_address.slice(-4)}`}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

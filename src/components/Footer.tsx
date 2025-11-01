@@ -35,7 +35,7 @@ const Footer = () => {
             <div className="flex items-center gap-2 mb-3">
               <Music className="h-4 w-4 text-neon-green" />
               <h3 className="text-sm font-bold neon-text font-mono">
-                ROUGEE PLAY
+                ROUGEE
               </h3>
             </div>
             <p className="text-[10px] text-muted-foreground font-mono mb-3">
@@ -120,7 +120,7 @@ const Footer = () => {
         {/* Bottom Bar */}
         <div className="mt-8 pt-6 border-t border-neon-green/10 flex flex-col md:flex-row justify-between items-center gap-3 max-w-6xl mx-auto">
           <p className="text-[10px] text-muted-foreground font-mono text-center md:text-left">
-            © {currentYear} ROUGEE PLAY. All rights reserved.
+            © {currentYear} ROUGEE. All rights reserved.
           </p>
           <div className="flex items-center gap-3 text-[10px] text-muted-foreground font-mono">
             <button onClick={() => navigate("/privacy-policy")} className="hover:text-neon-green transition-colors">

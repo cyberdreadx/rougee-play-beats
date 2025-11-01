@@ -82,17 +82,30 @@ const AppContent = () => {
   
   // Check sessionStorage directly for immediate lock/unlock detection
   // Priority: isLocked=true locks immediately, isVerified=true unlocks immediately
+  // Use state to force re-render when unlockTrigger changes
+  const [sessionStorageCheck, setSessionStorageCheck] = React.useState(0);
+  
   const actuallyLocked = React.useMemo(() => {
     if (!fullAddress) return isLocked;
     
     // Read sessionStorage directly for immediate detection
     const sessionKey = `lock_code_verified_${fullAddress.toLowerCase()}`;
-    const isVerified = sessionStorage.getItem(sessionKey) === "true";
+    // Force a fresh read of sessionStorage - try multiple times if needed
+    let isVerified = false;
+    try {
+      const value = sessionStorage.getItem(sessionKey);
+      isVerified = value === "true";
+      if (!isVerified && value !== null) {
+        console.log('⚠️ actuallyLocked: sessionStorage value is not "true":', value);
+      }
+    } catch (e) {
+      console.error('❌ actuallyLocked: Error reading sessionStorage:', e);
+    }
     const hasLockCode = localStorage.getItem(`lock_code_enabled_${fullAddress.toLowerCase()}`) === "true";
     const requireAfterLogin = localStorage.getItem(`require_pin_after_login_${fullAddress.toLowerCase()}`);
     const requirePin = requireAfterLogin !== null ? requireAfterLogin === "true" : true;
     
-    console.log('🔍 actuallyLocked: isVerified=', isVerified, 'hasLockCode=', hasLockCode, 'requirePin=', requirePin, 'isLocked=', isLocked, 'unlockTrigger=', unlockTrigger, 'lockUpdateTrigger=', lockUpdateTrigger);
+    console.log('🔍 actuallyLocked: isVerified=', isVerified, 'hasLockCode=', hasLockCode, 'requirePin=', requirePin, 'isLocked=', isLocked, 'unlockTrigger=', unlockTrigger, 'lockUpdateTrigger=', lockUpdateTrigger, 'sessionStorageCheck=', sessionStorageCheck);
     console.log('🔍 actuallyLocked: sessionStorage key=', sessionKey, 'value=', sessionStorage.getItem(sessionKey));
     
     // Priority 1: If user is verified in sessionStorage, unlock immediately (even if isLocked is true)
@@ -117,7 +130,7 @@ const AppContent = () => {
     // Default: unlocked
     console.log('🔓 actuallyLocked: Default unlocked');
     return false;
-  }, [fullAddress, isLocked, unlockTrigger, lockUpdateTrigger]); // Added lockUpdateTrigger to force recalculation on lock
+  }, [fullAddress, isLocked, unlockTrigger, lockUpdateTrigger, sessionStorageCheck]); // Added sessionStorageCheck to force recalculation
   
   console.log('🔍 App: isLocked =', isLocked, 'shouldBeLocked =', shouldBeLocked, 'actuallyLocked =', actuallyLocked, 'fullAddress =', fullAddress);
   
@@ -131,6 +144,11 @@ const AppContent = () => {
           // Force a re-render to check isLocked state again
           setUnlockTrigger(prev => {
             console.log('🔓 App: Unlock trigger incremented from', prev, 'to', prev + 1);
+            return prev + 1;
+          });
+          // Also force a sessionStorage check
+          setSessionStorageCheck(prev => {
+            console.log('🔓 App: SessionStorage check triggered, prev=', prev);
             return prev + 1;
           });
         }} 

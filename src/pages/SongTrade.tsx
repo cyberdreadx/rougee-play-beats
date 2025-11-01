@@ -27,13 +27,14 @@ import { useArtistProfile } from "@/hooks/useArtistProfile";
 import { SongComments } from "@/components/SongComments";
 import { AudioWaveform } from "@/components/AudioWaveform";
 import { useAudioStateForSong } from "@/hooks/useAudioState";
-import { useBuySongTokens, useSellSongTokens, useSongPrice, useSongMetadata, useCreateSong, SONG_FACTORY_ADDRESS, useApproveToken, useBuyQuote, useSellQuote, useBondingCurveSupply, useSongTokenBalance, BONDING_CURVE_ADDRESS } from "@/hooks/useSongBondingCurve";
+import { useBuySongTokens, useSellSongTokens, useSongPrice, useSongMetadata, useCreateSong, SONG_FACTORY_ADDRESS, useApproveToken, useBuyQuote, useSellQuote, useBondingCurveSupply, useSongTokenBalance, BONDING_CURVE_ADDRESS, useAutoIndexTrades } from "@/hooks/useSongBondingCurve";
 import { useBalance, useConnect, useWaitForTransactionReceipt, usePublicClient } from "wagmi";
 import { useXRGESwap, KTA_TOKEN_ADDRESS, USDC_TOKEN_ADDRESS, useXRGEQuote, useXRGEQuoteFromKTA, useXRGEQuoteFromUSDC, XRGE_TOKEN_ADDRESS as XRGE_TOKEN } from "@/hooks/useXRGESwap";
 import { usePrivyToken } from "@/hooks/usePrivyToken";
 import { usePrivyWagmi } from "@/hooks/usePrivyWagmi";
 import { useFundWallet, useWallets, usePrivy } from "@privy-io/react-auth";
 import { useTokenPrices } from "@/hooks/useTokenPrices";
+import { invalidate24hDataCache } from "@/hooks/useSong24hData";
 import { createWalletClient, custom } from "viem";
 import { base } from "viem/chains";
 import { Play, TrendingUp, TrendingDown, Users, MessageSquare, ArrowUpRight, ArrowDownRight, Loader2, Rocket, Wallet, Copy, Check, ExternalLink, CreditCard, Share2, Pause, Edit, Download, Lock } from "lucide-react";
@@ -176,8 +177,9 @@ const SongTrade = ({ playSong, currentSong, isPlaying }: SongTradeProps) => {
 
   // Bonding curve hooks
   const { createSong, isPending: isDeploying, isConfirming, isSuccess: deploySuccess, hash, receipt } = useCreateSong();
-  const { buyWithETH, buyWithXRGE, isPending: isBuying, isSuccess: buySuccess } = useBuySongTokens();
-  const { sell, isPending: isSelling, isSuccess: sellSuccess } = useSellSongTokens();
+  const { buyWithETH, buyWithXRGE, isPending: isBuying, isSuccess: buySuccess, hash: buyHash } = useBuySongTokens();
+  const { sell, isPending: isSelling, isSuccess: sellSuccess, hash: sellHash } = useSellSongTokens();
+  const { indexTradeAfterSuccess } = useAutoIndexTrades();
   const { price: priceData, rawPrice, isLoading: priceLoading, refetch: refetchPrice } = useSongPrice(songTokenAddress);
   const { metadata: metadataData, isLoading: metadataLoading, refetch: refetchMetadata } = useSongMetadata(songTokenAddress);
   const { supply: bondingSupply, refetch: refetchSupply } = useBondingCurveSupply(songTokenAddress);
@@ -1060,11 +1062,9 @@ const SongTrade = ({ playSong, currentSong, isPlaying }: SongTradeProps) => {
         });
         
         // Approve using the approve function from useSongBondingCurve
+        // The approve function now waits for confirmation before returning
         await approve(XRGE_TOKEN, xrgeReceived);
         console.log('✅ XRGE approved for bonding curve');
-        
-        // Wait a bit for approval to propagate
-        await new Promise(resolve => setTimeout(resolve, 2000));
         
         toast({
           title: "Step 4/4: Buying song tokens",
@@ -1083,23 +1083,33 @@ const SongTrade = ({ playSong, currentSong, isPlaying }: SongTradeProps) => {
         });
       }
       
-      // Record purchase in database
+      // Record purchase in database using edge function to bypass RLS
       if (song && fullAddress) {
         try {
-          const { error: purchaseError } = await supabase
-            .from('song_purchases')
-            .insert({
-              song_id: song.id,
-              buyer_wallet_address: fullAddress.toLowerCase(),
-              artist_wallet_address: song.wallet_address.toLowerCase(),
-            });
+          const authHeaders = await getAuthHeaders();
           
-          if (purchaseError) {
-            console.error('Error recording purchase:', purchaseError);
+          const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/record-purchase`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...authHeaders,
+            },
+            body: JSON.stringify({
+              songId: song.id,
+              artistWalletAddress: song.wallet_address.toLowerCase(),
+            })
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+            console.error('Error recording purchase:', errorData.error || `HTTP ${response.status}`);
           } else {
-            console.log('✅ Purchase recorded in database');
-            // Refresh holders immediately after recording purchase
-            setTimeout(() => fetchHolders(), 1000);
+            const result = await response.json();
+            if (result.success) {
+              console.log('✅ Purchase recorded in database');
+              // Refresh holders immediately after recording purchase
+              setTimeout(() => fetchHolders(), 1000);
+            }
           }
         } catch (dbError) {
           console.error('Database error:', dbError);
@@ -1117,6 +1127,22 @@ const SongTrade = ({ playSong, currentSong, isPlaying }: SongTradeProps) => {
         await refetchPrice();
         await refetchSupply();
         await refetchMetadata();
+        
+        // Invalidate 24h data cache to force recalculation after purchase
+        if (songTokenAddress) {
+          invalidate24hDataCache(songTokenAddress);
+          console.log('🔄 Invalidated 24h data cache after purchase');
+        }
+        
+        // Auto-index trade for database-backed charts
+        if (buyHash && songTokenAddress && song?.id) {
+          try {
+            await indexTradeAfterSuccess(buyHash, songTokenAddress, song.id);
+            console.log('✅ Trade indexed for charts');
+          } catch (idxError) {
+            console.warn('Failed to auto-index trade (non-critical):', idxError);
+          }
+        }
         
         toast({
           title: "✅ Balances updated!",
@@ -1194,6 +1220,21 @@ const SongTrade = ({ playSong, currentSong, isPlaying }: SongTradeProps) => {
       refetchPrice();
       refetchSupply();
       refetchMetadata();
+      
+      // Auto-index trade for database-backed charts
+      if (sellHash && songTokenAddress && song?.id) {
+        try {
+          await indexTradeAfterSuccess(sellHash, songTokenAddress, song.id);
+          console.log('✅ Sell trade indexed for charts');
+        } catch (idxError) {
+          console.warn('Failed to auto-index sell trade (non-critical):', idxError);
+        }
+      }
+      
+      // Invalidate 24h data cache after sell
+      if (songTokenAddress) {
+        invalidate24hDataCache(songTokenAddress);
+      }
     } catch (error) {
       console.error("Sell error:", error);
       toast({
@@ -1303,7 +1344,7 @@ const SongTrade = ({ playSong, currentSong, isPlaying }: SongTradeProps) => {
     if (!song) return;
     try {
       setSharing(true);
-      const text = `Listen to ${song.title} by ${song.artist || 'Unknown Artist'} on ROUGEE PLAY`;
+      const text = `Listen to ${song.title} by ${song.artist || 'Unknown Artist'} on ROUGEE`;
       if (navigator.share) {
         await navigator.share({ title: song.title, text, url: pageUrl });
         toast({ title: "Shared", description: "Thanks for spreading the word!" });
@@ -1595,11 +1636,11 @@ const SongTrade = ({ playSong, currentSong, isPlaying }: SongTradeProps) => {
     <NetworkGuard>
       <div className="min-h-screen bg-background pb-20 md:pb-8">
         <Helmet>
-          <title>{song.title} - {song.artist || 'Unknown Artist'} | ROUGEE PLAY</title>
-        <meta name="description" content={`Listen to ${song.title} by ${song.artist || 'Unknown Artist'} on ROUGEE PLAY. Stream and trade music NFTs on the blockchain.`} />
+          <title>{song.title} - {song.artist || 'Unknown Artist'} | ROUGEE</title>
+        <meta name="description" content={`Listen to ${song.title} by ${song.artist || 'Unknown Artist'} on ROUGEE. Stream and trade music NFTs on the blockchain.`} />
         
         <meta property="og:title" content={`${song.title} - ${song.artist || 'Unknown Artist'}`} />
-        <meta property="og:description" content={`Listen to ${song.title} by ${song.artist || 'Unknown Artist'} on ROUGEE PLAY`} />
+        <meta property="og:description" content={`Listen to ${song.title} by ${song.artist || 'Unknown Artist'} on ROUGEE`} />
         <meta property="og:image" content={coverImageUrl} />
         <meta property="og:image:secure_url" content={coverImageUrl} />
         <meta property="og:image:type" content="image/jpeg" />
@@ -1610,7 +1651,7 @@ const SongTrade = ({ playSong, currentSong, isPlaying }: SongTradeProps) => {
         
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content={`${song.title} - ${song.artist || 'Unknown Artist'}`} />
-        <meta name="twitter:description" content={`Listen to ${song.title} by ${song.artist || 'Unknown Artist'} on ROUGEE PLAY`} />
+        <meta name="twitter:description" content={`Listen to ${song.title} by ${song.artist || 'Unknown Artist'} on ROUGEE`} />
         <meta name="twitter:image" content={coverImageUrl} />
         <meta name="twitter:image:src" content={coverImageUrl} />
       </Helmet>

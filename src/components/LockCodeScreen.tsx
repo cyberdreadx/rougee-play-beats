@@ -27,9 +27,32 @@ export const LockCodeScreen = ({ onUnlock }: LockCodeScreenProps) => {
       setIsVerifying(false);
       console.log('🔐 LockCodeScreen: Code valid, calling onUnlock');
       
-      // Small delay to ensure sessionStorage write is complete and App component can read it
-      // sessionStorage is synchronous, but we want to give React time to propagate state changes
-      await new Promise(resolve => setTimeout(resolve, 150));
+      // Verify sessionStorage was set before calling onUnlock
+      // Wait and check sessionStorage multiple times to ensure it persists
+      let verified = false;
+      for (let i = 0; i < 5; i++) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Check all sessionStorage keys to find the verification key
+        for (let j = 0; j < sessionStorage.length; j++) {
+          const key = sessionStorage.key(j);
+          if (key && key.startsWith('lock_code_verified_')) {
+            const value = sessionStorage.getItem(key);
+            console.log(`🔐 LockCodeScreen: Check ${i + 1}/5 - Found key:`, key, 'value:', value);
+            if (value === "true") {
+              verified = true;
+              break;
+            }
+          }
+        }
+        
+        if (verified) {
+          console.log('✅ LockCodeScreen: SessionStorage verified, proceeding with unlock');
+          break;
+        } else if (i === 4) {
+          console.warn('⚠️ LockCodeScreen: SessionStorage not found after 5 checks, proceeding anyway');
+        }
+      }
       
       // Call onUnlock callback to notify parent that unlock succeeded
       // This ensures the App component re-renders and hides the lock screen

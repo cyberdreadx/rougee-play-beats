@@ -572,10 +572,10 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
   };
   const handleSharePost = async (post: FeedPost) => {
     const url = `https://rougee.app/feed#post-${post.id}`;
-    const text = post.content_text ? post.content_text.slice(0, 140) : 'Check out this post on ROUGEE PLAY';
+    const text = post.content_text ? post.content_text.slice(0, 140) : 'Check out this post on ROUGEE';
     try {
       if (navigator.share) {
-        await navigator.share({ title: 'ROUGEE PLAY', text, url });
+        await navigator.share({ title: 'ROUGEE', text, url });
         toast({ title: 'Shared', description: 'Post shared successfully' });
       } else {
         await navigator.clipboard.writeText(url);

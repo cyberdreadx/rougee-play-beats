@@ -15,7 +15,7 @@ const buttonVariants = cva(
         secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80 active:bg-secondary/70",
         ghost: "hover:bg-accent hover:text-accent-foreground active:bg-accent/80",
         link: "text-primary underline-offset-4 hover:underline",
-        // ROUGEE PLAY tech variants
+        // ROUGEE tech variants
         tech: "tech-button text-foreground hover:text-neon-green hover:neon-glow active:text-neon-green active:scale-90 font-mono font-semibold",
         neon: "bg-neon-green text-black hover:bg-neon-green-dim active:bg-neon-green/80 font-mono font-bold neon-glow transition-all duration-300",
         disconnect: "tech-button text-neon-green border-neon-green hover:bg-neon-green hover:text-black active:bg-neon-green/80 active:scale-90 font-mono",

@@ -75,7 +75,7 @@ export const useLockCode = () => {
         const checkVerification = (retryCount = 0) => {
           const isVerified = sessionStorage.getItem(sessionKey) === "true";
           
-          console.log('🔍 useEffect: enabled=', enabled, 'isVerified=', isVerified, 'sessionKey=', sessionKey, 'retryCount=', retryCount);
+          console.log('🔍 useEffect: enabled=', enabled, 'isVerified=', isVerified, 'sessionKey=', sessionKey, 'retryCount=', retryCount, 'lockUpdateTrigger=', lockUpdateTrigger);
           console.log('🔍 useEffect: sessionStorage.getItem(sessionKey)=', sessionStorage.getItem(sessionKey));
           
           // Check if we should require pin after login
@@ -92,17 +92,27 @@ export const useLockCode = () => {
             return;
           }
           
+          // If lockUpdateTrigger > 0, this might be an unlock attempt
+          // Wait longer and retry more times to ensure sessionStorage is read correctly
+          // IMPORTANT: Read sessionStorage fresh each time (don't rely on closure)
+          const currentVerified = sessionStorage.getItem(sessionKey) === "true";
+          if (lockUpdateTrigger > 0 && retryCount < 3 && !currentVerified) {
+            console.log(`⏳ useEffect: lockUpdateTrigger=${lockUpdateTrigger}, retryCount=${retryCount}, sessionStorage still null, retrying in 150ms...`);
+            console.log(`⏳ useEffect: Current sessionStorage value:`, sessionStorage.getItem(sessionKey));
+            setTimeout(() => checkVerification(retryCount + 1), 150);
+            return;
+          }
+          
+          // Double-check sessionStorage one more time before locking
+          const finalCheck = sessionStorage.getItem(sessionKey) === "true";
+          if (finalCheck) {
+            console.log('✅ useEffect: Found verified status on final check, unlocking');
+            setIsLocked(false);
+            return;
+          }
+          
           // If not verified and require after login, lock
-          // BUT: Only if lockUpdateTrigger hasn't changed recently (meaning no recent unlock)
           if (!isVerified && requireAfterLogin) {
-            // If this is the first check and sessionStorage is null, it might be a timing issue
-            // Wait a bit and retry once before locking
-            if (retryCount === 0 && sessionStorage.getItem(sessionKey) === null) {
-              console.log('⏳ useEffect: sessionStorage is null, retrying in 100ms...');
-              setTimeout(() => checkVerification(1), 100);
-              return;
-            }
-            
             console.log('🔒 useEffect: Locking - not verified and require after login');
             setIsLocked(true);
           } else {
@@ -112,10 +122,9 @@ export const useLockCode = () => {
           }
         };
         
-        // Add a small delay to ensure sessionStorage writes from verifyLockCode are complete
-        // This is especially important if verifyLockCode just ran
+        // Add a delay to ensure sessionStorage writes from verifyLockCode are complete
         // Use a longer delay when lockUpdateTrigger changes (indicating a recent unlock attempt)
-        const delay = lockUpdateTrigger > 0 ? 200 : 50;
+        const delay = lockUpdateTrigger > 0 ? 300 : 50;
         const timeoutId = setTimeout(() => checkVerification(0), delay);
         return () => clearTimeout(timeoutId);
       } else {
@@ -171,12 +180,29 @@ export const useLockCode = () => {
     if (isValid) {
       // Mark as verified in this session FIRST
       const sessionKey = `lock_code_verified_${fullAddress.toLowerCase()}`;
-      sessionStorage.setItem(sessionKey, "true");
-      console.log('✅ verifyLockCode: Code valid, marked verified in sessionStorage');
-      
-      // Verify it was set
-      const verifyCheck = sessionStorage.getItem(sessionKey);
-      console.log('✅ verifyLockCode: Verification check:', verifyCheck);
+      try {
+        sessionStorage.setItem(sessionKey, "true");
+        console.log('✅ verifyLockCode: Code valid, marked verified in sessionStorage, key=', sessionKey);
+        
+        // Verify it was set - try multiple times to ensure it persists
+        let verifyCheck = sessionStorage.getItem(sessionKey);
+        console.log('✅ verifyLockCode: Verification check (first read):', verifyCheck);
+        
+        // Try reading it again after a tiny delay to ensure it persisted
+        setTimeout(() => {
+          const verifyCheck2 = sessionStorage.getItem(sessionKey);
+          console.log('✅ verifyLockCode: Verification check (delayed read):', verifyCheck2);
+          if (verifyCheck2 !== "true") {
+            console.error('❌ verifyLockCode: sessionStorage was not set correctly!');
+            // Try setting it again
+            sessionStorage.setItem(sessionKey, "true");
+            const verifyCheck3 = sessionStorage.getItem(sessionKey);
+            console.log('✅ verifyLockCode: Verification check (after re-set):', verifyCheck3);
+          }
+        }, 50);
+      } catch (e) {
+        console.error('❌ verifyLockCode: Error setting sessionStorage:', e);
+      }
       
       // Update state immediately - this will trigger a re-render
       // Use a callback to ensure it updates even if React batches
@@ -184,10 +210,13 @@ export const useLockCode = () => {
       console.log('✅ verifyLockCode: Set isLocked to false');
       
       // Also trigger unlock update to force App component to recalculate
-      setLockUpdateTrigger(prev => {
-        console.log('✅ verifyLockCode: Triggering unlock update, prev=', prev, 'to', prev + 1);
-        return prev + 1;
-      });
+      // Use setTimeout to ensure sessionStorage is written before state update
+      setTimeout(() => {
+        setLockUpdateTrigger(prev => {
+          console.log('✅ verifyLockCode: Triggering unlock update, prev=', prev, 'to', prev + 1);
+          return prev + 1;
+        });
+      }, 50);
     } else {
       console.log('❌ verifyLockCode: Code invalid');
     }

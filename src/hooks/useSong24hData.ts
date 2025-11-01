@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Address } from 'viem';
 import { usePublicClient } from 'wagmi';
 
@@ -12,20 +12,32 @@ interface Song24hData {
   loading: boolean;
 }
 
-// In-memory cache with 1-minute expiration (for testing)
+// In-memory cache with shorter expiration for more real-time updates
 const dataCache = new Map<string, { data: Song24hData; timestamp: number }>();
-const CACHE_DURATION = 1 * 60 * 1000; // 1 minute
+const CACHE_DURATION = 5 * 1000; // 5 seconds (reduced for faster updates after purchases)
+
+// Function to invalidate cache for a specific token (can be called after purchases)
+export const invalidate24hDataCache = (tokenAddress: Address) => {
+  const cacheKey = tokenAddress.toLowerCase();
+  dataCache.delete(cacheKey);
+  console.log('🗑️ useSong24hData: Cache invalidated for', tokenAddress);
+};
 
 /**
  * Hook for calculating real 24h price change and volume from blockchain data
+ * Returns data and a refetch function to manually trigger recalculation
+ * @param tokenAddress - The song token address
+ * @param _bondingSupplyStr - Optional bonding supply string (unused, kept for compatibility)
+ * @param bypassCache - If true, never use cached data (always fetch fresh data)
  */
-export const useSong24hData = (tokenAddress: Address | null, _bondingSupplyStr?: string | null) => {
+export const useSong24hData = (tokenAddress: Address | null, _bondingSupplyStr?: string | null, bypassCache: boolean = false) => {
   const publicClient = usePublicClient();
   const [data, setData] = useState<Song24hData>({
     priceChange24h: null,
     volume24h: 0,
     loading: true
   });
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   useEffect(() => {
     const calculate24hData = async () => {
@@ -36,15 +48,22 @@ export const useSong24hData = (tokenAddress: Address | null, _bondingSupplyStr?:
         return;
       }
       
-      // Check cache first
+      // Check cache first (but respect refresh trigger to force refresh and bypassCache flag)
       const cacheKey = `${tokenAddress.toLowerCase()}`;
       const cached = dataCache.get(cacheKey);
       const now = Date.now();
       
-      if (cached && (now - cached.timestamp) < CACHE_DURATION) {
+      // Never use cache if bypassCache is true (for real-time trending data)
+      if (!bypassCache && refreshTrigger === 0 && cached && (now - cached.timestamp) < CACHE_DURATION) {
         console.log('✅ useSong24hData: Using cached data', { tokenAddress, ...cached.data });
         setData(cached.data);
         return;
+      }
+      
+      // Clear cache if refresh triggered or bypassCache is true
+      if (refreshTrigger > 0 || bypassCache) {
+        dataCache.delete(cacheKey);
+        console.log('🔄 useSong24hData: Cache cleared, forcing refresh', { bypassCache });
       }
       
       try {
@@ -89,15 +108,18 @@ export const useSong24hData = (tokenAddress: Address | null, _bondingSupplyStr?:
             if (currentPrice && historicalPrice) {
               const changePercent = ((Number(currentPrice) - Number(historicalPrice)) / Number(historicalPrice)) * 100;
               
-              const resultData = {
-                priceChange24h: changePercent,
-                volume24h: 0, // Historical price method doesn't give us volume
-                loading: false
-              };
-              
-              dataCache.set(cacheKey, { data: resultData, timestamp: now });
-              setData(resultData);
-              return;
+          const resultData = {
+            priceChange24h: changePercent,
+            volume24h: 0, // Historical price method doesn't give us volume
+            loading: false
+          };
+          
+          // Only cache if bypassCache is false (trending needs real-time data)
+          if (!bypassCache) {
+            dataCache.set(cacheKey, { data: resultData, timestamp: now });
+          }
+          setData(resultData);
+          return;
             }
           } catch (histError) {
             // Historical queries not supported, fall through to trade-based calculation
@@ -213,8 +235,10 @@ export const useSong24hData = (tokenAddress: Address | null, _bondingSupplyStr?:
             loading: false
           };
           
-          // Cache the result
-          dataCache.set(cacheKey, { data: resultData, timestamp: now });
+          // Only cache if bypassCache is false (trending needs real-time data)
+          if (!bypassCache) {
+            dataCache.set(cacheKey, { data: resultData, timestamp: now });
+          }
           
           setData(resultData);
         } else {
@@ -225,8 +249,10 @@ export const useSong24hData = (tokenAddress: Address | null, _bondingSupplyStr?:
             loading: false
           };
           
-          // Cache the result
-          dataCache.set(cacheKey, { data: resultData, timestamp: now });
+          // Only cache if bypassCache is false (trending needs real-time data)
+          if (!bypassCache) {
+            dataCache.set(cacheKey, { data: resultData, timestamp: now });
+          }
           
           setData(resultData);
         }
@@ -238,7 +264,33 @@ export const useSong24hData = (tokenAddress: Address | null, _bondingSupplyStr?:
     };
     
     calculate24hData();
-  }, [tokenAddress, publicClient]);
+  }, [tokenAddress, publicClient, refreshTrigger, bypassCache]);
 
-  return data;
+  // Set up auto-refetch every 15 seconds (separate effect to avoid re-creating interval)
+  useEffect(() => {
+    if (!tokenAddress) return;
+    
+    const intervalId = setInterval(() => {
+      console.log('🔄 useSong24hData: Auto-refreshing 24h data for', tokenAddress);
+      // Invalidate cache and trigger refresh
+      invalidate24hDataCache(tokenAddress);
+      setRefreshTrigger(prev => prev + 1);
+    }, 15 * 1000); // 15 seconds
+    
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [tokenAddress]); // Only depend on tokenAddress, not refreshTrigger
+
+  // Function to manually trigger a refresh (useful after purchases)
+  const refetch = useCallback(() => {
+    console.log('🔄 useSong24hData: Manual refresh triggered for', tokenAddress);
+    // Invalidate cache for this token
+    if (tokenAddress) {
+      invalidate24hDataCache(tokenAddress);
+    }
+    setRefreshTrigger(prev => prev + 1);
+  }, [tokenAddress]);
+
+  return { ...data, refetch };
 };

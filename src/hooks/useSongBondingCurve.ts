@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt, useReadContract, usePublicClient, useSwitchChain } from 'wagmi';
 import { Address, parseEther, formatEther } from 'viem';
 import { toast } from 'sonner';
@@ -361,6 +361,50 @@ export const useBuySongTokens = () => {
   };
 };
 
+// Hook to automatically index trades after successful transactions
+export const useAutoIndexTrades = () => {
+  const { address } = useAccount();
+  
+  const indexTradeAfterSuccess = useCallback(async (
+    transactionHash: string | undefined,
+    songTokenAddress: Address | undefined,
+    songId?: string
+  ) => {
+    if (!transactionHash || !songTokenAddress) return;
+
+    try {
+      // Wait a bit for transaction to be indexed by blockchain
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      const { data, error } = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/index-song-trade`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+          },
+          body: JSON.stringify({
+            transactionHash,
+            tokenAddress: songTokenAddress.toLowerCase(),
+            songId
+          })
+        }
+      ).then(res => res.json());
+
+      if (error) {
+        console.error('Failed to auto-index trade:', error);
+      } else {
+        console.log('✅ Trade indexed successfully:', data);
+      }
+    } catch (err) {
+      console.error('Error auto-indexing trade:', err);
+    }
+  }, []);
+
+  return { indexTradeAfterSuccess };
+};
+
 // Hook for selling song tokens
 export const useSellSongTokens = () => {
   const { address, chainId } = useAccount();
@@ -477,6 +521,45 @@ export const useApproveToken = () => {
         args: [BONDING_CURVE_ADDRESS, parseEther(amount)],
         chainId: base.id,
       } as any);
+      
+      // Wait for approval transaction to be mined with better error handling
+      // Handle "receipt not found" errors gracefully
+      let receipt = null;
+      const maxAttempts = 60; // 60 seconds total
+      for (let i = 0; i < maxAttempts; i++) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        try {
+          receipt = await publicClient.getTransactionReceipt({ hash: txHash });
+          if (receipt) {
+            console.log('✅ Approval transaction confirmed:', txHash);
+            break;
+          }
+        } catch (receiptError: any) {
+          // If it's a "not found" error, continue waiting - transaction might still be pending
+          if (receiptError?.message?.includes('not found') || 
+              receiptError?.message?.includes('Transaction receipt') ||
+              receiptError?.code === 'NOT_FOUND') {
+            // Continue waiting
+            continue;
+          }
+          // Other errors should be thrown
+          throw receiptError;
+        }
+      }
+      
+      // If we still don't have a receipt after waiting, return the hash anyway
+      // The transaction was submitted successfully and may still be pending
+      if (!receipt) {
+        console.warn('⚠️ Approval transaction receipt not found after waiting, but transaction was submitted:', txHash);
+        toast({
+          title: "Transaction Submitted",
+          description: "Approval transaction submitted. It may still be processing. Please wait a moment before proceeding.",
+          variant: "default",
+        });
+        // Still wait a bit more before proceeding
+        await new Promise(resolve => setTimeout(resolve, 5000));
+      }
+      
       return txHash;
     } catch (err) {
       toast.error('Failed to approve token');
@@ -495,7 +578,7 @@ export const useApproveToken = () => {
 };
 
 // Hook for getting current price
-export const useSongPrice = (songTokenAddress: Address | undefined) => {
+export const useSongPrice = (songTokenAddress: Address | undefined, enableAutoRefresh: boolean = false) => {
   const { data, isLoading, error, refetch } = useReadContract({
     address: BONDING_CURVE_ADDRESS,
     abi: BONDING_CURVE_ABI,
@@ -503,6 +586,9 @@ export const useSongPrice = (songTokenAddress: Address | undefined) => {
     args: songTokenAddress ? [songTokenAddress] : undefined,
     query: {
       enabled: !!songTokenAddress,
+      refetchInterval: enableAutoRefresh ? 3 * 1000 : false, // Auto-refresh every 3 seconds if enabled
+      refetchOnMount: true,
+      refetchOnWindowFocus: true,
     },
   });
 
@@ -594,13 +680,16 @@ export const useSongTokenApproval = (
 };
 
 // Hook for getting bonding curve supply (the actual supply used in calculations)
-export const useBondingCurveSupply = (songTokenAddress: Address | undefined) => {
+export const useBondingCurveSupply = (songTokenAddress: Address | undefined, enableAutoRefresh: boolean = false) => {
   const { data, isLoading, error, refetch } = useReadContract({
     address: songTokenAddress,
     abi: SONG_TOKEN_ABI,
     functionName: 'bondingCurveSupply',
     query: {
       enabled: !!songTokenAddress,
+      refetchInterval: enableAutoRefresh ? 3 * 1000 : false, // Auto-refresh every 3 seconds if enabled
+      refetchOnMount: true,
+      refetchOnWindowFocus: true,
     },
   });
 

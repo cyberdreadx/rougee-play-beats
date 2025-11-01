@@ -28,7 +28,7 @@ const LoginModal = ({ open, onOpenChange }: LoginModalProps) => {
       onOpenChange(false);
       toast({
         title: "✅ Login Successful",
-        description: "Welcome to Rougee Play!",
+        description: "Welcome to Rougee!",
       });
     } catch (error) {
       console.error('Email login failed:', error);

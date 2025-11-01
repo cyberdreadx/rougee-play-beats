@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -7,6 +7,7 @@ import { Address } from 'viem';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { getIPFSGatewayUrl } from '@/lib/ipfs';
+import { useSongTradesFromDB } from '@/hooks/useSongTradesFromDB';
 
 export interface TradeData {
   timestamp: number;
@@ -52,33 +53,20 @@ const SongTradingHistory = ({
   const [loading, setLoading] = useState(true);
   const [timeFilter, setTimeFilter] = useState<'1H' | '24H' | '7D' | '30D' | 'ALL'>('ALL');
   const publicClient = usePublicClient();
+  
+  // Try database first (much faster), fallback to blockchain if no data
+  const { 
+    trades: dbTrades, 
+    loading: dbLoading, 
+    error: dbError,
+    refetch: refetchDB 
+  } = useSongTradesFromDB(tokenAddress, xrgeUsdPrice, timeFilter === 'ALL' ? 8760 : 
+    timeFilter === '1H' ? 1 : 
+    timeFilter === '24H' ? 24 : 
+    timeFilter === '7D' ? 168 : 720); // 30 days
 
-  // Pass trades data to parent whenever it changes
-  useEffect(() => {
-    if (onTradesLoaded) {
-      onTradesLoaded(trades);
-    }
-  }, [trades, onTradesLoaded]);
-
-  // Calculate 24h volume whenever trades change
-  useEffect(() => {
-    if (trades.length > 0 && onVolumeCalculated) {
-      const now = Date.now();
-      const oneDayAgo = now - (24 * 60 * 60 * 1000);
-      
-      const volume24h = trades
-        .filter(trade => trade.timestamp >= oneDayAgo)
-        .reduce((sum, trade) => sum + (trade.xrgeAmount || 0), 0);
-      
-      onVolumeCalculated(volume24h);
-    }
-  }, [trades, onVolumeCalculated]);
-
-  useEffect(() => {
-    fetchTradingHistory();
-  }, [tokenAddress, refreshTrigger]);
-
-  const fetchTradingHistory = async () => {
+  // Define blockchain fetch function before using it in useEffect
+  const fetchTradingHistoryFromBlockchain = useCallback(async () => {
     if (!publicClient || !tokenAddress) return;
     
     setLoading(true);
@@ -230,13 +218,139 @@ const SongTradingHistory = ({
         });
       }
 
-      setChartData(chartPoints);
+      // Chart data will be updated by the useEffect that watches trades
+      // No need to setChartData here since setTrades will trigger the effect
     } catch (error) {
-      console.error('Error fetching trading history:', error);
+      console.error('Error fetching trading history from blockchain:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [publicClient, tokenAddress, xrgeUsdPrice, currentPriceInXRGE]);
+
+  // Use database trades if available, otherwise fallback to blockchain
+  useEffect(() => {
+    if (dbTrades && dbTrades.length > 0) {
+      // Database has trades - use them
+      console.log('✅ Using database trades:', dbTrades.length);
+      setTrades(dbTrades);
+      setLoading(dbLoading);
+    } else if (!dbLoading && dbTrades.length === 0 && !dbError) {
+      // Database is empty but no error - fallback to blockchain
+      console.log('⚠️ No database trades, falling back to blockchain');
+      fetchTradingHistoryFromBlockchain();
+    } else if (dbError) {
+      // Database error - fallback to blockchain
+      console.warn('Database query error, falling back to blockchain:', dbError);
+      fetchTradingHistoryFromBlockchain();
+    } else {
+      // Still loading database
+      setLoading(dbLoading);
+    }
+  }, [dbTrades, dbLoading, dbError, fetchTradingHistoryFromBlockchain]);
+
+  // Pass trades data to parent whenever it changes
+  useEffect(() => {
+    if (onTradesLoaded && trades.length > 0) {
+      onTradesLoaded(trades);
+    }
+  }, [trades, onTradesLoaded]);
+
+  // Calculate 24h volume whenever trades change
+  useEffect(() => {
+    if (trades.length > 0 && onVolumeCalculated) {
+      const now = Date.now();
+      const oneDayAgo = now - (24 * 60 * 60 * 1000);
+      
+      const volume24h = trades
+        .filter(trade => trade.timestamp >= oneDayAgo)
+        .reduce((sum, trade) => sum + (trade.xrgeAmount || 0), 0);
+      
+      onVolumeCalculated(volume24h);
+    }
+  }, [trades, onVolumeCalculated]);
+
+  // Auto-refresh: use database refetch if available, otherwise blockchain
+  useEffect(() => {
+    if (dbTrades.length > 0) {
+      // Database has data - just use its auto-refresh (handled by useSongTradesFromDB)
+      return;
+    }
+    
+    // Fallback: blockchain refresh only if no database data
+    let intervalId: NodeJS.Timeout | null = null;
+    
+    intervalId = setInterval(() => {
+      console.log('🔄 SongTradingHistory: Auto-refreshing from blockchain');
+      fetchTradingHistoryFromBlockchain();
+      // Also try database again in case trades were indexed
+      refetchDB();
+    }, 3 * 1000); // 3 seconds
+    
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [dbTrades.length, fetchTradingHistoryFromBlockchain, refetchDB, refreshTrigger]);
+  
+  // Trigger blockchain fetch when refreshTrigger changes (manual refresh)
+  useEffect(() => {
+    if (refreshTrigger !== undefined && refreshTrigger > 0) {
+      refetchDB(); // Try database first
+      if (dbTrades.length === 0) {
+        fetchTradingHistoryFromBlockchain(); // Fallback if needed
+      }
+    }
+  }, [refreshTrigger, refetchDB, fetchTradingHistoryFromBlockchain, dbTrades.length]);
+  
+  // Update chart data whenever trades change (for both database and blockchain trades)
+  useEffect(() => {
+    if (trades.length === 0) {
+      setChartData([]);
+      return;
+    }
+    
+    // Aggregate to 5-minute intervals
+    const intervalMs = 5 * 60 * 1000;
+    const intervalMap = new Map<number, { prices: number[]; volume: number }>();
+
+    trades.forEach(trade => {
+      const intervalKey = Math.floor(trade.timestamp / intervalMs);
+      const existing = intervalMap.get(intervalKey) || { prices: [], volume: 0 };
+      existing.prices.push(trade.priceUSD);
+      existing.volume += trade.amount;
+      intervalMap.set(intervalKey, existing);
+    });
+
+    const chartPoints = Array.from(intervalMap.entries())
+      .map(([intervalKey, data]) => {
+        const timestamp = intervalKey * intervalMs;
+        const date = new Date(timestamp);
+        const timeStr = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+        
+        return {
+          time: timeStr,
+          price: data.prices[data.prices.length - 1], // Last price in interval
+          volume: data.volume
+        };
+      })
+      .slice(-288);
+
+    // Add current price
+    if (currentPriceInXRGE && currentPriceInXRGE > 0) {
+      const currentPriceUSD = currentPriceInXRGE * xrgeUsdPrice;
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+      
+      chartPoints.push({
+        time: timeStr + ' (Now)',
+        price: currentPriceUSD,
+        volume: 0
+      });
+    }
+
+    setChartData(chartPoints);
+  }, [trades, currentPriceInXRGE, xrgeUsdPrice]);
 
   // Filter chart data based on time range
   const filteredChartData = useMemo(() => {

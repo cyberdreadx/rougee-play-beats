@@ -32,8 +32,10 @@ export const SongPriceSparkline = ({
   const [tradeData, setTradeData] = useState<{ value: number }[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // Fetch actual trade data from blockchain
+  // Fetch actual trade data from blockchain with auto-refresh
   useEffect(() => {
+    let intervalId: NodeJS.Timeout | null = null;
+    
     const fetchTradeHistory = async () => {
       if (!publicClient || !tokenAddress) {
         setLoading(false);
@@ -208,11 +210,24 @@ export const SongPriceSparkline = ({
       }
     };
 
+    // Fetch immediately
     fetchTradeHistory();
+    
+    // Set up auto-refresh every 3 seconds for real-time updates
+    intervalId = setInterval(() => {
+      console.log('🔄 SongPriceSparkline: Auto-refreshing chart data');
+      fetchTradeHistory();
+    }, 3 * 1000); // 3 seconds
+    
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
   }, [tokenAddress, publicClient, prices.xrge, priceInXRGE, timeframeHours, bondingSupply]);
   
-  // Don't render if no meaningful data
-  if (loading) {
+  // Don't render if no meaningful data - wait for data to load first
+  if (loading || !tokenAddress || !priceInXRGE || !bondingSupply) {
     return (
       <div className={`flex items-center justify-center ${className}`} style={{ height }}>
         <div className="text-[8px] text-muted-foreground animate-pulse">...</div>

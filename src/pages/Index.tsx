@@ -88,10 +88,10 @@ const Index = ({ playSong, currentSong, isPlaying, isRadioMode, onToggleRadio }:
         {/* Compact hero header (keeps logo/title tagline visible after login) */}
         <div className="text-center px-4 md:px-6 pt-2 md:pt-3">
           <div className="mb-2 flex justify-center">
-            <img src={logo} alt="ROUGEE PLAY Logo" className="w-8 h-8 md:w-10 md:h-10 rounded-full object-cover border border-primary/20" />
+            <img src={logo} alt="ROUGEE Logo" className="w-8 h-8 md:w-10 md:h-10 rounded-full object-cover border border-primary/20" />
           </div>
           <h1 className="text-lg md:text-xl font-bold mb-1 bg-gradient-to-r from-primary via-purple-500 to-pink-500 bg-clip-text text-transparent">
-            ROUGEE PLAY
+            ROUGEE
           </h1>
           <p className="text-[11px] md:text-sm text-muted-foreground mb-3">
             The decentralized music platform where artists own their content and fans discover amazing beats

@@ -17,19 +17,17 @@ import {
 } from "@/components/ui/table";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTokenPrices } from "@/hooks/useTokenPrices";
-import { useSongPrice, useSongMetadata, useBondingCurveSupply, SONG_TOKEN_ABI } from "@/hooks/useSongBondingCurve";
+import { useSongPrice, useSongMetadata, useBondingCurveSupply } from "@/hooks/useSongBondingCurve";
 import { useSong24hData } from "@/hooks/useSong24hData";
-import { useReadContract, usePublicClient } from "wagmi";
-import { Address, formatEther } from "viem";
+import { usePublicClient } from "wagmi";
+import { Address } from "viem";
 import { AiBadge } from "@/components/AiBadge";
 import { SongPriceSparkline } from "@/components/SongPriceSparkline";
 import { SongTradingChart } from "@/components/SongTradingChart";
-import { useTradeDataCache } from "@/hooks/useTradeDataCache";
-import { useRequestQueue } from "@/hooks/useRequestQueue";
 import { AudioWaveform } from "@/components/AudioWaveform";
 import { useAudioStateForSong } from "@/hooks/useAudioState";
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import SongTradingHistory, { TradeData } from "@/components/SongTradingHistory";
+import { memo } from "react";
 
 interface Artist {
   wallet_address: string;
@@ -58,7 +56,7 @@ interface Song {
 
 
   // Waveform component for trending page
-  const TrendingWaveform = ({ songId, audioCid }: { songId: string; audioCid: string }) => {
+  const TrendingWaveform = memo(({ songId, audioCid }: { songId: string; audioCid: string }) => {
     const audioState = useAudioStateForSong(songId);
     
     return (
@@ -71,15 +69,14 @@ interface Song {
         showProgress={audioState.isCurrentSong && audioState.isPlaying}
         currentTime={audioState.currentTime}
         duration={audioState.duration}
-        onSeek={(time) => {
-          console.log('Seek to:', time);
-        }}
+        onSeek={() => {}}
       />
     );
-  };
+  });
+  TrendingWaveform.displayName = 'TrendingWaveform';
 
   // Component for featured banner with real data
-  const FeaturedSong = ({ song, playSong, currentSong, isPlaying }: { song: Song; playSong?: (song: any) => void; currentSong?: any; isPlaying?: boolean }) => {
+  const FeaturedSong = memo(({ song, playSong, currentSong, isPlaying }: { song: Song; playSong?: (song: any) => void; currentSong?: any; isPlaying?: boolean }) => {
   const navigate = useNavigate();
   const { prices } = useTokenPrices();
   const publicClient = usePublicClient();
@@ -93,12 +90,13 @@ interface Song {
   const isThisSongPlaying = isCurrentSong && isPlaying;
   
   
-  const { price: priceData } = useSongPrice(song.token_address as Address);
+  // Get current price from bonding curve with auto-refresh for real-time trending
+  const { price: priceData } = useSongPrice(song.token_address as Address, true);
   const priceInXRGE = priceData ? parseFloat(priceData) : undefined;
   
-  // Get metadata and supply using proper hooks (EXACTLY like SongTrade)
+  // Get metadata and supply using proper hooks with auto-refresh for real-time trending
   const { metadata: metadataData, isLoading: metadataLoading, error: metadataError } = useSongMetadata(song.token_address as Address);
-  const { supply: bondingSupply, isLoading: supplyLoading, error: supplyError } = useBondingCurveSupply(song.token_address as Address);
+  const { supply: bondingSupply, isLoading: supplyLoading, error: supplyError } = useBondingCurveSupply(song.token_address as Address, true);
   
   
   
@@ -160,7 +158,7 @@ interface Song {
   const marketCap = marketCapUSD;
   
   return (
-    <div className="mb-6 relative overflow-hidden md:rounded-2xl border border-white/20 bg-white/5 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,255,159,0.15)] p-6 hover:bg-white/8 transition-all duration-300">
+      <div className="mb-6 relative overflow-hidden md:rounded-2xl border border-white/20 bg-white/5 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,255,159,0.15)] p-6 hover:bg-white/8 hover:border-white/30 hover:shadow-[0_8px_32px_0_rgba(0,255,159,0.25)] transition-all duration-300">
       {/* Faded background album cover */}
       {song.cover_cid && (
         <div 
@@ -216,19 +214,24 @@ interface Song {
             By {song.artist || 'Unknown'} • {song.ticker && `$${song.ticker}`}
           </p>
           <div className="flex flex-wrap gap-3 mb-4">
-            <div className="bg-black/40 rounded-lg px-3 py-2">
-              <div className="text-xs text-muted-foreground font-mono">PRICE</div>
+            <div className="bg-black/40 rounded-lg px-3 py-2 border border-white/5 hover:border-neon-green/20 transition-colors">
+              <div className="text-xs text-muted-foreground font-mono">PRICE (USD)</div>
               <div className="text-sm font-bold font-mono neon-text">
                 ${currentPrice ? (currentPrice < 0.000001 ? currentPrice.toFixed(10) : currentPrice < 0.01 ? currentPrice.toFixed(8) : currentPrice.toFixed(6)) : '$0.000000'}
               </div>
+              {priceInXRGE && (
+                <div className="text-[10px] text-muted-foreground/70 font-mono mt-0.5">
+                  {priceInXRGE < 0.000001 ? priceInXRGE.toFixed(10) : priceInXRGE.toFixed(8)} XRGE
+                </div>
+              )}
             </div>
-            <div className="bg-black/40 rounded-lg px-3 py-2">
+            <div className="bg-black/40 rounded-lg px-3 py-2 border border-white/5 hover:border-green-400/20 transition-colors">
               <div className="text-xs text-muted-foreground font-mono">MKT CAP</div>
               <div className="text-sm font-bold font-mono text-green-400">
                 ${marketCap < 1 ? marketCap.toFixed(2) : marketCap.toLocaleString(undefined, {maximumFractionDigits: 2})}
               </div>
             </div>
-            <div className="bg-black/40 rounded-lg px-3 py-2">
+            <div className="bg-black/40 rounded-lg px-3 py-2 border border-white/5 hover:border-blue-400/20 transition-colors">
               <div className="text-xs text-muted-foreground font-mono">VOLUME</div>
               <div className="text-sm font-bold font-mono text-blue-400">
                 ${volumeUSD < 1 ? volumeUSD.toFixed(4) : volumeUSD.toLocaleString(undefined, {maximumFractionDigits: 2})}
@@ -237,7 +240,7 @@ interface Song {
                 {volumeXRGE.toLocaleString(undefined, {maximumFractionDigits: 2})} XRGE
               </div>
             </div>
-            <div className="bg-black/40 rounded-lg px-3 py-2">
+            <div className="bg-black/40 rounded-lg px-3 py-2 border border-white/5 hover:border-orange-400/20 transition-colors">
               <div className="text-xs text-muted-foreground font-mono">PLAYS</div>
               <div className="text-sm font-bold font-mono text-orange-400">
                 <Flame className="w-3 h-3 inline mr-1" />
@@ -247,12 +250,15 @@ interface Song {
           </div>
           
           {/* Price Chart - Collapsible */}
-          <div className="bg-black/40 rounded-lg px-4 py-3 border border-neon-green/20" data-tour="featured-chart">
+          <div className="bg-black/40 rounded-lg px-4 py-3 border border-neon-green/20 hover:border-neon-green/40 transition-colors" data-tour="featured-chart">
             <div className="flex items-center justify-between mb-2">
-              <div className="text-xs text-muted-foreground font-mono">PRICE CHART</div>
+              <div className="text-xs text-muted-foreground font-mono flex items-center gap-2">
+                <TrendingUp className="w-3 h-3 text-neon-green" />
+                PRICE CHART
+              </div>
               <button
                 onClick={() => setIsChartExpanded(!isChartExpanded)}
-                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-neon-green transition-colors font-mono"
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-neon-green transition-colors font-mono px-2 py-1 rounded hover:bg-white/5"
               >
                 {isChartExpanded ? 'HIDE' : 'SHOW'}
                 {isChartExpanded ? (
@@ -275,7 +281,6 @@ interface Song {
                     onVolumeCalculated={setVolume24h}
                     showRecentTrades={false}
                     onTradesLoaded={(trades) => {
-                      console.log('🔥 FeaturedSong received trades:', trades.length, trades);
                       setRecentTrades(trades);
                     }}
                   />
@@ -288,9 +293,6 @@ interface Song {
                   bondingSupply={bondingSupply}
                   trades={recentTrades}
                 />
-                
-                {/* Debug info */}
-                {console.log('📊 FeaturedSong passing trades to chart:', recentTrades.length)}
               </>
             )}
           </div>
@@ -313,30 +315,32 @@ interface Song {
       </div>
     </div>
   );
-};
+});
+FeaturedSong.displayName = 'FeaturedSong';
 
 // Component for individual song row with real-time data
-const SongRow = ({ song, index, onStatsUpdate, playSong, currentSong, isPlaying }: { song: Song; index: number; onStatsUpdate?: (songId: string, volume: number, change: number, marketCap: number, price: number) => void; playSong?: (song: any) => void; currentSong?: any; isPlaying?: boolean }) => {
+const SongRow = memo(({ song, index, onStatsUpdate, playSong, currentSong, isPlaying, style }: { song: Song; index: number; onStatsUpdate?: (songId: string, volume: number, change: number, marketCap: number, price: number) => void; playSong?: (song: any) => void; currentSong?: any; isPlaying?: boolean; style?: React.CSSProperties }) => {
   const navigate = useNavigate();
   const { prices } = useTokenPrices();
   
   const isCurrentSong = currentSong?.id === song.id;
   const isThisSongPlaying = isCurrentSong && isPlaying;
   
-  // Get current price from bonding curve (EXACTLY like SongTrade)
-  const { price: priceData } = useSongPrice(song.token_address as Address);
+  // Get current price from bonding curve with auto-refresh for real-time trending
+  const { price: priceData } = useSongPrice(song.token_address as Address, true);
   const priceInXRGE = priceData ? parseFloat(priceData) : undefined;
   
-  // Get metadata and supply using proper hooks (EXACTLY like SongTrade)
+  // Get metadata and supply using proper hooks with auto-refresh for real-time trending
   const { metadata: metadataData, isLoading: metadataLoading } = useSongMetadata(song.token_address as Address);
-  const { supply: bondingSupply, isLoading: supplyLoading } = useBondingCurveSupply(song.token_address as Address);
+  const { supply: bondingSupply, isLoading: supplyLoading } = useBondingCurveSupply(song.token_address as Address, true);
   
   
   // Convert bondingSupply to a stable string value to prevent infinite loops
   const bondingSupplyStr = bondingSupply ? bondingSupply.toString() : null;
   
   // Use shared 24h data hook for consistent data between mobile and desktop
-  const { priceChange24h, volume24h } = useSong24hData(song.token_address as Address, bondingSupplyStr);
+  // bypassCache=true ensures real-time trending data (no caching)
+  const { priceChange24h, volume24h } = useSong24hData(song.token_address as Address, bondingSupplyStr, true);
   
   // EXACTLY match SongTrade page calculations
   const currentPrice = priceInXRGE && prices.xrge ? priceInXRGE * prices.xrge : undefined;
@@ -379,6 +383,7 @@ const SongRow = ({ song, index, onStatsUpdate, playSong, currentSong, isPlaying 
     <TableRow 
       className="cursor-pointer hover:bg-muted/50 transition-colors"
       onClick={() => navigate(`/song/${song.id}`)}
+      style={style}
     >
       <TableCell className="font-mono text-muted-foreground w-12">
         #{index + 1}
@@ -447,17 +452,26 @@ const SongRow = ({ song, index, onStatsUpdate, playSong, currentSong, isPlaying 
         </div>
       </TableCell>
       
+      {/* Chart Column - Only render when we have price data */}
       <TableCell>
-        <div className="text-xs font-mono">
-          <div className="font-bold text-neon-green">
-            ${currentPrice ? (currentPrice < 0.000001 ? currentPrice.toFixed(10) : currentPrice < 0.01 ? currentPrice.toFixed(8) : currentPrice.toFixed(6)) : '0.000000'}
+        {song.token_address && priceInXRGE !== undefined && bondingSupplyStr ? (
+          <div className="w-32 h-10">
+            <SongPriceSparkline 
+              tokenAddress={song.token_address || undefined}
+              bondingSupply={bondingSupplyStr || undefined}
+              priceInXRGE={typeof priceInXRGE === 'number' ? priceInXRGE : undefined}
+              height={40}
+              showPercentChange={false}
+              timeframeHours={24}
+              percentChange={priceChange24h !== null ? priceChange24h : undefined}
+              className="w-full"
+            />
           </div>
-          {priceChange24h !== null && priceChange24h !== 0 && (
-            <div className={`text-[10px] font-bold ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
-              {isPositive ? '+' : ''}{priceChange24h.toFixed(1)}%
-            </div>
-          )}
-        </div>
+        ) : (
+          <div className="w-32 h-10 flex items-center justify-center">
+            <div className="text-[8px] text-muted-foreground animate-pulse">...</div>
+          </div>
+        )}
       </TableCell>
       
       <TableCell>
@@ -474,10 +488,10 @@ const SongRow = ({ song, index, onStatsUpdate, playSong, currentSong, isPlaying 
         {song.token_address ? (
           <div>
             <div className="font-semibold text-sm">
-              ${currentPrice ? (currentPrice < 0.000001 ? currentPrice.toFixed(10) : currentPrice < 0.01 ? currentPrice.toFixed(8) : currentPrice.toFixed(4)) : '$0.0000'}
+              ${currentPrice ? (currentPrice < 0.000001 ? currentPrice.toFixed(10) : currentPrice < 0.01 ? currentPrice.toFixed(8) : currentPrice.toFixed(6)) : '$0.000000'}
             </div>
-            <div className="text-xs text-muted-foreground">
-              {priceInXRGE ? priceInXRGE.toFixed(6) : '0.000000'} XRGE
+            <div className="text-xs text-muted-foreground font-mono">
+              {priceInXRGE ? (priceInXRGE < 0.000001 ? priceInXRGE.toFixed(10) : priceInXRGE.toFixed(8)) : '0.00000000'} XRGE
             </div>
           </div>
         ) : (
@@ -489,7 +503,7 @@ const SongRow = ({ song, index, onStatsUpdate, playSong, currentSong, isPlaying 
         {song.token_address ? (
           <div className="flex items-center justify-end gap-1">
             {isPositive ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
-            <span className="whitespace-nowrap">{isPositive ? '+' : ''}{change24h.toFixed(1)}%</span>
+            <span className="whitespace-nowrap">{isPositive ? '+' : ''}{Math.abs(change24h) < 0.01 ? change24h.toFixed(2) : change24h.toFixed(1)}%</span>
           </div>
         ) : (
           <span className="text-muted-foreground">—</span>
@@ -502,8 +516,8 @@ const SongRow = ({ song, index, onStatsUpdate, playSong, currentSong, isPlaying 
             <div className="font-semibold text-sm">
               ${volumeUSD < 1 ? volumeUSD.toFixed(4) : volumeUSD.toLocaleString(undefined, {maximumFractionDigits: 2})}
             </div>
-            <div className="text-xs text-muted-foreground">
-              {volumeXRGE.toLocaleString(undefined, {maximumFractionDigits: 2})} XRGE
+            <div className="text-xs text-muted-foreground font-mono">
+              {volumeXRGE < 1000 ? volumeXRGE.toFixed(2) : volumeXRGE.toLocaleString(undefined, {maximumFractionDigits: 2})} XRGE
             </div>
           </div>
         ) : (
@@ -623,8 +637,8 @@ const SongRow = ({ song, index, onStatsUpdate, playSong, currentSong, isPlaying 
             )}
           </div>
 
-          {/* Sparkline Chart */}
-          {song.token_address && (
+          {/* Sparkline Chart - Only render when we have price data */}
+          {song.token_address && priceInXRGE !== undefined && bondingSupplyStr && (
             <div className="mt-1 bg-black/30 rounded-lg p-1.5 border border-neon-green/10">
               <SongPriceSparkline 
                 tokenAddress={song.token_address || undefined}
@@ -645,28 +659,31 @@ const SongRow = ({ song, index, onStatsUpdate, playSong, currentSong, isPlaying 
 
   // Return desktop view
   return desktopView;
-};
+});
+SongRow.displayName = 'SongRow';
 
 // Separate mobile card component
-const SongCard = ({ song, index, onStatsUpdate, playSong, currentSong, isPlaying }: { song: Song; index: number; onStatsUpdate?: (songId: string, volume: number, change: number, marketCap: number, price: number) => void; playSong?: (song: any) => void; currentSong?: any; isPlaying?: boolean }) => {
+const SongCard = memo(({ song, index, onStatsUpdate, playSong, currentSong, isPlaying }: { song: Song; index: number; onStatsUpdate?: (songId: string, volume: number, change: number, marketCap: number, price: number) => void; playSong?: (song: any) => void; currentSong?: any; isPlaying?: boolean }) => {
   const navigate = useNavigate();
   const { prices } = useTokenPrices();
   const [recentTrades, setRecentTrades] = useState<TradeData[]>([]);
   const isCurrentSong = currentSong?.id === song.id;
   const isThisSongPlaying = isCurrentSong && isPlaying;
   
-  const { price: priceInXRGENumber } = useSongPrice(song.token_address as Address);
+  // Get current price from bonding curve with auto-refresh for real-time trending
+  const { price: priceInXRGENumber } = useSongPrice(song.token_address as Address, true);
   const priceInXRGE = priceInXRGENumber ? parseFloat(priceInXRGENumber) : undefined;
   
-  // Get metadata and supply using proper hooks (EXACTLY like SongTrade)
+  // Get metadata and supply using proper hooks with auto-refresh for real-time trending
   const { metadata: metadataData, isLoading: metadataLoading } = useSongMetadata(song.token_address as Address);
-  const { supply: bondingSupply, isLoading: supplyLoading } = useBondingCurveSupply(song.token_address as Address);
+  const { supply: bondingSupply, isLoading: supplyLoading } = useBondingCurveSupply(song.token_address as Address, true);
   
   
   const bondingSupplyStr = bondingSupply ? bondingSupply.toString() : null;
   
   // Use shared 24h data hook for consistent data between mobile and desktop
-  const { priceChange24h, volume24h } = useSong24hData(song.token_address as Address, bondingSupplyStr);
+  // bypassCache=true ensures real-time trending data (no caching)
+  const { priceChange24h, volume24h } = useSong24hData(song.token_address as Address, bondingSupplyStr, true);
   
   
   // EXACTLY match SongTrade page calculations
@@ -783,7 +800,8 @@ const SongCard = ({ song, index, onStatsUpdate, playSong, currentSong, isPlaying
       </div>
     </div>
   );
-};
+});
+SongCard.displayName = 'SongCard';
 
 type SortField = 'trending' | 'price' | 'change' | 'volume' | 'marketCap' | 'plays';
 type SortDirection = 'asc' | 'desc';
@@ -801,7 +819,7 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
   const [songStats, setSongStats] = useState<Map<string, { volume: number; change: number; marketCap: number; price: number }>>(new Map());
   const [sortField, setSortField] = useState<SortField>('trending');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
-  const [displayLimit, setDisplayLimit] = useState<number | null>(10); // null = show all
+  const [displayLimit, setDisplayLimit] = useState<number | null>(50); // Start with 50 to load all data, user can change
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const searchQuery = searchParams.get('search');
@@ -953,9 +971,14 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
       return sortDirection === 'desc' ? bValue - aValue : aValue - bValue;
     });
     
-    // Apply display limit if set
-    return displayLimit ? sorted.slice(0, displayLimit) : sorted;
-  }, [songs, sortField, sortDirection, songStats, calculateTrendingScore, displayLimit]);
+    // Apply display limit if set (but always return full sorted list for data loading)
+    return sorted;
+  }, [songs, sortField, sortDirection, songStats, calculateTrendingScore]);
+  
+  // Separate displayed songs (applies displayLimit)
+  const displayedSongs = useMemo(() => {
+    return displayLimit ? sortedSongs.slice(0, displayLimit) : sortedSongs;
+  }, [sortedSongs, displayLimit]);
   
   // Featured song is always the top trending song (by trending score)
   const featuredSong = useMemo(() => {
@@ -969,8 +992,11 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
       <div className="min-h-screen bg-background pb-24 md:pb-20">
         <NetworkInfo />
         <main className="container mx-auto px-4 py-8">
-          <div className="flex items-center justify-center h-64">
-            <Loader2 className="h-8 w-8 animate-spin text-neon-green" />
+          <div className="flex flex-col items-center justify-center h-64 gap-4">
+            <Loader2 className="h-12 w-12 animate-spin text-neon-green" />
+            <p className="text-muted-foreground font-mono text-sm animate-pulse">
+              Loading trending data...
+            </p>
           </div>
         </main>
       </div>
@@ -986,11 +1012,11 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
       <div className="text-center px-4 md:px-6 pt-2 md:pt-3 pb-4">
         <div className="mb-2 flex justify-center items-center gap-3">
           <MusicBars bars={6} className="h-6 md:h-8 flex-shrink-0" />
-          <img src={logo} alt="ROUGEE PLAY Logo" className="w-8 h-8 md:w-10 md:h-10 rounded-full object-cover border border-primary/20" />
+          <img src={logo} alt="ROUGEE Logo" className="w-8 h-8 md:w-10 md:h-10 rounded-full object-cover border border-primary/20" />
           <MusicBars bars={6} className="h-6 md:h-8 flex-shrink-0" />
         </div>
         <h1 className="text-lg md:text-xl font-bold mb-1 bg-gradient-to-r from-primary via-purple-500 to-pink-500 bg-clip-text text-transparent">
-          ROUGEE PLAY
+          ROUGEE
         </h1>
         <p className="text-[11px] md:text-sm text-muted-foreground mb-0">
           The decentralized music platform where artists own their content and fans discover amazing beats
@@ -1184,16 +1210,42 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {sortedSongs.length === 0 ? (
+                  {displayedSongs.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
-                        No deployed songs yet
+                      <TableCell colSpan={9} className="text-center py-16">
+                        <div className="flex flex-col items-center gap-3">
+                          <Music className="w-12 h-12 text-muted-foreground/50" />
+                          <p className="text-muted-foreground font-mono">
+                            {searchQuery ? 'No songs found matching your search' : 'No deployed songs yet'}
+                          </p>
+                          {searchQuery && (
+                            <p className="text-xs text-muted-foreground/70 font-mono">
+                              Try a different search term
+                            </p>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ) : (
-                    sortedSongs.map((song, index) => (
-                      <SongRow key={song.id} song={song} index={index} onStatsUpdate={handleStatsUpdate} playSong={playSong} currentSong={currentSong} isPlaying={isPlaying} />
-                    ))
+                    <>
+                      {/* Render displayed songs */}
+                      {displayedSongs.map((song, index) => (
+                        <SongRow key={song.id} song={song} index={index} onStatsUpdate={handleStatsUpdate} playSong={playSong} currentSong={currentSong} isPlaying={isPlaying} />
+                      ))}
+                      {/* Hidden section to pre-load data for all songs (rendered but not visible) */}
+                      {sortedSongs.length > displayedSongs.length && sortedSongs.slice(displayedSongs.length).map((song, index) => (
+                        <SongRow 
+                          key={`preload-${song.id}`} 
+                          song={song} 
+                          index={displayedSongs.length + index} 
+                          onStatsUpdate={handleStatsUpdate} 
+                          playSong={playSong} 
+                          currentSong={currentSong} 
+                          isPlaying={isPlaying} 
+                          style={{ display: 'none' }}
+                        />
+                      ))}
+                    </>
                   )}
                 </TableBody>
               </Table>
@@ -1201,14 +1253,43 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
             
             {/* Mobile Card View */}
             <div className="md:hidden space-y-2">
-              {sortedSongs.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground">
-                  No deployed songs yet
+              {displayedSongs.length === 0 ? (
+                <div className="text-center py-16">
+                  <div className="flex flex-col items-center gap-3">
+                    <Music className="w-12 h-12 text-muted-foreground/50" />
+                    <p className="text-muted-foreground font-mono">
+                      {searchQuery ? 'No songs found matching your search' : 'No deployed songs yet'}
+                    </p>
+                    {searchQuery && (
+                      <p className="text-xs text-muted-foreground/70 font-mono">
+                        Try a different search term
+                      </p>
+                    )}
+                  </div>
                 </div>
               ) : (
-                sortedSongs.map((song, index) => (
-                  <SongCard key={song.id} song={song} index={index} onStatsUpdate={handleStatsUpdate} playSong={playSong} currentSong={currentSong} isPlaying={isPlaying} />
-                ))
+                <>
+                  {/* Render displayed songs */}
+                  {displayedSongs.map((song, index) => (
+                    <SongCard key={song.id} song={song} index={index} onStatsUpdate={handleStatsUpdate} playSong={playSong} currentSong={currentSong} isPlaying={isPlaying} />
+                  ))}
+                  {/* Hidden section to pre-load data for all songs (but not displayed) */}
+                  {sortedSongs.length > displayedSongs.length && (
+                    <div style={{ display: 'none' }}>
+                      {sortedSongs.slice(displayedSongs.length).map((song, index) => (
+                        <SongCard 
+                          key={`preload-${song.id}`} 
+                          song={song} 
+                          index={displayedSongs.length + index} 
+                          onStatsUpdate={handleStatsUpdate} 
+                          playSong={playSong} 
+                          currentSong={currentSong} 
+                          isPlaying={isPlaying} 
+                        />
+                      ))}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </TabsContent>
@@ -1273,8 +1354,13 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
                 <TableBody>
                   {artists.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center py-12 text-muted-foreground">
-                        No artists yet
+                      <TableCell colSpan={5} className="text-center py-16">
+                        <div className="flex flex-col items-center gap-3">
+                          <Music className="w-12 h-12 text-muted-foreground/50" />
+                          <p className="text-muted-foreground font-mono">
+                            {searchQuery ? 'No artists found matching your search' : 'No artists yet'}
+                          </p>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ) : (

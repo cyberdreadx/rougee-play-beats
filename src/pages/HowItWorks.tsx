@@ -154,8 +154,8 @@ const HowItWorks = () => {
   return (
     <>
       <Helmet>
-        <title>How It Works - ROUGEE PLAY</title>
-        <meta name="description" content="Learn how ROUGEE PLAY works in simple steps. Upload music, trade tokens, and support artists." />
+        <title>How It Works - ROUGEE</title>
+        <meta name="description" content="Learn how ROUGEE works in simple steps. Upload music, trade tokens, and support artists." />
       </Helmet>
       
       <div className="min-h-screen bg-background">
@@ -168,7 +168,7 @@ const HowItWorks = () => {
               Simple Guide for Everyone
             </Badge>
             <h1 className="text-3xl sm:text-5xl lg:text-6xl font-bold mb-4 sm:mb-6 bg-gradient-to-r from-primary via-purple-500 to-pink-500 bg-clip-text text-transparent px-2">
-              How ROUGEE PLAY Works
+              How ROUGEE Works
             </h1>
             <p className="text-lg sm:text-xl lg:text-2xl text-muted-foreground max-w-3xl mx-auto mb-3 px-4">
               Music + Blockchain = Magic ✨
@@ -254,7 +254,7 @@ const HowItWorks = () => {
                 Think of it like this...
               </CardTitle>
               <CardDescription className="text-base sm:text-lg lg:text-xl px-4">
-                <strong className="text-foreground">ROUGEE PLAY</strong> combines the best of three worlds
+                <strong className="text-foreground">ROUGEE</strong> combines the best of three worlds
               </CardDescription>
             </CardHeader>
             <CardContent className="pt-2 sm:pt-4">
@@ -376,7 +376,7 @@ const HowItWorks = () => {
                   Do I need crypto experience?
                 </h3>
                 <p className="text-sm sm:text-base text-muted-foreground leading-relaxed pl-8 sm:pl-9">
-                  Not at all! If you can use Instagram or TikTok, you can use ROUGEE PLAY. We guide you through everything step-by-step. Just connect a wallet (we'll help you create one) and start exploring!
+                  Not at all! If you can use Instagram or TikTok, you can use ROUGEE. We guide you through everything step-by-step. Just connect a wallet (we'll help you create one) and start exploring!
                 </p>
               </div>
 

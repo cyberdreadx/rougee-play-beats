@@ -18,7 +18,7 @@ const NotFound = () => {
         </p>
         <Button variant="neon" asChild>
           <a href="/">
-            [RETURN TO ROUGEE PLAY]
+            [RETURN TO ROUGEE]
           </a>
         </Button>
       </div>

@@ -19,7 +19,20 @@ export const PWAUpdatePrompt = () => {
       // Check for updates every 60 seconds
       const checkInterval = setInterval(() => {
         navigator.serviceWorker.ready.then((reg) => {
-          reg.update();
+          // Only update if we have an active service worker
+          if (reg.active) {
+            reg.update().catch((error) => {
+              // Silently handle expected update errors
+              const isExpectedError = 
+                error?.message?.includes('Failed to fetch') ||
+                error?.message?.includes('404') ||
+                error?.message?.includes('NetworkError');
+              
+              if (!isExpectedError) {
+                console.warn('⚠️ Service Worker update check failed:', error);
+              }
+            });
+          }
         });
       }, 60000); // Check every minute
 

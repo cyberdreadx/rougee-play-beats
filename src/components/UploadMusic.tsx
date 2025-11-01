@@ -1000,7 +1000,7 @@ export default function UploadMusic() {
           <div className="flex items-start gap-3 rounded-md border border-border p-3 bg-muted/30">
             <Checkbox id="confirm-rights" checked={confirmRights} onCheckedChange={(v) => setConfirmRights(Boolean(v))} />
             <label htmlFor="confirm-rights" className="text-xs leading-5 text-foreground">
-              I confirm that I own the rights to this content or have obtained all necessary licenses and permissions to upload it to ROUGEE PLAY, and that the upload does not breach any contract to which I am a party. I agree to the
+              I confirm that I own the rights to this content or have obtained all necessary licenses and permissions to upload it to ROUGEE, and that the upload does not breach any contract to which I am a party. I agree to the
               <button type="button" onClick={() => navigate('/terms-of-service')} className="ml-1 underline text-primary hover:text-primary/80">
                 Terms of Service
               </button>

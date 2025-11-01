@@ -10,13 +10,33 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
       .then((registration) => {
         console.log('✅ Service Worker registered:', registration.scope);
         
-        // Check for updates every 5 minutes
-        setInterval(() => {
-          registration.update().catch(() => {});
-        }, 5 * 60 * 1000);
+        // Helper function to safely check for updates
+        const checkForUpdate = () => {
+          // Only check for updates if we have an active service worker
+          if (registration.active) {
+            registration.update().catch((error) => {
+              // Silently handle common update errors:
+              // - 404 if sw.js doesn't exist yet (first deployment)
+              // - Network errors during update checks
+              // - Fetch errors that are expected
+              const isExpectedError = 
+                error?.message?.includes('Failed to fetch') ||
+                error?.message?.includes('404') ||
+                error?.message?.includes('NetworkError') ||
+                error?.name === 'TypeError';
+              
+              if (!isExpectedError) {
+                console.warn('⚠️ Service Worker update check failed:', error);
+              }
+            });
+          }
+        };
         
-        // Initial update check
-        registration.update().catch(() => {});
+        // Check for updates every 5 minutes
+        setInterval(checkForUpdate, 5 * 60 * 1000);
+        
+        // Initial update check (with delay to ensure SW is ready)
+        setTimeout(checkForUpdate, 1000);
         
         // Handle service worker updates
         registration.addEventListener('updatefound', () => {
@@ -34,7 +54,10 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
         });
       })
       .catch((error) => {
-        console.error('❌ Service Worker registration failed:', error);
+        // Only log if it's not a 404 (file might not exist on first load)
+        if (!error?.message?.includes('404')) {
+          console.error('❌ Service Worker registration failed:', error);
+        }
       });
   });
 }

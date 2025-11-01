@@ -21,11 +21,11 @@ export default function LandingHero() {
       {/* Hero Section */}
       <div className="text-center max-w-4xl mx-auto mb-8">
         <div className="mb-3 flex justify-center">
-          <img src={logo} alt="ROUGEE PLAY Logo" className="w-12 h-12 rounded-full object-cover border border-primary/20" />
+          <img src={logo} alt="ROUGEE Logo" className="w-12 h-12 rounded-full object-cover border border-primary/20" />
         </div>
         
         <h1 className="text-2xl md:text-3xl font-bold mb-3 bg-gradient-to-r from-primary via-purple-500 to-pink-500 bg-clip-text text-transparent">
-          ROUGEE PLAY
+          ROUGEE
         </h1>
         
         <p className="text-xs md:text-sm text-muted-foreground mb-6 max-w-2xl mx-auto px-4">

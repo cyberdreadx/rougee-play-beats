@@ -38,7 +38,7 @@
   100% { transform: translateX(-100%); }
 }
 
-/* ROUGEE PLAY - Blockchain Music DApp Design System */
+/* ROUGEE - Blockchain Music DApp Design System */
 
 @layer base {
   /* Prevent mobile zoom on input focus - Ensure minimum 16px font size on mobile */
@@ -100,7 +100,7 @@
     /* Tech radius */
     --radius: 0.25rem;
 
-    /* Custom ROUGEE PLAY tokens */
+    /* Custom ROUGEE tokens */
     --neon-green: 120 100% 50%;
     --neon-green-dim: 120 100% 30%;
     --tech-border: 120 20% 20%;

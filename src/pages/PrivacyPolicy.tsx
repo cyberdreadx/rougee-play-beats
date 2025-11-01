@@ -9,8 +9,8 @@ const PrivacyPolicy = () => {
   return (
     <>
       <Helmet>
-        <title>Privacy Policy - ROUGEE PLAY</title>
-        <meta name="description" content="Privacy Policy for ROUGEE PLAY - how we collect, use, and protect your data." />
+        <title>Privacy Policy - ROUGEE</title>
+        <meta name="description" content="Privacy Policy for ROUGEE - how we collect, use, and protect your data." />
       </Helmet>
 
       <div className="min-h-screen bg-background">
@@ -38,7 +38,7 @@ const PrivacyPolicy = () => {
             </CardHeader>
             <CardContent className="space-y-3 text-sm sm:text-base leading-relaxed">
               <p>
-                ROUGEE PLAY is a decentralized platform. Some information (like wallet addresses and on-chain transactions) is public by design and stored on blockchains we do not control.
+                ROUGEE is a decentralized platform. Some information (like wallet addresses and on-chain transactions) is public by design and stored on blockchains we do not control.
               </p>
               <p>
                 This policy applies to off-chain data we process directly (e.g., website analytics, account metadata) and how we interface with third parties.

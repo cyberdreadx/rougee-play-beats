@@ -39,6 +39,22 @@ interface IndexProps {
   onToggleRadio?: () => void;
 }
 
+interface FeedPost {
+  id: string;
+  content_text: string | null;
+  media_cid: string | null;
+  wallet_address: string;
+  created_at: string;
+  like_count: number;
+  songs?: {
+    id: string;
+    title: string;
+    artist: string | null;
+    cover_cid: string | null;
+    audio_cid: string | null;
+  } | null;
+}
+
 // Skeleton components for Index page
 const FeaturedCardSkeleton = memo(() => (
   <Card className="mb-6 overflow-hidden border-neon-green/20 bg-gradient-to-br from-white/5 via-white/3 to-transparent backdrop-blur-xl rounded-2xl">
@@ -75,6 +91,19 @@ const SongGridCardSkeleton = memo(() => (
 ));
 SongGridCardSkeleton.displayName = 'SongGridCardSkeleton';
 
+const PostGridCardSkeleton = memo(() => (
+  <Card className="border-neon-green/10 bg-gradient-to-br from-white/5 to-transparent backdrop-blur-xl overflow-hidden">
+    <div className="relative aspect-square">
+      <div className="w-full h-full bg-white/10 animate-pulse" />
+    </div>
+    <div className="p-3">
+      <div className="h-4 bg-white/10 rounded w-3/4 mb-2 animate-pulse" />
+      <div className="h-3 bg-white/10 rounded w-1/2 animate-pulse" />
+    </div>
+  </Card>
+));
+PostGridCardSkeleton.displayName = 'PostGridCardSkeleton';
+
 const Index = ({ playSong, currentSong, isPlaying, isRadioMode, onToggleRadio }: IndexProps) => {
   const [activeTab, setActiveTab] = React.useState("artists");
   const topSongsRef = useRef<TopSongsRef>(null);
@@ -84,7 +113,9 @@ const Index = ({ playSong, currentSong, isPlaying, isRadioMode, onToggleRadio }:
   const [featuredSong, setFeaturedSong] = useState<Song | null>(null);
   const [trendingSongs, setTrendingSongs] = useState<Song[]>([]);
   const [newReleases, setNewReleases] = useState<Song[]>([]);
+  const [trendingPosts, setTrendingPosts] = useState<FeedPost[]>([]);
   const [loadingFeatured, setLoadingFeatured] = useState(true);
+  const [loadingTrendingPosts, setLoadingTrendingPosts] = useState(true);
 
   const handlePlayCountUpdate = () => {
     topSongsRef.current?.refreshSongs();
@@ -145,6 +176,16 @@ const Index = ({ playSong, currentSong, isPlaying, isRadioMode, onToggleRadio }:
         if (newSongs) {
           setNewReleases(newSongs);
         }
+
+        // Get trending posts (top by like_count)
+        setLoadingTrendingPosts(true);
+        const { data: topPosts } = await supabase
+          .from('feed_posts')
+          .select(`id, content_text, media_cid, wallet_address, created_at, like_count, songs ( id, title, artist, cover_cid, audio_cid )`)
+          .order('like_count', { ascending: false })
+          .limit(6);
+        setTrendingPosts((topPosts || []) as unknown as FeedPost[]);
+        setLoadingTrendingPosts(false);
       } catch (error) {
         console.error('Error fetching featured content:', error);
       } finally {
@@ -507,6 +548,89 @@ const Index = ({ playSong, currentSong, isPlaying, isRadioMode, onToggleRadio }:
             </div>
           </div>
         ) : null}
+
+        {/* Trending Posts */}
+        <div className="px-4 md:px-6 mb-8">
+          <div className="flex items-center gap-2 mb-4">
+            <Sparkles className="w-5 h-5 text-neon-green" />
+            <h2 className="text-lg md:text-xl font-bold font-mono">Trending Posts</h2>
+          </div>
+          {loadingTrendingPosts ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4">
+              {[...Array(6)].map((_, i) => (
+                <PostGridCardSkeleton key={`skeleton-post-${i}`} />
+              ))}
+            </div>
+          ) : trendingPosts.length > 0 ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4">
+              {trendingPosts.map((post) => (
+                <Card 
+                  key={post.id}
+                  className="group cursor-pointer border-neon-green/10 hover:border-neon-green/30 bg-gradient-to-br from-white/5 to-transparent backdrop-blur-xl overflow-hidden transition-all duration-300 hover:scale-[1.02]"
+                  onClick={() => navigate(`/post/${post.id}`)}
+                >
+                  <div className="relative aspect-square">
+                    {post.media_cid ? (
+                      <img
+                        src={getIPFSGatewayUrl(post.media_cid)}
+                        alt="Post media"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-neon-green/20 to-purple-500/20 flex items-center justify-center p-3 text-sm text-white/80 text-center">
+                        {post.content_text?.slice(0, 90) || 'Post'}
+                      </div>
+                    )}
+                    {post.songs && (
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-colors duration-300 flex items-center justify-center">
+                        <Button
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            playSong({
+                              id: post.songs!.id,
+                              title: post.songs!.title,
+                              artist: post.songs!.artist || null,
+                              audio_cid: post.songs!.audio_cid || '',
+                              cover_cid: post.songs!.cover_cid || null,
+                              wallet_address: post.wallet_address,
+                              play_count: 0,
+                              created_at: post.created_at,
+                            } as any);
+                          }}
+                          className="opacity-0 group-hover:opacity-100 bg-neon-green hover:bg-neon-green/90 text-black rounded-full w-12 h-12 transition-opacity duration-300 shadow-lg"
+                        >
+                          {currentSong?.id === post.songs.id && isPlaying ? (
+                            <Pause className="w-5 h-5 fill-black" />
+                          ) : (
+                            <Play className="w-5 h-5 fill-black ml-0.5" />
+                          )}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                  {post.songs && (
+                    <div className="p-3 border-t border-white/10">
+                      <div className="flex items-center gap-2">
+                        {post.songs.cover_cid ? (
+                          <img src={getIPFSGatewayUrl(post.songs.cover_cid)} alt={post.songs.title} className="w-8 h-8 rounded object-cover" />
+                        ) : (
+                          <div className="w-8 h-8 rounded bg-white/10" />
+                        )}
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold truncate">{post.songs.title}</p>
+                          <p className="text-xs text-muted-foreground truncate">{post.songs.artist || 'Unknown'}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">No trending posts yet.</div>
+          )}
+        </div>
         
         {/* Tabs for different discovery sections */}
         <div ref={tabsContentRef} id="tabs-section" className="scroll-mt-20">

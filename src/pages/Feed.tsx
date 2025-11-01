@@ -681,7 +681,7 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
     }
   };
   const handleSharePost = async (post: FeedPost) => {
-    const url = `https://rougee.app/feed#post-${post.id}`;
+    const url = `https://rougee.app/post/${post.id}`;
     const text = post.content_text ? post.content_text.slice(0, 140) : 'Check out this post on ROUGEE';
     try {
       if (navigator.share) {

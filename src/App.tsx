@@ -36,6 +36,7 @@ import Messages from "./pages/Messages";
 import Genre from "./pages/Genre";
 import SongEdit from "./pages/SongEdit";
 import NotFound from "./pages/NotFound";
+import Post from "./pages/Post";
 import { LockCodeScreen } from "@/components/LockCodeScreen";
 import { useLockCode } from "@/hooks/useLockCode";
 import { useWallet } from "@/hooks/useWallet";
@@ -208,6 +209,7 @@ const AppContent = () => {
           <Route path="/privacy-policy" element={<PrivacyPolicy />} />
           <Route path="/cookie-policy" element={<CookiePolicy />} />
           <Route path="/feed" element={<Feed playSong={handlePlaySong} currentSong={activeSong} isPlaying={activeIsPlaying} />} />
+          <Route path="/post/:postId" element={<Post playSong={handlePlaySong} currentSong={activeSong} isPlaying={activeIsPlaying} />} />
           <Route path="/artist/:walletAddress" element={<Artist playSong={handlePlaySong} currentSong={activeSong} isPlaying={activeIsPlaying} />} />
           <Route path="/profile/edit" element={<ProfileEdit />} />
           <Route path="/song/:songId" element={<SongTrade playSong={handlePlaySong} currentSong={activeSong} isPlaying={activeIsPlaying} />} />

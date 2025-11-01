@@ -577,6 +577,12 @@ const Artist = ({ playSong, currentSong, isPlaying }: ArtistProps) => {
     }
   };
 
+  const formatDuration = (song: Song) => {
+    // Duration is typically stored in metadata or calculated from audio
+    // For now, return a placeholder - can be enhanced later with audio metadata
+    return "N/A";
+  };
+
   const formatTimeAgo = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -619,562 +625,380 @@ const Artist = ({ playSong, currentSong, isPlaying }: ArtistProps) => {
     <div className="min-h-screen bg-background pb-16 md:pb-0">
       <NetworkInfo />
 
-      {/* Cover Photo Hero */}
-      <div 
-        className="relative h-64 w-full"
-        style={coverUrl ? {
-          backgroundImage: `url(${coverUrl})`,
-          backgroundSize: 'cover',
-          backgroundPosition: `center ${coverPosition}%`
-        } : undefined}
-      >
-        {!coverUrl && (
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/30 via-background to-background" />
-        )}
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
-        
-        {/* Avatar Overlapping Cover */}
-        <div className="absolute bottom-0 left-8 transform translate-y-1/2">
-          <Avatar className="h-32 w-32 border-4 border-background shadow-2xl">
-            <AvatarImage src={avatarUrl || undefined} alt={profile.artist_name || profile.display_name || 'Profile avatar'} className="object-cover" />
-            <AvatarFallback className="bg-primary/20 text-neon-green font-mono text-4xl">
-              {(profile.artist_name || profile.display_name || profile.wallet_address || '??').substring(0, 2).toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
+      {/* Modern Profile Header */}
+      <div className="max-w-7xl mx-auto px-6 md:px-12 py-8">
+        <div className="relative">
+          {/* Background with subtle gradient */}
+          <div 
+            className="absolute inset-0 rounded-3xl overflow-hidden opacity-20"
+            style={coverUrl ? {
+              backgroundImage: `url(${coverUrl})`,
+              backgroundSize: 'cover',
+              backgroundPosition: `center ${coverPosition}%`,
+              filter: 'blur(40px)'
+            } : {
+              background: 'linear-gradient(135deg, rgba(0,255,159,0.1) 0%, rgba(147,51,234,0.1) 100%)'
+            }}
+          />
+          
+          {/* Main Content Card */}
+          <Card className="relative bg-gradient-to-br from-white/5 via-white/5 to-white/0 backdrop-blur-2xl border border-white/10 rounded-3xl p-6 md:p-8 shadow-2xl">
+            <div className="flex flex-col md:flex-row gap-6 md:gap-8">
+              {/* Avatar Section */}
+              <div className="flex-shrink-0">
+                <div className="relative">
+                  <Avatar className="h-32 w-32 md:h-40 md:w-40 ring-4 ring-neon-green/20 ring-offset-4 ring-offset-background/50 shadow-2xl rounded-2xl overflow-hidden">
+                    <AvatarImage src={avatarUrl || undefined} alt={profile.artist_name || profile.display_name || 'Profile avatar'} className="object-cover" />
+                    <AvatarFallback className="bg-gradient-to-br from-neon-green/20 to-purple-500/20 text-neon-green font-mono text-4xl md:text-5xl">
+                      {(profile.artist_name || profile.display_name || profile.wallet_address || '??').substring(0, 2).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  {profile.verified && (
+                    <div className="absolute -bottom-2 -right-2 bg-background rounded-full p-1 shadow-lg">
+                      <CircleCheckBig 
+                        className="h-6 w-6 text-blue-400" 
+                        aria-label="Verified artist"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Info Section */}
+              <div className="flex-1 flex flex-col justify-between min-w-0">
+                <div>
+                  <div className="flex items-center gap-3 mb-2 flex-wrap">
+                    <h1 className="text-3xl md:text-5xl font-bold bg-gradient-to-r from-white via-white to-white/80 bg-clip-text text-transparent">
+                      {profile.artist_name || profile.display_name}
+                    </h1>
+                    <XRGETierBadge walletAddress={walletAddress || null} size="md" />
+                  </div>
+                  {profile.display_name && profile.display_name !== profile.artist_name && (
+                    <p className="text-base md:text-lg text-white/70 mb-2 font-medium">
+                      aka {profile.display_name}
+                    </p>
+                  )}
+                  {profile.artist_ticker && (
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-2xl font-mono text-neon-green font-bold">
+                        ${profile.artist_ticker}
+                      </span>
+                    </div>
+                  )}
+                  
+                  {/* Quick Stats Row */}
+                  <div className="flex items-center gap-6 flex-wrap mt-4">
+                    <button
+                      onClick={() => setShowHoldersModal(true)}
+                      className="flex items-center gap-2 text-sm text-white/70 hover:text-neon-green transition-colors cursor-pointer"
+                    >
+                      <Users className="h-4 w-4" />
+                      <span className="font-semibold">{loadingStats ? '...' : holdersCount.toLocaleString()}</span>
+                      <span className="text-white/50">followers</span>
+                    </button>
+                    <button
+                      onClick={() => setShowHoldingsModal(true)}
+                      className="flex items-center gap-2 text-sm text-white/70 hover:text-neon-green transition-colors cursor-pointer"
+                    >
+                      <Wallet className="h-4 w-4" />
+                      <span className="font-semibold">{loadingStats ? '...' : holdingsCount.toLocaleString()}</span>
+                      <span className="text-white/50">holding</span>
+                    </button>
+                    <div className="flex items-center gap-2 text-sm text-white/70">
+                      <Music className="h-4 w-4" />
+                      <span className="font-semibold">{totalSongsCount.toLocaleString()}</span>
+                      <span className="text-white/50">tracks</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-white/70">
+                      <Play className="h-4 w-4" />
+                      <span className="font-semibold">{(profile.total_plays || 0).toLocaleString()}</span>
+                      <span className="text-white/50">plays</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-3 mt-6 flex-wrap">
+                  {isOwnProfile ? (
+                    <>
+                      <Button 
+                        variant="default" 
+                        onClick={() => navigate("/upload")}
+                        className="bg-neon-green hover:bg-neon-green/80 text-black font-semibold"
+                      >
+                        <Upload className="h-4 w-4 mr-2" />
+                        UPLOAD
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        onClick={() => navigate("/profile/edit")}
+                        className="border-white/20 hover:border-neon-green/50"
+                      >
+                        <Edit className="h-4 w-4 mr-2" />
+                        EDIT PROFILE
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      {fullAddress && (
+                        <Button 
+                          variant="outline" 
+                          onClick={() => navigate(`/messages?to=${walletAddress}`)}
+                          className="border-white/20 hover:border-neon-green/50"
+                        >
+                          <MessageSquare className="h-4 w-4 mr-2" />
+                          MESSAGE
+                        </Button>
+                      )}
+                      <TipButton
+                        artistId={walletAddress || ''}
+                        artistWalletAddress={walletAddress || ''}
+                        artistName={profile.artist_name || 'this artist'}
+                        variant="default"
+                        size="default"
+                      />
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Bio Section */}
+            {profile.bio && (
+              <div className="mt-6 pt-6 border-t border-white/10">
+                <p className="text-sm md:text-base text-white/80 leading-relaxed whitespace-pre-wrap">
+                  {profile.bio}
+                </p>
+              </div>
+            )}
+
+            {/* Social Links */}
+            {profile.social_links && (profile.social_links.website || profile.social_links.twitter || profile.social_links.instagram || profile.social_links.soundcloud) && (
+              <div className="mt-6 pt-6 border-t border-white/10">
+                <div className="flex gap-4 flex-wrap">
+                  {profile.social_links.website && (
+                    <a
+                      href={profile.social_links.website}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 text-sm text-white/70 hover:text-neon-green transition-colors"
+                    >
+                      <Globe className="h-4 w-4" />
+                      Website
+                    </a>
+                  )}
+                  {profile.social_links.twitter && (
+                    <a
+                      href={profile.social_links.twitter}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 text-sm text-white/70 hover:text-neon-green transition-colors"
+                    >
+                      <FaXTwitter className="h-4 w-4" />
+                      Twitter
+                    </a>
+                  )}
+                  {profile.social_links.instagram && (
+                    <a
+                      href={profile.social_links.instagram}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 text-sm text-white/70 hover:text-neon-green transition-colors"
+                    >
+                      <Instagram className="h-4 w-4" />
+                      Instagram
+                    </a>
+                  )}
+                  {profile.social_links.soundcloud && (
+                    <a
+                      href={profile.social_links.soundcloud}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 text-sm text-white/70 hover:text-neon-green transition-colors"
+                    >
+                      <Music className="h-4 w-4" />
+                      SoundCloud
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
+          </Card>
         </div>
       </div>
 
-      {/* Profile Info */}
-      <div className="max-w-6xl mx-auto px-6 py-8 pt-20">
-        <StoriesBar />
-        
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <h1 className="text-4xl font-mono font-bold neon-text">
-                {profile.artist_name}
-              </h1>
-              {profile.verified && (
-                <CircleCheckBig 
-                  className="h-5 w-5 text-blue-500" 
-                  aria-label="Verified artist"
-                />
-              )}
-              <XRGETierBadge walletAddress={walletAddress || null} size="md" />
-            </div>
-            {profile.artist_ticker && (
-              <p className="text-2xl font-mono text-neon-green mb-2">
-                ${profile.artist_ticker}
-              </p>
-            )}
-            <button 
-              className="text-sm font-mono text-muted-foreground hover:text-neon-green transition-colors flex items-center gap-2 group"
-              onClick={() => {
-                if (walletAddress) {
-                  navigator.clipboard.writeText(walletAddress);
-                  toast({ title: "Wallet address copied!", description: walletAddress });
-                }
-              }}
-            >
-              {walletAddress?.slice(0, 6)}...{walletAddress?.slice(-4)}
-              <svg className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-              </svg>
-            </button>
+      {/* Content Navigation Tabs & Main Content */}
+      <div className="max-w-7xl mx-auto px-6 md:px-12 mt-6">
+        <Tabs defaultValue="all" className="w-full">
+          {/* Modern Navigation Tabs */}
+          <div className="mb-8">
+            <TabsList className="h-auto p-1.5 bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl inline-flex">
+              <TabsTrigger 
+                value="all" 
+                className="px-5 py-2.5 font-medium text-sm data-[state=active]:bg-neon-green data-[state=active]:text-black data-[state=active]:shadow-lg data-[state=inactive]:text-white/70 data-[state=inactive]:hover:text-white rounded-xl transition-all"
+              >
+                ALL
+              </TabsTrigger>
+              <TabsTrigger 
+                value="popular" 
+                className="px-5 py-2.5 font-medium text-sm data-[state=active]:bg-neon-green data-[state=active]:text-black data-[state=active]:shadow-lg data-[state=inactive]:text-white/70 data-[state=inactive]:hover:text-white rounded-xl transition-all"
+              >
+                POPULAR
+              </TabsTrigger>
+              <TabsTrigger 
+                value="tracks" 
+                className="px-5 py-2.5 font-medium text-sm data-[state=active]:bg-neon-green data-[state=active]:text-black data-[state=active]:shadow-lg data-[state=inactive]:text-white/70 data-[state=inactive]:hover:text-white rounded-xl transition-all"
+              >
+                TRACKS
+              </TabsTrigger>
+              <TabsTrigger 
+                value="albums" 
+                className="px-5 py-2.5 font-medium text-sm data-[state=active]:bg-neon-green data-[state=active]:text-black data-[state=active]:shadow-lg data-[state=inactive]:text-white/70 data-[state=inactive]:hover:text-white rounded-xl transition-all"
+              >
+                ALBUMS
+              </TabsTrigger>
+              <TabsTrigger 
+                value="playlists" 
+                className="px-5 py-2.5 font-medium text-sm data-[state=active]:bg-neon-green data-[state=active]:text-black data-[state=active]:shadow-lg data-[state=inactive]:text-white/70 data-[state=inactive]:hover:text-white rounded-xl transition-all"
+              >
+                PLAYLISTS
+              </TabsTrigger>
+              <TabsTrigger 
+                value="reposts" 
+                className="px-5 py-2.5 font-medium text-sm data-[state=active]:bg-neon-green data-[state=active]:text-black data-[state=active]:shadow-lg data-[state=inactive]:text-white/70 data-[state=inactive]:hover:text-white rounded-xl transition-all"
+              >
+                REPOSTS
+              </TabsTrigger>
+            </TabsList>
           </div>
 
-          {isOwnProfile ? (
-            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-              <Button variant="neon" onClick={() => {
-                console.log('Upload button clicked');
-                navigate("/upload");
-              }}>
-                <Upload className="h-4 w-4 mr-2" />
-                UPLOAD MUSIC
-              </Button>
-              <Button variant="outline" onClick={() => {
-                console.log('Edit profile button clicked');
-                navigate("/profile/edit");
-              }}>
-                <Edit className="h-4 w-4 mr-2" />
-                EDIT PROFILE
-              </Button>
-            </div>
-          ) : (
-            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-              {fullAddress && (
-                <Button 
-                  variant="outline" 
-                  className="font-mono"
-                  onClick={() => navigate(`/messages?to=${walletAddress}`)}
-                >
-                  <MessageSquare className="mr-2 h-4 w-4" />
-                  MESSAGE
-                </Button>
-              )}
-              <TipButton
-                artistId={walletAddress || ''}
-                artistWalletAddress={walletAddress || ''}
-                artistName={profile.artist_name || 'this artist'}
-                variant="neon"
-                size="default"
-              />
-            </div>
-          )}
-        </div>
-
-        {/* Stats Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-8">
-          <Card className="console-bg tech-border p-4 text-center">
-            <Music className="h-6 w-6 mx-auto mb-2 text-neon-green" />
-            <p className="text-2xl font-mono font-bold">{totalSongsCount}</p>
-            <p className="text-xs font-mono text-muted-foreground">SONGS</p>
-          </Card>
-          <Card className="console-bg tech-border p-4 text-center">
-            <Play className="h-6 w-6 mx-auto mb-2 text-neon-green" />
-            <p className="text-2xl font-mono font-bold">
-              {profile.total_plays || 0}
-            </p>
-            <p className="text-xs font-mono text-muted-foreground">PLAYS</p>
-          </Card>
-          <Card 
-            className="console-bg tech-border p-4 text-center cursor-pointer hover:border-neon-green transition-colors"
-            onClick={() => setShowHoldersModal(true)}
-          >
-            <Users className="h-6 w-6 mx-auto mb-2 text-neon-green" />
-            <p className="text-2xl font-mono font-bold">
-              {loadingStats ? <Loader2 className="h-4 w-4 animate-spin mx-auto" /> : holdersCount}
-            </p>
-            <p className="text-xs font-mono text-muted-foreground">HOLDERS</p>
-          </Card>
-          <Card 
-            className="console-bg tech-border p-4 text-center cursor-pointer hover:border-neon-green transition-colors"
-            onClick={() => setShowHoldingsModal(true)}
-          >
-            <Wallet className="h-6 w-6 mx-auto mb-2 text-neon-green" />
-            <p className="text-2xl font-mono font-bold">
-              {loadingStats ? <Loader2 className="h-4 w-4 animate-spin mx-auto" /> : holdingsCount}
-            </p>
-            <p className="text-xs font-mono text-muted-foreground">HOLDINGS</p>
-          </Card>
-          <Card className="console-bg tech-border p-4 text-center">
-            <Calendar className="h-6 w-6 mx-auto mb-2 text-neon-green" />
-            <p className="text-xs font-mono font-bold">
-              {new Date(profile.created_at).toLocaleDateString()}
-            </p>
-            <p className="text-xs font-mono text-muted-foreground">MEMBER SINCE</p>
-          </Card>
-          {profile.profile_metadata_cid && (
-            <Card className="console-bg tech-border p-4 text-center">
-              <a
-                href={getIPFSGatewayUrl(profile.profile_metadata_cid)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block hover:text-neon-green transition-colors"
-              >
-                <ExternalLink className="h-6 w-6 mx-auto mb-2" />
-                <p className="text-xs font-mono font-bold">VIEW ON</p>
-                <p className="text-xs font-mono text-muted-foreground">IPFS</p>
-              </a>
-            </Card>
-          )}
-        </div>
-
-        {/* Bio & Social Links */}
-        {(profile.bio || profile.social_links) && (
-          <Card className="console-bg tech-border p-6 mb-8">
-            {profile.bio && (
-              <p className="font-mono text-sm mb-4 whitespace-pre-wrap">
-                {profile.bio}
-              </p>
-            )}
-            {profile.social_links && (
-              <div className="flex gap-4">
-                {profile.social_links.twitter && (
-                  <a
-                    href={profile.social_links.twitter}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-muted-foreground hover:text-neon-green transition-colors"
-                    aria-label="Twitter/X"
-                  >
-                    <FaXTwitter className="h-5 w-5" />
-                  </a>
-                )}
-                {profile.social_links.instagram && (
-                  <a
-                    href={profile.social_links.instagram}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-muted-foreground hover:text-neon-green transition-colors"
-                    aria-label="Instagram"
-                  >
-                    <Instagram className="h-5 w-5" />
-                  </a>
-                )}
-                {profile.social_links.website && (
-                  <a
-                    href={profile.social_links.website}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-muted-foreground hover:text-neon-green transition-colors"
-                    aria-label="Website"
-                  >
-                    <Globe className="h-5 w-5" />
-                  </a>
-                )}
-                {profile.social_links.soundcloud && (
-                  <a
-                    href={profile.social_links.soundcloud}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-muted-foreground hover:text-neon-green transition-colors"
-                    aria-label="SoundCloud"
-                  >
-                    <Music className="h-5 w-5" />
-                  </a>
-                )}
-              </div>
-            )}
-          </Card>
-        )}
-
-        {/* Tabs for Music and Posts */}
-        <Tabs defaultValue="music" className="w-full">
-          <TabsList className="w-full justify-start mb-6 bg-black/20 backdrop-blur-xl border border-white/10 rounded-2xl p-1 shadow-2xl">
-            <TabsTrigger 
-              value="music" 
-              className="font-mono data-[state=active]:bg-white/10 data-[state=active]:text-neon-green data-[state=active]:shadow-lg data-[state=active]:shadow-neon-green/20 data-[state=active]:border data-[state=active]:border-neon-green/30 data-[state=inactive]:text-white/60 data-[state=inactive]:hover:text-white/80 data-[state=inactive]:hover:bg-white/5 transition-all duration-300 rounded-xl px-6 py-3 backdrop-blur-sm"
-            >
-              <Music className="h-4 w-4 mr-2" />
-              MUSIC
-            </TabsTrigger>
-            <TabsTrigger 
-              value="posts" 
-              className="font-mono data-[state=active]:bg-white/10 data-[state=active]:text-neon-green data-[state=active]:shadow-lg data-[state=active]:shadow-neon-green/20 data-[state=active]:border data-[state=active]:border-neon-green/30 data-[state=inactive]:text-white/60 data-[state=inactive]:hover:text-white/80 data-[state=inactive]:hover:bg-white/5 transition-all duration-300 rounded-xl px-6 py-3 backdrop-blur-sm"
-            >
-              <MessageSquare className="h-4 w-4 mr-2" />
-              POSTS
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="music">
-            {loadingSongs ? (
-              <div className="flex justify-center py-8">
-                <Loader2 className="h-8 w-8 animate-spin text-neon-green" />
-              </div>
-            ) : songs.length === 0 ? (
-              <Card className="console-bg tech-border p-6 text-center">
-                <p className="font-mono text-muted-foreground">No songs uploaded yet</p>
-              </Card>
-            ) : (
-              <div className="space-y-4">
-                {songs.map((song) => {
-                  const coverUrl = song.cover_cid ? getIPFSGatewayUrl(song.cover_cid) : null;
-                  const isThisSongPlaying = currentSong?.id === song.id && isPlaying;
-                  
-                  return (
-                    <ArtistSongCard 
-                      key={song.id}
-                      song={song}
-                      coverUrl={coverUrl}
-                      isThisSongPlaying={isThisSongPlaying}
-                      navigate={navigate}
-                      playSong={playSong}
-                      toggleSongComments={toggleSongComments}
-                      expandedSongComments={expandedSongComments}
-                    />
-                  );
-                })}
-                
-                {/* Load More Button */}
-                {hasMoreSongs && !loadingSongs && (
-                  <div className="flex justify-center pt-6">
-                    <Button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        fetchArtistSongs(true);
-                      }}
-                      variant="outline"
-                      className="font-mono"
-                      type="button"
-                    >
-                      Load More Songs
-                    </Button>
-                  </div>
-                )}
-                
-                {loadingSongs && songs.length > 0 && (
-                  <div className="flex justify-center py-4">
-                    <Loader2 className="h-6 w-6 animate-spin text-neon-green" />
-                  </div>
-                )}
-              </div>
-            )}
-          </TabsContent>
-
-          <TabsContent value="posts">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-mono text-lg">Posts ({posts.length})</h3>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => setRefreshKey(prev => prev + 1)}
-                disabled={loadingPosts}
-              >
-                {loadingPosts ? 'Loading...' : 'Refresh'}
-              </Button>
-            </div>
-            
-            {loadingPosts ? (
-              <div className="flex justify-center py-8">
-                <Loader2 className="h-8 w-8 animate-spin text-neon-green" />
-              </div>
-            ) : posts.length === 0 ? (
-              <Card className="console-bg tech-border p-6 text-center">
-                <p className="font-mono text-muted-foreground">No posts yet</p>
-                <p className="font-mono text-xs text-muted-foreground mt-2">
-                  Posts you create will appear here
-                </p>
-              </Card>
-            ) : (
-              <div className="space-y-6">
-                {posts.map((post) => (
-                  <Card key={post.id} className="console-bg tech-border p-6">
-                    <div className="flex items-center gap-2 mb-3">
-                      <span className="font-mono text-sm text-muted-foreground">
-                        {profile.artist_name || profile.display_name} posted {formatTimeAgo(post.created_at)}
-                      </span>
-                    </div>
-                    {post.content_text && (
-                      <p className="font-mono text-sm mb-4 whitespace-pre-wrap">
-                        {post.content_text}
-                      </p>
-                    )}
+          {/* Main Content Area */}
+          <div className="pb-6">
+            <TabsContent value="all" className="mt-0">
+              {loadingSongs ? (
+                <div className="flex justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-neon-green" />
+                </div>
+              ) : songs.length === 0 ? (
+                <Card className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-8 text-center">
+                  <Music className="h-12 w-12 mx-auto mb-4 text-white/40" />
+                  <p className="font-medium text-white/60">No songs uploaded yet</p>
+                </Card>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {songs.map((song, index) => {
+                    const coverUrl = song.cover_cid ? getIPFSGatewayUrl(song.cover_cid) : null;
+                    const isThisSongPlaying = currentSong?.id === song.id && isPlaying;
                     
-                    {/* Post Media with Song Player Overlay */}
-                    {post.media_cid && post.media_type && post.songs && (
-                      <div className="mb-4 rounded-lg overflow-hidden relative group">
-                        {post.media_type.startsWith('image') ? (
-                          <img 
-                            src={getIPFSGatewayUrl(post.media_cid)}
-                            alt="Post media"
-                            className="w-full max-h-[600px] object-contain bg-black/5 rounded-lg"
-                          />
-                        ) : post.media_type.startsWith('video') ? (
-                          <video 
-                            src={getIPFSGatewayUrl(post.media_cid)}
-                            controls
-                            className="w-full max-h-[600px] object-contain bg-black/5 rounded-lg"
-                          />
-                        ) : null}
-                        
-                        {/* Opaque Play/Pause Button Overlay */}
-                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                          <button
-                            onClick={() => {
-                              if (playSong) {
-                                playSong({
-                                  id: post.songs.id,
-                                  title: post.songs.title,
-                                  artist: post.songs.artist,
-                                  audio_cid: post.songs.audio_cid,
-                                  cover_cid: post.songs.cover_cid
-                                });
-                              }
-                            }}
-                            className="pointer-events-auto bg-black/60 backdrop-blur-sm hover:bg-black/80 transition-all p-6 rounded-full opacity-0 group-hover:opacity-100"
-                          >
-                            {currentSong?.id === post.songs.id && isPlaying ? (
-                              <Pause className="w-12 h-12 text-white" />
-                            ) : (
-                              <Play className="w-12 h-12 text-white" />
-                            )}
-                          </button>
-                        </div>
-
-                        {/* Bottom Song Scroller */}
-                        <div 
-                          onClick={() => navigate(`/song/${post.songs.id}`)}
-                          className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/70 to-transparent p-3 cursor-pointer hover:bg-black/95 transition-all"
-                        >
-                          <div className="flex items-center gap-2">
-                            {post.songs.cover_cid && (
-                              <img 
-                                src={getIPFSGatewayUrl(post.songs.cover_cid)} 
-                                alt={post.songs.title}
-                                className="w-10 h-10 rounded object-cover flex-shrink-0"
-                              />
-                            )}
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <Music className="w-3 h-3 text-neon-green flex-shrink-0" />
-                                <p className="font-semibold text-white text-sm truncate">
-                                  {post.songs.title}
-                                </p>
-                              </div>
-                              <p className="text-xs text-gray-300 truncate">
-                                {post.songs.artist}
-                              </p>
-                            </div>
-                            {currentSong?.id === post.songs.id && isPlaying && (
-                              <div className="flex gap-0.5 items-end h-4">
-                                <div className="w-0.5 bg-neon-green animate-pulse" style={{ height: '60%' }}></div>
-                                <div className="w-0.5 bg-neon-green animate-pulse" style={{ height: '100%', animationDelay: '0.2s' }}></div>
-                                <div className="w-0.5 bg-neon-green animate-pulse" style={{ height: '80%', animationDelay: '0.4s' }}></div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Regular media without song */}
-                    {post.media_cid && post.media_type && !post.songs && (
-                      <div className="mb-4">
-                        {post.media_type.startsWith('image') ? (
-                          <img 
-                            src={getIPFSGatewayUrl(post.media_cid)}
-                            alt="Post media"
-                            className="w-full rounded tech-border"
-                          />
-                        ) : post.media_type.startsWith('video') ? (
-                          <video 
-                            src={getIPFSGatewayUrl(post.media_cid)}
-                            controls
-                            className="w-full rounded tech-border"
-                          />
-                        ) : null}
-                      </div>
-                    )}
-
-                    {/* Song Player Card for Text-Only Posts */}
-                    {!post.media_cid && post.songs && (
-                      <div 
-                        className="mb-4 rounded-lg overflow-hidden bg-gradient-to-br from-neon-green/5 to-purple-500/5 border border-neon-green/10 p-4 cursor-pointer hover:border-neon-green/30 transition-all group"
-                        onClick={() => {
-                          if (playSong) {
-                            playSong({
-                              id: post.songs.id,
-                              title: post.songs.title,
-                              artist: post.songs.artist,
-                              audio_cid: post.songs.audio_cid,
-                              cover_cid: post.songs.cover_cid
-                            });
-                          }
-                        }}
+                    return (
+                      <Card
+                        key={song.id}
+                        className="group bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden hover:bg-white/10 hover:border-neon-green/30 transition-all cursor-pointer"
+                        onClick={() => navigate(`/song/${song.id}`)}
                       >
-                        <div className="flex items-center gap-3">
-                          {post.songs.cover_cid && (
+                        {/* Cover Image */}
+                        <div className="relative aspect-square bg-gradient-to-br from-neon-green/10 to-purple-500/10">
+                          {coverUrl ? (
                             <img 
-                              src={getIPFSGatewayUrl(post.songs.cover_cid)} 
-                              alt={post.songs.title}
-                              className="w-12 h-12 rounded object-cover flex-shrink-0"
+                              src={coverUrl} 
+                              alt={song.title}
+                              className="w-full h-full object-cover"
                             />
-                          )}
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <Music className="w-4 h-4 text-neon-green flex-shrink-0" />
-                              <p className="font-semibold text-white text-sm truncate">
-                                {post.songs.title}
-                              </p>
-                            </div>
-                            <p className="text-xs text-gray-300 truncate">
-                              {post.songs.artist}
-                            </p>
-                          </div>
-                          {currentSong?.id === post.songs.id && isPlaying ? (
-                            <Pause className="w-6 h-6 text-neon-green" />
                           ) : (
-                            <Play className="w-6 h-6 text-neon-green" />
+                            <div className="w-full h-full flex items-center justify-center">
+                              <Music className="h-16 w-16 text-neon-green/40" />
+                            </div>
+                          )}
+                          
+                          {/* Play Overlay */}
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <button
+                              className="w-16 h-16 rounded-full bg-neon-green hover:bg-neon-green/80 flex items-center justify-center shadow-2xl transform hover:scale-110 transition-transform"
+                              onClick={(e) => { 
+                                e.stopPropagation(); 
+                                playSong(song); 
+                              }}
+                            >
+                              {isThisSongPlaying ? (
+                                <Pause className="h-6 w-6 text-black fill-black" />
+                              ) : (
+                                <Play className="h-6 w-6 text-black fill-black ml-1" />
+                              )}
+                            </button>
+                          </div>
+                          
+                          {/* Waveform Overlay */}
+                          {song.audio_cid && isThisSongPlaying && (
+                            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2">
+                              <ArtistWaveform songId={song.id} audioCid={song.audio_cid} />
+                            </div>
                           )}
                         </div>
-                      </div>
-                    )}
-
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground font-mono border-t border-border pt-4 mt-4">
-                      <div className="flex items-center gap-2">
-                        <LikeButton songId={post.id} size="sm" showCount={true} entityType="post" />
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => toggleComments(post.id)}
-                        className="flex items-center gap-1 font-mono"
-                      >
-                        <MessageSquare className="h-4 w-4" />
-                        <span>{post.comment_count}</span>
-                      </Button>
-                    </div>
-
-                    {/* Comments Section */}
-                    {expandedComments.has(post.id) && (
-                      <div className="mt-4 space-y-4 border-t border-border pt-4">
-                        {/* Add Comment Input */}
-                        <div className="flex gap-2">
-                          <Input
-                            placeholder="Add a comment..."
-                            value={commentText[post.id] || ''}
-                            onChange={(e) => setCommentText(prev => ({ ...prev, [post.id]: e.target.value }))}
-                            onKeyPress={(e) => {
-                              if (e.key === 'Enter' && !e.shiftKey) {
-                                e.preventDefault();
-                                handleAddComment(post.id);
-                              }
-                            }}
-                            className="font-mono text-sm"
-                          />
-                          <Button
-                            size="sm"
-                            variant="neon"
-                            onClick={() => handleAddComment(post.id)}
-                            disabled={!commentText[post.id]?.trim()}
-                          >
-                            <Send className="h-4 w-4" />
-                          </Button>
+                        
+                        {/* Song Info */}
+                        <div className="p-4">
+                          <h3 className="font-semibold text-white truncate mb-1 group-hover:text-neon-green transition-colors">
+                            {song.title}
+                          </h3>
+                          <div className="flex items-center gap-2 mb-2">
+                            <p className="text-xs text-white/60 truncate">
+                              {profile.artist_name || profile.display_name}
+                            </p>
+                            {song.ticker && (
+                              <span className="text-xs text-neon-green font-mono">${song.ticker}</span>
+                            )}
+                          </div>
+                          
+                          {/* Meta */}
+                          <div className="flex items-center gap-3 text-xs text-white/40">
+                            <LikeButton songId={song.id} size="sm" showCount={true} />
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleSongComments(song.id);
+                              }}
+                              className="flex items-center gap-1 hover:text-neon-green transition-colors"
+                            >
+                              <MessageSquare className="h-3 w-3" />
+                            </button>
+                            <span>► {song.play_count}</span>
+                            <span>{formatDuration(song)}</span>
+                          </div>
                         </div>
-
-                        {/* Comments List */}
-                        <div className="space-y-3">
-                          {comments[post.id]?.map((comment) => (
-                            <div key={comment.id} className="flex gap-3">
-                              <div 
-                                className="cursor-pointer hover:opacity-80 transition-opacity"
-                                onClick={() => navigate(`/artist/${comment.wallet_address}`)}
-                              >
-                                <Avatar className="h-8 w-8 flex-shrink-0">
-                                  <AvatarImage 
-                                    src={comment.profiles?.avatar_cid ? getIPFSGatewayUrl(comment.profiles.avatar_cid) : undefined} 
-                                  />
-                                  <AvatarFallback className="bg-primary/20 text-neon-green text-xs">
-                                    {(comment.profiles?.artist_name || comment.wallet_address).substring(0, 2).toUpperCase()}
-                                  </AvatarFallback>
-                                </Avatar>
-                              </div>
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <span 
-                                    className="font-mono text-xs font-semibold cursor-pointer hover:text-neon-green transition-colors"
-                                    onClick={() => navigate(`/artist/${comment.wallet_address}`)}
-                                  >
-                                    {comment.profiles?.artist_name || `${comment.wallet_address.slice(0, 6)}...${comment.wallet_address.slice(-4)}`}
-                                  </span>
-                                  <span className="text-xs text-muted-foreground">
-                                    {formatTimeAgo(comment.created_at)}
-                                  </span>
-                                </div>
-                                <p className="font-mono text-sm">{comment.comment_text}</p>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </Card>
-                ))}
-              </div>
-            )}
-          </TabsContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
+            </TabsContent>
+            
+            {/* Other tab contents */}
+            <TabsContent value="popular" className="mt-0">
+              <Card className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-8 text-center">
+                <p className="text-white/60">Popular tracks coming soon</p>
+              </Card>
+            </TabsContent>
+            <TabsContent value="tracks" className="mt-0">
+              <Card className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-8 text-center">
+                <p className="text-white/60">All tracks</p>
+              </Card>
+            </TabsContent>
+            <TabsContent value="albums" className="mt-0">
+              <Card className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-8 text-center">
+                <p className="text-white/60">Albums coming soon</p>
+              </Card>
+            </TabsContent>
+            <TabsContent value="playlists" className="mt-0">
+              <Card className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-8 text-center">
+                <p className="text-white/60">Playlists coming soon</p>
+              </Card>
+            </TabsContent>
+            <TabsContent value="reposts" className="mt-0">
+              <Card className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-8 text-center">
+                <p className="text-white/60">Reposts coming soon</p>
+              </Card>
+            </TabsContent>
+          </div>
         </Tabs>
       </div>
 

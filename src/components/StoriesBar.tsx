@@ -298,7 +298,11 @@ const StoriesBar = ({ hasXRGE }: StoriesBarProps) => {
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/80" onClick={() => setShowUpload(false)} />
           <div className="relative z-10">
-            <StoryUpload />
+            <StoryUpload onUploaded={() => {
+              setShowUpload(false);
+              fetchStories();
+              if (fullAddress) setSelectedWallet(fullAddress);
+            }} />
           </div>
         </div>
       )}

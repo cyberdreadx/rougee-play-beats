@@ -1,8 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { X, ChevronLeft, ChevronRight, Heart, Eye, MessageCircle, Send } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, Heart, Eye, MessageCircle, Send, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import TaggedText from "@/components/TaggedText";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { formatDistanceToNow } from "date-fns";
 import { getIPFSGatewayUrl } from "@/lib/ipfs";
@@ -46,12 +48,29 @@ const StoryViewer = ({
   const [likeCount, setLikeCount] = useState(0);
   const [viewCount, setViewCount] = useState(0);
   const [showComments, setShowComments] = useState(false);
+  const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null);
   const [comments, setComments] = useState<Array<{ id: string; wallet_address: string; comment_text: string; created_at: string; profiles?: { artist_name: string | null; avatar_cid: string | null } | null }>>([]);
   const [commentText, setCommentText] = useState("");
   const [videoDuration, setVideoDuration] = useState<number | null>(null);
   const [isMuted, setIsMuted] = useState(true);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const { fullAddress } = useWallet();
   const { toast } = useToast();
+  // Fallback viewer id so views count even when not logged in
+  const viewerId = (() => {
+    try {
+      if (fullAddress) return fullAddress.toLowerCase();
+      let anon = localStorage.getItem('story_viewer_id');
+      if (!anon) {
+        const gen = (globalThis.crypto?.randomUUID && globalThis.crypto.randomUUID()) || `anon-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        anon = gen;
+        localStorage.setItem('story_viewer_id', anon);
+      }
+      return `anon:${anon}`;
+    } catch {
+      return `anon-${Date.now()}`;
+    }
+  })();
   const [showViewers, setShowViewers] = useState(false);
   const [viewers, setViewers] = useState<Array<{ wallet_address: string; profiles?: { artist_name: string | null; avatar_cid: string | null } | null }>>([]);
 
@@ -60,30 +79,53 @@ const StoryViewer = ({
   const currentStories = allStories[currentWalletAddress];
   const currentStory = currentStories[currentStoryIndex];
   const currentProfile = profiles[currentWalletAddress];
+  // Defer close to avoid cross-tree setState warning
+  const deferClose = () => {
+    try {
+      // Defer to next animation frame so StoriesBar updates outside this render phase
+      requestAnimationFrame(() => onClose());
+    } catch {
+      onClose();
+    }
+  };
 
   // Load counts and comments when story changes
   useEffect(() => {
+    // Reset local comment UI when changing stories to avoid cross-story bleed
+    setComments([]);
+    setCommentText("");
     const recordAndLoad = async () => {
       if (!currentStory) return;
-      setViewCount(currentStory.view_count || 0);
       // load comments
       await loadComments(currentStory.id);
 
-      if (!fullAddress) return;
+      // Always load persisted view count from DB
+      try {
+        const { count: initialCount } = await supabase
+          .from('story_views')
+          .select('id', { count: 'exact', head: true })
+          .eq('story_id', currentStory.id);
+        setViewCount(initialCount || 0);
+      } catch {}
+
       try {
         // Check if already viewed
         const { data: existing } = await supabase
           .from('story_views')
           .select('id')
           .eq('story_id', currentStory.id)
-          .eq('viewer_wallet_address', fullAddress.toLowerCase())
+          .eq('viewer_wallet_address', viewerId)
           .maybeSingle();
         if (!existing) {
           const { error } = await supabase
             .from('story_views')
-            .insert({ story_id: currentStory.id, viewer_wallet_address: fullAddress.toLowerCase() });
+            .insert({ story_id: currentStory.id, viewer_wallet_address: viewerId });
           if (!error) {
-            setViewCount(prev => prev + 1);
+            const { count: afterCount } = await supabase
+              .from('story_views')
+              .select('id', { count: 'exact', head: true })
+              .eq('story_id', currentStory.id);
+            setViewCount(afterCount || 1);
           }
         }
       } catch {}
@@ -186,6 +228,44 @@ const StoryViewer = ({
     setCommentText("");
     await loadComments(currentStory.id);
   };
+
+  const handleDeleteComment = async (commentId: string) => {
+    if (!currentStory || !fullAddress) return;
+    setDeletingCommentId(commentId);
+    try {
+      const { error } = await supabase
+        .from('story_comments')
+        .delete()
+        .eq('id', commentId)
+        .eq('wallet_address', fullAddress.toLowerCase());
+      if (error) {
+        toast({ title: 'Delete failed', description: error.message, variant: 'destructive' });
+      } else {
+        // Optimistically remove from UI
+        setComments(prev => prev.filter(c => c.id !== commentId));
+        toast({ title: 'Comment deleted' });
+      }
+    } catch (e) {
+      toast({ title: 'Error', description: 'Failed to delete comment', variant: 'destructive' });
+    } finally {
+      setDeletingCommentId(null);
+    }
+  };
+
+  // Auto-pause video when comments drawer is open; resume when closed
+  useEffect(() => {
+    if (!videoRef.current || currentStory.media_type !== 'video') return;
+    try {
+      if (showComments) {
+        videoRef.current.pause();
+      } else {
+        // Resume only if not at end
+        if (videoRef.current.currentTime < (videoRef.current.duration || Infinity)) {
+          void videoRef.current.play();
+        }
+      }
+    } catch {}
+  }, [showComments, currentStory?.id]);
 
   const loadViewers = async (storyId: string) => {
     const { data: viewRows } = await supabase
@@ -306,7 +386,7 @@ const StoryViewer = ({
         <div 
           className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
           onClick={() => {
-            onClose();
+            deferClose();
             navigate(`/artist/${currentWalletAddress}`);
           }}
         >
@@ -334,7 +414,7 @@ const StoryViewer = ({
           </div>
         </div>
         <button 
-          onClick={(e) => { e.stopPropagation(); onClose(); }} 
+          onClick={(e) => { e.stopPropagation(); deferClose(); }} 
           className="text-white bg-transparent hover:bg-black/20 rounded-full p-2 transition-all z-50"
         >
           <X className="w-6 h-6" />
@@ -352,6 +432,7 @@ const StoryViewer = ({
         ) : (
           <video
             ref={(el) => {
+              videoRef.current = el;
               if (el) {
                 el.muted = isMuted;
               }
@@ -395,7 +476,7 @@ const StoryViewer = ({
         )}
 
         {/* Caption and Stats */}
-        <div className="absolute bottom-20 left-0 right-0 px-8">
+        <div className="absolute bottom-20 left-0 right-0 px-8 z-30 pointer-events-auto">
           {currentStory.caption && (
             <p className="text-white text-lg font-medium bg-black/50 px-4 py-2 rounded-lg inline-block mb-4">
               {currentStory.caption}
@@ -424,7 +505,7 @@ const StoryViewer = ({
       </div>
 
       {/* Like Button */}
-      <div className="absolute bottom-32 right-8 z-20">
+      <div className="absolute bottom-32 right-8 z-20 pointer-events-auto">
         <button
           className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${hasLiked ? 'bg-red-500/20' : 'bg-black/30 hover:bg-black/50'}`}
           onClick={(e) => {
@@ -489,7 +570,7 @@ const StoryViewer = ({
             <div className="space-y-3">
               {comments.map((c) => (
                 <div key={c.id} className="flex gap-3">
-                  <div className="cursor-pointer" onClick={() => { onClose(); navigate(`/artist/${c.wallet_address}`); }}>
+                  <div className="cursor-pointer" onClick={() => { deferClose(); navigate(`/artist/${c.wallet_address}`); }}>
                     {c.profiles?.avatar_cid ? (
                       <img src={getIPFSGatewayUrl(c.profiles.avatar_cid)} alt="Avatar" className="w-8 h-8 rounded-full object-cover" />
                     ) : (
@@ -500,9 +581,19 @@ const StoryViewer = ({
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-1.5 mb-1">
-                      <p className="text-sm font-semibold cursor-pointer hover:text-neon-green" onClick={() => { onClose(); navigate(`/artist/${c.wallet_address}`); }}>
+                      <p className="text-sm font-semibold cursor-pointer hover:text-neon-green" onClick={() => { deferClose(); navigate(`/artist/${c.wallet_address}`); }}>
                         {c.profiles?.artist_name || `${c.wallet_address.slice(0, 6)}...${c.wallet_address.slice(-4)}`}
                       </p>
+                      {fullAddress && c.wallet_address?.toLowerCase() === fullAddress.toLowerCase() && (
+                        <button
+                          className="ml-auto text-white/60 hover:text-white disabled:opacity-50"
+                          title="Delete comment"
+                          disabled={deletingCommentId === c.id}
+                          onClick={(e) => { e.stopPropagation(); handleDeleteComment(c.id); }}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
                     <div className="text-sm text-white/80">
                       <TaggedText text={c.comment_text} />

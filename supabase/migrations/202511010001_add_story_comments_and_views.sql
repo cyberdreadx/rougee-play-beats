@@ -27,6 +27,11 @@ do $$ begin
   ) then
     create policy story_comments_insert_any on public.story_comments for insert with check (true);
   end if;
+  if not exists (
+    select 1 from pg_policies where schemaname = 'public' and tablename = 'story_comments' and policyname = 'story_comments_delete_any'
+  ) then
+    create policy story_comments_delete_any on public.story_comments for delete using (true);
+  end if;
 end $$;
 
 -- Ensure story_views exists and supports unique per viewer per story

@@ -9,7 +9,11 @@ import { toast } from "@/hooks/use-toast";
 import { Plus, Upload, X } from "lucide-react";
 import { usePrivyToken } from "@/hooks/usePrivyToken";
 
-const StoryUpload = () => {
+interface StoryUploadProps {
+  onUploaded?: () => void;
+}
+
+const StoryUpload = ({ onUploaded }: StoryUploadProps) => {
   const { fullAddress } = useWallet();
   const { getAuthHeaders } = usePrivyToken();
   const [open, setOpen] = useState(false);
@@ -87,7 +91,8 @@ const StoryUpload = () => {
       setMediaType(null);
       setOpen(false);
 
-      // Story will appear via realtime subscription in StoriesBar
+      // Immediate refresh fallback if realtime is not available
+      try { onUploaded && onUploaded(); } catch {}
     } catch (error) {
       console.error("Upload error:", error);
       toast({

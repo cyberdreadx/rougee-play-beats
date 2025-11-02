@@ -64,15 +64,19 @@ Deno.serve(async (req) => {
     // Now try to get profile data separately for each request
     const requestsWithProfiles = await Promise.all(
       (requests || []).map(async (request) => {
-        const { data: profile } = await supabase
+        const { data: profile, error: profileError } = await supabase
           .from('profiles')
-          .select('artist_name, artist_ticker, avatar_cid, total_songs, total_plays, verified')
+          .select('artist_name, display_name, artist_ticker, avatar_cid, total_songs, total_plays, verified')
           .eq('wallet_address', request.wallet_address)
-          .single();
+          .maybeSingle();
+        
+        if (profileError) {
+          console.warn('⚠️ Error fetching profile for', request.wallet_address, ':', profileError);
+        }
         
         return {
           ...request,
-          profiles: profile
+          profiles: profile || null
         };
       })
     );

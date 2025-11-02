@@ -7,9 +7,20 @@ import { useLockCode } from "@/hooks/useLockCode";
 import WalletButton from "@/components/WalletButton";
 import ThemeSwitcher from "@/components/ThemeSwitcher";
 import { Button } from "@/components/ui/button";
-import { User, Shield, CheckCircle, HelpCircle, Lock } from "lucide-react";
+import { User, Shield, CheckCircle, HelpCircle, Lock, ChevronDown, Network, Wallet as WalletIcon, LogOut, Link as LinkIcon } from "lucide-react";
 import { UploadSlotsBadge } from "@/components/UploadSlotsBadge";
 import { toast } from "@/hooks/use-toast";
+import { useAccount, useChainId, useSwitchChain } from 'wagmi';
+import { base } from 'wagmi/chains';
+import { usePrivy } from '@privy-io/react-auth';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu";
 
 
 const Header = () => {
@@ -18,6 +29,17 @@ const Header = () => {
   const { profile, isArtist } = useCurrentUserProfile();
   const { hasLockCode, lock, triggerLockUpdate } = useLockCode();
   const [isAdmin, setIsAdmin] = useState(false);
+  
+  // Wagmi hooks for network switching
+  const chainId = useChainId();
+  const { switchChain } = useSwitchChain();
+  const { logout } = usePrivy();
+
+  const networks = [
+    { chain: base, name: 'Base' },
+  ];
+
+  const currentNetwork = networks.find(n => n.chain.id === chainId);
 
   const handleLock = () => {
     console.log('🔒 Header: handleLock called');
@@ -95,73 +117,134 @@ const Header = () => {
             <UploadSlotsBadge className="hidden md:flex" />
           )}
           
-          {/* Lock Button - Show if lock code is enabled */}
-          {isConnected && hasLockCode && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleLock}
-              className="font-mono text-yellow-500 hover:text-yellow-400 hover:bg-yellow-500/10"
-              title="Lock App"
-            >
-              <Lock className="h-4 w-4 md:h-5 md:w-5 md:mr-2" />
-              <span className="hidden md:inline">LOCK</span>
-            </Button>
-          )}
-
-          {/* How It Works - always visible */}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate("/how-it-works")}
-            className="font-mono"
-            title="How It Works"
-          >
-            <HelpCircle className="h-4 w-4 md:h-5 md:w-5 text-primary md:mr-2" />
-            <span className="hidden md:inline">HOW IT WORKS</span>
-          </Button>
+          {/* Consolidated Menu Dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="font-mono border-neon-green/30 hover:border-neon-green/50 bg-black/40 backdrop-blur-sm"
+              >
+                {isConnected ? (
+                  <>
+                    <Network className="h-4 w-4 md:mr-2 text-neon-green" />
+                    <span className="hidden md:inline text-neon-green">{currentNetwork?.name || 'Menu'}</span>
+                  </>
+                ) : (
+                  <>
+                    <HelpCircle className="h-4 w-4 md:mr-2" />
+                    <span className="hidden md:inline">Menu</span>
+                  </>
+                )}
+                <ChevronDown className="h-3 w-3 ml-1 opacity-50" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-64 console-bg backdrop-blur-xl border-white/20">
+              <DropdownMenuLabel className="font-mono text-xs text-muted-foreground uppercase">
+                {isConnected ? 'Network & Account' : 'Menu'}
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator className="bg-white/10" />
+              
+              {/* Network Selection - Only show if connected */}
+              {isConnected && (
+                <>
+                  <div className="px-2 py-1">
+                    <p className="text-xs font-mono text-muted-foreground mb-2 uppercase">Network:</p>
+                    {networks.map(({ chain, name }) => (
+                      <DropdownMenuItem
+                        key={chain.id}
+                        onClick={() => switchChain({ chainId: chain.id })}
+                        className={`font-mono text-sm ${
+                          chainId === chain.id 
+                            ? 'bg-neon-green/10 text-neon-green' 
+                            : 'hover:bg-white/5'
+                        }`}
+                      >
+                        <Network className="h-4 w-4 mr-2" />
+                        {name}
+                        {chainId === chain.id && <CheckCircle className="h-3 w-3 ml-auto text-neon-green" />}
+                      </DropdownMenuItem>
+                    ))}
+                    <div className="mt-2 px-2 py-1">
+                      <span className="text-xs font-mono text-muted-foreground/60">KTA</span>
+                    </div>
+                  </div>
+                  
+                  <DropdownMenuSeparator className="bg-white/10" />
+                  
+                  {/* Wallet Info */}
+                  <div className="px-2 py-2">
+                    <p className="text-xs font-mono text-muted-foreground mb-1 uppercase">Wallet Address:</p>
+                    <p className="text-xs font-mono text-foreground break-all bg-black/40 p-2 rounded border border-white/10">
+                      {fullAddress}
+                    </p>
+                  </div>
+                  
+                  <DropdownMenuSeparator className="bg-white/10" />
+                </>
+              )}
+              
+              {/* Navigation Items */}
+              <DropdownMenuItem
+                onClick={() => navigate("/how-it-works")}
+                className="font-mono text-sm hover:bg-white/5"
+              >
+                <HelpCircle className="h-4 w-4 mr-2 text-primary" />
+                How It Works
+              </DropdownMenuItem>
+              
+              {isConnected && (
+                <>
+                  <DropdownMenuItem
+                    onClick={() => navigate("/profile/edit")}
+                    className="font-mono text-sm hover:bg-white/5"
+                  >
+                    <User className="h-4 w-4 mr-2" />
+                    My Profile
+                  </DropdownMenuItem>
+                  
+                  {isAdmin && (
+                    <DropdownMenuItem
+                      onClick={() => navigate("/admin")}
+                      className="font-mono text-sm hover:bg-white/5 text-neon-green"
+                    >
+                      <Shield className="h-4 w-4 mr-2" />
+                      Admin Panel
+                    </DropdownMenuItem>
+                  )}
+                  
+                  {hasLockCode && (
+                    <DropdownMenuItem
+                      onClick={handleLock}
+                      className="font-mono text-sm hover:bg-white/5 text-yellow-500"
+                    >
+                      <Lock className="h-4 w-4 mr-2" />
+                      Lock App
+                    </DropdownMenuItem>
+                  )}
+                  
+                  <DropdownMenuSeparator className="bg-white/10" />
+                  
+                  {/* Disconnect Button */}
+                  <DropdownMenuItem
+                    onClick={() => {
+                      logout();
+                      toast({
+                        title: "Disconnected",
+                        description: "Your wallet has been disconnected.",
+                      });
+                    }}
+                    className="font-mono text-sm text-red-500 hover:bg-red-500/10 hover:text-red-400 focus:bg-red-500/10 focus:text-red-400"
+                  >
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Disconnect Wallet
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
           
           <ThemeSwitcher />
-          {isConnected && isAdmin && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate("/admin")}
-              className="font-mono hidden md:flex border-neon-green/50 text-neon-green hover:bg-neon-green/10"
-            >
-              <Shield className="h-4 w-4 md:mr-2" />
-              <span className="hidden md:inline">ADMIN</span>
-            </Button>
-          )}
-          {isConnected && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate("/profile/edit")}
-              className="font-mono hidden md:flex"
-            >
-              <User className="h-4 w-4 md:mr-2" />
-              <span className="hidden md:inline">MY PROFILE</span>
-            </Button>
-          )}
-          {/* Mobile quick profile icon */}
-          {isConnected && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => {
-                if (profile) {
-                  navigate(`/artist/${fullAddress}`);
-                } else {
-                  navigate("/profile/edit");
-                }
-              }}
-              className="md:hidden h-9 w-9"
-              title="Profile"
-            >
-              <User className="h-5 w-5" />
-            </Button>
-          )}
           <WalletButton />
         </div>
       </div>

@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import NetworkInfo from "@/components/NetworkInfo";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -352,9 +351,16 @@ const Admin = () => {
 
   const fetchVerificationRequests = async () => {
     try {
-      if (!fullAddress) return;
+      if (!fullAddress) {
+        console.warn('⚠️ No wallet address available for fetching verification requests');
+        return;
+      }
+      
+      console.log('🔍 Fetching verification requests for admin:', fullAddress);
       
       const token = await getAccessToken();
+      console.log('✅ Got access token, invoking edge function...');
+      
       const { data, error } = await supabase.functions.invoke('admin-get-verification-requests', {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -363,15 +369,26 @@ const Admin = () => {
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Edge function error:', error);
+        throw error;
+      }
 
-      console.log('Verification requests loaded:', data);
-      setVerificationRequests((data as any)?.data ?? (Array.isArray(data) ? data : []));
+      console.log('✅ Verification requests response:', data);
+      
+      const requestsData = (data as any)?.data ?? (Array.isArray(data) ? data : []);
+      console.log('📋 Parsed verification requests:', requestsData);
+      
+      setVerificationRequests(requestsData);
     } catch (error) {
-      console.error('Error fetching verification requests:', error);
+      console.error('❌ Error fetching verification requests:', error);
+      console.error('Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       toast({
         title: "Error",
-        description: "Failed to load verification requests",
+        description: `Failed to load verification requests: ${error instanceof Error ? error.message : 'Unknown error'}`,
         variant: "destructive",
       });
     }
@@ -493,47 +510,53 @@ const Admin = () => {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <NetworkInfo />
-
-      <div className="max-w-7xl mx-auto px-6 py-8">
-        <div className="flex items-center gap-3 mb-8">
-          <AlertTriangle className="h-8 w-8 text-neon-green" />
-          <h1 className="text-3xl font-mono font-bold neon-text">ADMIN PANEL</h1>
+      <div className="max-w-7xl mx-auto px-4 md:px-6 py-6 md:py-8">
+        <div className="flex items-center gap-2 md:gap-3 mb-6 md:mb-8">
+          <AlertTriangle className="h-6 w-6 md:h-8 md:w-8 text-neon-green" />
+          <h1 className="text-2xl md:text-3xl font-mono font-bold neon-text">ADMIN PANEL</h1>
         </div>
 
         <Tabs defaultValue="dashboard" className="w-full">
-          <TabsList className="grid w-full grid-cols-8 mb-6">
-            <TabsTrigger value="dashboard" className="gap-2">
-              <BarChart3 className="h-4 w-4" />
-              DASHBOARD
+          <TabsList className="w-full grid grid-cols-4 md:grid-cols-8 gap-1 mb-4 md:mb-6 bg-black/40 p-1 rounded-lg overflow-x-auto">
+            <TabsTrigger value="dashboard" className="gap-1 md:gap-2 text-[10px] md:text-sm px-1 md:px-3 whitespace-nowrap">
+              <BarChart3 className="h-3 w-3 md:h-4 md:w-4" />
+              <span className="hidden sm:inline">DASHBOARD</span>
+              <span className="sm:hidden">Stats</span>
             </TabsTrigger>
-            <TabsTrigger value="reports" className="gap-2">
-              <AlertTriangle className="h-4 w-4" />
-              REPORTS ({reports.length})
+            <TabsTrigger value="reports" className="gap-1 md:gap-2 text-[10px] md:text-sm px-1 md:px-3 whitespace-nowrap">
+              <AlertTriangle className="h-3 w-3 md:h-4 md:w-4" />
+              <span className="hidden sm:inline">REPORTS ({reports.length})</span>
+              <span className="sm:hidden">{reports.length}</span>
             </TabsTrigger>
-            <TabsTrigger value="verification" className="gap-2">
-              <CheckCircle2 className="h-4 w-4" />
-              VERIFY ({verificationRequests.filter(r => r.status === 'pending').length})
+            <TabsTrigger value="verification" className="gap-1 md:gap-2 text-[10px] md:text-sm px-1 md:px-3 whitespace-nowrap">
+              <CheckCircle2 className="h-3 w-3 md:h-4 md:w-4" />
+              <span className="hidden sm:inline">VERIFY ({verificationRequests.filter(r => r.status === 'pending').length})</span>
+              <span className="sm:hidden">{verificationRequests.filter(r => r.status === 'pending').length}</span>
             </TabsTrigger>
-            <TabsTrigger value="users" className="gap-2">
-              <Users className="h-4 w-4" />
-              USERS ({users.length})
+            <TabsTrigger value="users" className="gap-1 md:gap-2 text-[10px] md:text-sm px-1 md:px-3 whitespace-nowrap">
+              <Users className="h-3 w-3 md:h-4 md:w-4" />
+              <span className="hidden sm:inline">USERS ({users.length})</span>
+              <span className="sm:hidden">{users.length}</span>
             </TabsTrigger>
-            <TabsTrigger value="songs" className="gap-2">
-              <Music className="h-4 w-4" />
-              SONGS ({songs.length})
+            <TabsTrigger value="songs" className="gap-1 md:gap-2 text-[10px] md:text-sm px-1 md:px-3 whitespace-nowrap">
+              <Music className="h-3 w-3 md:h-4 md:w-4" />
+              <span className="hidden sm:inline">SONGS ({songs.length})</span>
+              <span className="sm:hidden">{songs.length}</span>
             </TabsTrigger>
-            <TabsTrigger value="posts" className="gap-2">
-              <MessageSquare className="h-4 w-4" />
-              POSTS ({feedPosts.length})
+            <TabsTrigger value="posts" className="gap-1 md:gap-2 text-[10px] md:text-sm px-1 md:px-3 whitespace-nowrap">
+              <MessageSquare className="h-3 w-3 md:h-4 md:w-4" />
+              <span className="hidden sm:inline">POSTS ({feedPosts.length})</span>
+              <span className="sm:hidden">{feedPosts.length}</span>
             </TabsTrigger>
-            <TabsTrigger value="security" className="gap-2">
-              <Shield className="h-4 w-4" />
-              SECURITY
+            <TabsTrigger value="security" className="gap-1 md:gap-2 text-[10px] md:text-sm px-1 md:px-3 whitespace-nowrap">
+              <Shield className="h-3 w-3 md:h-4 md:w-4" />
+              <span className="hidden sm:inline">SECURITY</span>
+              <span className="sm:hidden">Sec</span>
             </TabsTrigger>
-            <TabsTrigger value="activity" className="gap-2">
-              <Activity className="h-4 w-4" />
-              ACTIVITY
+            <TabsTrigger value="activity" className="gap-1 md:gap-2 text-[10px] md:text-sm px-1 md:px-3 whitespace-nowrap">
+              <Activity className="h-3 w-3 md:h-4 md:w-4" />
+              <span className="hidden sm:inline">ACTIVITY</span>
+              <span className="sm:hidden">Act</span>
             </TabsTrigger>
           </TabsList>
 

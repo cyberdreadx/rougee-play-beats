@@ -52,6 +52,7 @@ const ProfileEdit = () => {
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [isArtist, setIsArtist] = useState(false);
+  const [hasArtistProfile, setHasArtistProfile] = useState(false); // Track if artist profile is set up
   const [verificationStatus, setVerificationStatus] = useState<'none' | 'pending' | 'approved' | 'rejected'>('none');
   const [verificationMessage, setVerificationMessage] = useState("");
   const [requestingVerification, setRequestingVerification] = useState(false);
@@ -95,6 +96,14 @@ const ProfileEdit = () => {
       setWebsite(profile.social_links?.website || "");
       setSoundcloud(profile.social_links?.soundcloud || "");
       setIsArtist(!!profile.artist_name);
+      
+      // Check if artist profile is set up (has artist name and at least some info)
+      const hasProfile = !!(
+        profile.artist_name && 
+        (profile.avatar_cid || profile.bio || profile.artist_ticker)
+      );
+      setHasArtistProfile(hasProfile);
+      
       setAutoLockMinutes(autoLockTimeoutMinutes);
       if (profile.avatar_cid) {
         setAvatarPreview(getIPFSGatewayUrl(profile.avatar_cid));
@@ -718,22 +727,33 @@ const ProfileEdit = () => {
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      <p className="text-sm font-mono text-muted-foreground">
-                        Get a blue checkmark to show your authenticity
-                      </p>
-                      <Textarea
-                        value={verificationMessage}
-                        onChange={(e) => setVerificationMessage(e.target.value)}
-                        placeholder="Why should you be verified? Include links to your social profiles, music platforms, etc."
-                        rows={3}
-                        maxLength={500}
-                      />
+                      {!hasArtistProfile ? (
+                        <div className="p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                          <p className="text-sm font-mono text-yellow-500">
+                            ⚠️ Complete your artist profile first (add artist name, avatar, or bio) before requesting verification
+                          </p>
+                        </div>
+                      ) : (
+                        <>
+                          <p className="text-sm font-mono text-muted-foreground">
+                            Get a blue checkmark to show your authenticity
+                          </p>
+                          <Textarea
+                            value={verificationMessage}
+                            onChange={(e) => setVerificationMessage(e.target.value)}
+                            placeholder="Why should you be verified? Include links to your social profiles, music platforms, etc."
+                            rows={3}
+                            maxLength={500}
+                          />
+                        </>
+                      )}
                       <Button
                         type="button"
                         onClick={handleRequestVerification}
-                        disabled={!verificationMessage.trim() || requestingVerification}
+                        disabled={!hasArtistProfile || !verificationMessage.trim() || requestingVerification}
                         variant="outline"
                         size="sm"
+                        className={!hasArtistProfile ? 'opacity-50 cursor-not-allowed' : ''}
                       >
                         {requestingVerification ? (
                           <>

@@ -16,7 +16,7 @@ const NetworkInfo = () => {
   const currentNetwork = networks.find(n => n.chain.id === chainId);
 
   return (
-    <div className="px-6 py-2 console-bg border-b tech-border">
+    <div className="px-6 py-2 console-bg border-b tech-border mt-14 md:mt-16">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
           <span className="text-sm font-mono text-muted-foreground">
@@ -40,7 +40,7 @@ const NetworkInfo = () => {
             </Button>
           ))}
           <span className="text-xs font-mono text-muted-foreground/60">
-            KTA coming soon
+            KTA
           </span>
         </div>
       </div>

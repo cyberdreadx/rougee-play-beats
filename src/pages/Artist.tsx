@@ -1,6 +1,5 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useEffect, useState, memo } from "react";
-import NetworkInfo from "@/components/NetworkInfo";
 import { useArtistProfile } from "@/hooks/useArtistProfile";
 import { useWallet } from "@/hooks/useWallet";
 import StoriesBar from "@/components/StoriesBar";
@@ -701,8 +700,6 @@ const Artist = ({ playSong, currentSong, isPlaying }: ArtistProps) => {
 
   return (
     <div className="min-h-screen bg-background pb-16 md:pb-0">
-      <NetworkInfo />
-
       {/* Modern Profile Header */}
       <div className="max-w-7xl mx-auto px-6 md:px-12 py-8">
         {loading ? (

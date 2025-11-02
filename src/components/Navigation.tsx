@@ -80,6 +80,7 @@ const Navigation = ({ activeTab = "DISCOVER", onTabChange }: NavigationProps) =>
     { name: "Discover", path: "/discover", icon: Compass },
     { name: "Swap", path: "/swap", icon: ArrowLeftRight },
     { name: "Wallet", path: "/wallet", icon: Wallet },
+    { name: "Settings", path: "/settings", icon: SettingsIcon },
     { name: "Profile", path: isArtist ? `/artist/${fullAddress}` : "/profile/edit", icon: User },
   ];
 

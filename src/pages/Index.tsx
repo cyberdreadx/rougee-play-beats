@@ -1,7 +1,6 @@
 import React, { useRef, useState, useEffect, memo } from "react";
 import { useWallet } from "@/hooks/useWallet";
 import { useNavigate } from "react-router-dom";
-import NetworkInfo from "@/components/NetworkInfo";
 import SearchBar from "@/components/SearchBar";
 import TrendingArtists from "@/components/TrendingArtists";
 import TopSongs, { TopSongsRef } from "@/components/TopSongs";
@@ -232,7 +231,6 @@ const Index = ({ playSong, currentSong, isPlaying, isRadioMode, onToggleRadio }:
 
   return (
     <div className="min-h-screen bg-background pb-24 md:pb-20 flex flex-col overflow-x-hidden">
-      <NetworkInfo />
       <div className="flex items-center justify-between px-4 md:px-6 py-4 gap-3">
         {onToggleRadio && (
           <RadioToggle 

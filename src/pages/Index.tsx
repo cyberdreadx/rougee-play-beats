@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Play, Pause, TrendingUp, Sparkles, Clock, Flame, Radio, Music, Zap } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import LiveStreams from "@/components/LiveStreams";
 
 interface Song {
   id: string;

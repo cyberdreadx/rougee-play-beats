@@ -39,6 +39,8 @@ import SongEdit from "./pages/SongEdit";
 import NotFound from "./pages/NotFound";
 import Post from "./pages/Post";
 import Settings from "./pages/Settings";
+import GoLive from "./pages/GoLive";
+import WatchStream from "./pages/WatchStream";
 import { LockCodeScreen } from "@/components/LockCodeScreen";
 import { useLockCode } from "@/hooks/useLockCode";
 import { useWallet } from "@/hooks/useWallet";
@@ -236,6 +238,8 @@ const AppContent = () => {
           <Route path="/genre/:genreName" element={<Genre playSong={handlePlaySong} currentSong={activeSong} isPlaying={activeIsPlaying} />} />
           <Route path="/playlists" element={<Playlists />} />
           <Route path="/admin" element={<Admin />} />
+          <Route path="/go-live" element={<GoLive />} />
+          <Route path="/stream/:streamId" element={<WatchStream />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

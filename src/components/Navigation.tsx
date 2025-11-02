@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useCurrentUserProfile } from "@/hooks/useCurrentUserProfile";
 import { useWallet } from "@/hooks/useWallet";
-import { Compass, TrendingUp, User, Wallet, Upload, Radio, ArrowLeftRight, HelpCircle, Music, MessageSquare, Search, ChevronLeft, ChevronRight, Settings as SettingsIcon } from "lucide-react";
+import { Compass, TrendingUp, User, Wallet, Upload, Radio, ArrowLeftRight, HelpCircle, Music, MessageSquare, Search, ChevronLeft, ChevronRight, Settings as SettingsIcon, Video } from "lucide-react";
 import MusicBars from "./MusicBars";
 import { useState, useEffect } from "react";
 
@@ -62,7 +62,10 @@ const Navigation = ({ activeTab = "DISCOVER", onTabChange }: NavigationProps) =>
     { name: "GLTCH FEED", path: "/feed", icon: Radio },
     { name: "DISCOVER", path: "/discover", icon: Compass },
     ...(isArtist 
-      ? [{ name: "MY PROFILE", path: `/artist/${fullAddress}`, icon: User }]
+      ? [
+          { name: "MY PROFILE", path: `/artist/${fullAddress}`, icon: User },
+          { name: "GO LIVE", path: "/go-live", icon: Video, highlight: true }
+        ]
       : [{ name: "BECOME ARTIST", path: "/become-artist", icon: User }]
     ),
     { name: "PLAYLISTS", path: "/playlists", icon: Music, comingSoon: true },

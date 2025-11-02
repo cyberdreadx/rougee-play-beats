@@ -7,6 +7,7 @@ import { getIPFSGatewayUrl } from "@/lib/ipfs";
 import logo from "@/assets/logo.png";
 import MusicBars from "@/components/MusicBars";
 import { AppTutorial } from "@/components/AppTutorial";
+import LiveStreams from "@/components/LiveStreams";
 import {
   Table,
   TableBody,

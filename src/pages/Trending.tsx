@@ -1149,6 +1149,11 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
   const [featuredSongIndex, setFeaturedSongIndex] = useState(0);
   const [nextSongIndex, setNextSongIndex] = useState<number | null>(null);
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [isAutoCyclePaused, setIsAutoCyclePaused] = useState(() => {
+    // Load pause state from localStorage
+    const saved = localStorage.getItem('trending_autoCycle_paused');
+    return saved === 'true';
+  });
   
   // Reset index when top 5 songs change (e.g., new data loaded)
   useEffect(() => {
@@ -1161,9 +1166,14 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
   const nextSongIndexForPreload = top5Songs.length > 0 ? (featuredSongIndex + 1) % top5Songs.length : null;
   const nextSongForPreload = nextSongIndexForPreload !== null ? top5Songs[nextSongIndexForPreload] : null;
   
-  // Cycle through top 5 songs every 8 seconds
+  // Save pause state to localStorage when it changes
   useEffect(() => {
-    if (top5Songs.length === 0) return;
+    localStorage.setItem('trending_autoCycle_paused', String(isAutoCyclePaused));
+  }, [isAutoCyclePaused]);
+
+  // Cycle through top 5 songs every 8 seconds (only when not paused)
+  useEffect(() => {
+    if (top5Songs.length === 0 || isAutoCyclePaused) return;
     
     const interval = setInterval(() => {
       const next = (featuredSongIndex + 1) % top5Songs.length;
@@ -1185,7 +1195,7 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
     }, 8000); // Cycle every 8 seconds
     
     return () => clearInterval(interval);
-  }, [top5Songs.length, featuredSongIndex]);
+  }, [top5Songs.length, featuredSongIndex, isAutoCyclePaused]);
   
   // Handle manual navigation
   const handleFeaturedSongChange = (index: number) => {
@@ -1355,20 +1365,43 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
             </div>
             
             {top5Songs.length > 1 && (
-              <div className="absolute top-4 left-6 md:left-4 flex gap-1.5 z-50 bg-black/60 backdrop-blur-md px-2 py-1.5 rounded-full border border-white/10">
-                {top5Songs.map((_, index) => (
+              <>
+                {/* Navigation Dots */}
+                <div className="absolute top-4 left-6 md:left-4 flex gap-1.5 z-50 bg-black/60 backdrop-blur-md px-2 py-1.5 rounded-full border border-white/10">
+                  {top5Songs.map((_, index) => (
+                    <button
+                      key={index}
+                      onClick={() => handleFeaturedSongChange(index)}
+                      className={`h-2 rounded-full transition-all duration-300 ${
+                        index === featuredSongIndex 
+                          ? 'w-8 bg-neon-green shadow-[0_0_8px_rgba(0,255,159,0.6)]' 
+                          : 'w-2 bg-white/30 hover:bg-white/50 hover:w-3'
+                      }`}
+                      aria-label={`Show featured song ${index + 1}`}
+                    />
+                  ))}
+                </div>
+                {/* Pause/Resume Button */}
+                <div className="absolute top-4 right-6 md:right-4 z-50">
                   <button
-                    key={index}
-                    onClick={() => handleFeaturedSongChange(index)}
-                    className={`h-2 rounded-full transition-all duration-300 ${
-                      index === featuredSongIndex 
-                        ? 'w-8 bg-neon-green shadow-[0_0_8px_rgba(0,255,159,0.6)]' 
-                        : 'w-2 bg-white/30 hover:bg-white/50 hover:w-3'
-                    }`}
-                    aria-label={`Show featured song ${index + 1}`}
-                  />
-                ))}
-              </div>
+                    onClick={() => setIsAutoCyclePaused(!isAutoCyclePaused)}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 hover:border-neon-green/50 hover:bg-black/80 transition-all font-mono text-xs uppercase text-white/70 hover:text-neon-green group"
+                    title={isAutoCyclePaused ? 'Resume auto-cycling' : 'Pause auto-cycling'}
+                  >
+                    {isAutoCyclePaused ? (
+                      <>
+                        <Play className="w-3 h-3 group-hover:scale-110 transition-transform" />
+                        <span>RESUME</span>
+                      </>
+                    ) : (
+                      <>
+                        <Pause className="w-3 h-3 group-hover:scale-110 transition-transform" />
+                        <span>PAUSE</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </>
             )}
           </div>
         ) : null}

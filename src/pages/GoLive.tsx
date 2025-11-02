@@ -35,6 +35,8 @@ export default function GoLive() {
   const [viewerCount, setViewerCount] = useState(0);
   const [chatMessages, setChatMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState('');
+  const [previewTracks, setPreviewTracks] = useState<{ audio: any; video: any } | null>(null);
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
   
   const localVideoRef = useRef<HTMLDivElement>(null);
 
@@ -57,34 +59,95 @@ export default function GoLive() {
     role: 'host'
   });
 
-  // Redirect if not an artist or verified
+  // Redirect if not connected
   useEffect(() => {
-    // Allow if user is an artist OR verified OR has any profile
-    const canGoLive = isArtist || profile?.verified || profile;
-    
-    if (!canGoLive && fullAddress) {
-      console.log('🔒 Go Live access denied:', { isArtist, verified: profile?.verified, hasProfile: !!profile });
+    if (!fullAddress) {
       toast({
-        title: 'Artist Profile Required',
-        description: 'Please create an artist profile to go live.',
+        title: 'Wallet Not Connected',
+        description: 'Please connect your wallet to go live.',
         variant: 'destructive'
       });
-      navigate('/become-artist');
-    }
-  }, [isArtist, profile, fullAddress, navigate]);
-
-  // Play local video preview
-  useEffect(() => {
-    if (localVideoTrack && localVideoRef.current) {
-      localVideoTrack.play(localVideoRef.current);
+      navigate('/');
+      return;
     }
     
-    return () => {
-      if (localVideoTrack) {
-        localVideoTrack.stop();
+    // Allow going live if user has any profile data or is connected
+    // The check is very lenient - if you're here and have a wallet, you can go live
+    console.log('🎬 Go Live access check:', { 
+      fullAddress, 
+      isArtist, 
+      verified: profile?.verified, 
+      hasArtistName: !!profile?.artist_name,
+      hasProfile: !!profile 
+    });
+  }, [fullAddress, isArtist, profile, navigate]);
+
+  // Initialize camera preview on mount
+  useEffect(() => {
+    const initPreview = async () => {
+      if (previewTracks) return; // Already initialized
+      
+      setIsLoadingPreview(true);
+      console.log('🎥 Initializing camera preview...');
+      
+      try {
+        // Import Agora utilities
+        const { createLocalTracks } = await import('@/lib/agora');
+        
+        // Request camera and microphone permissions
+        const tracks = await createLocalTracks();
+        
+        console.log('✅ Camera preview tracks created:', tracks);
+        setPreviewTracks(tracks);
+        
+        // Play video in preview
+        if (tracks.videoTrack && localVideoRef.current) {
+          tracks.videoTrack.play(localVideoRef.current);
+          console.log('✅ Video preview playing');
+        }
+      } catch (error: any) {
+        console.error('❌ Failed to initialize preview:', error);
+        toast({
+          title: 'Camera/Mic Access Required',
+          description: error.message || 'Please allow camera and microphone access to go live.',
+          variant: 'destructive'
+        });
+      } finally {
+        setIsLoadingPreview(false);
       }
     };
-  }, [localVideoTrack]);
+    
+    initPreview();
+    
+    // Cleanup on unmount
+    return () => {
+      if (previewTracks) {
+        console.log('🧹 Cleaning up preview tracks');
+        previewTracks.audioTrack?.stop();
+        previewTracks.audioTrack?.close();
+        previewTracks.videoTrack?.stop();
+        previewTracks.videoTrack?.close();
+      }
+    };
+  }, []); // Run once on mount
+
+  // Toggle video preview
+  const handleToggleVideo = () => {
+    if (previewTracks?.videoTrack) {
+      const newState = !isVideoEnabled;
+      previewTracks.videoTrack.setEnabled(newState);
+      console.log('📹 Video toggled:', newState);
+    }
+  };
+
+  // Toggle audio preview
+  const handleToggleAudio = () => {
+    if (previewTracks?.audioTrack) {
+      const newState = !isAudioEnabled;
+      previewTracks.audioTrack.setEnabled(newState);
+      console.log('🎤 Audio toggled:', newState);
+    }
+  };
 
   // Subscribe to viewer count changes
   useEffect(() => {
@@ -141,12 +204,24 @@ export default function GoLive() {
       return;
     }
 
+    if (!previewTracks) {
+      toast({
+        title: 'Camera Not Ready',
+        description: 'Please wait for camera preview to load',
+        variant: 'destructive'
+      });
+      return;
+    }
+
     try {
+      console.log('🔴 Starting live stream...');
+      
       // Generate unique channel name
       const channel = `${fullAddress}-${Date.now()}`;
       setChannelName(channel);
 
       // Create stream record in database
+      console.log('📝 Creating stream record...');
       const { data: stream, error: dbError } = await supabase
         .from('live_streams')
         .insert({
@@ -159,14 +234,20 @@ export default function GoLive() {
         .select()
         .single();
 
-      if (dbError) throw dbError;
+      if (dbError) {
+        console.error('❌ Database error:', dbError);
+        throw dbError;
+      }
       
+      console.log('✅ Stream record created:', stream.id);
       setStreamId(stream.id);
 
       // Join Agora channel
+      console.log('🌐 Joining Agora channel...');
       await join(channel, fullAddress);
       
-      // Start publishing
+      // Start publishing (using existing preview tracks)
+      console.log('📡 Starting broadcast...');
       await startPublishing();
       
       setIsSettingUp(false);
@@ -175,6 +256,8 @@ export default function GoLive() {
         title: '🔴 You\'re Live!',
         description: 'Your stream is now broadcasting',
       });
+      
+      console.log('✅ Live stream started successfully!');
     } catch (error: any) {
       console.error('❌ Failed to go live:', error);
       toast({
@@ -252,7 +335,15 @@ export default function GoLive() {
               {/* Video Preview */}
               <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
                 <div ref={localVideoRef} className="w-full h-full" />
-                {!localVideoTrack && (
+                {isLoadingPreview && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/80">
+                    <div className="text-center">
+                      <div className="animate-spin h-12 w-12 border-4 border-neon-green border-t-transparent rounded-full mx-auto mb-4" />
+                      <p className="font-mono text-sm text-muted-foreground">Requesting camera access...</p>
+                    </div>
+                  </div>
+                )}
+                {!previewTracks && !isLoadingPreview && (
                   <div className="absolute inset-0 flex items-center justify-center">
                     <VideoOff className="h-16 w-16 text-muted-foreground" />
                   </div>
@@ -295,7 +386,8 @@ export default function GoLive() {
                   <Button
                     variant="outline"
                     size="icon"
-                    onClick={toggleVideo}
+                    onClick={handleToggleVideo}
+                    disabled={!previewTracks}
                     className={isVideoEnabled ? '' : 'bg-red-500/20 border-red-500/50'}
                   >
                     {isVideoEnabled ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5 text-red-500" />}
@@ -303,7 +395,8 @@ export default function GoLive() {
                   <Button
                     variant="outline"
                     size="icon"
-                    onClick={toggleAudio}
+                    onClick={handleToggleAudio}
+                    disabled={!previewTracks}
                     className={isAudioEnabled ? '' : 'bg-red-500/20 border-red-500/50'}
                   >
                     {isAudioEnabled ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5 text-red-500" />}
@@ -313,7 +406,7 @@ export default function GoLive() {
                 <Button
                   onClick={handleGoLive}
                   className="neon-button font-mono px-8"
-                  disabled={!streamTitle.trim()}
+                  disabled={!streamTitle.trim() || !previewTracks || isLoadingPreview}
                 >
                   <Radio className="h-5 w-5 mr-2" />
                   GO LIVE

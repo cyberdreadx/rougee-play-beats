@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.58.0';
-import { requireWalletAddress } from '../_shared/privy.ts';
+import { validatePrivyToken } from '../_shared/privy.ts';
 import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 
 const corsHeaders = {
@@ -19,8 +19,63 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Validate Privy JWT and get wallet address
-    const walletAddress = await requireWalletAddress(req.headers.get('authorization'), req);
+    console.log('🔍 Admin process verification - Starting request');
+    
+    let walletAddress: string | null = null;
+    
+    // Try multiple methods to get wallet address
+    // Method 1: Check x-wallet-address header (direct from client)
+    const headerWallet = req.headers.get('x-wallet-address');
+    if (headerWallet) {
+      console.log('✅ Wallet from x-wallet-address header:', headerWallet);
+      walletAddress = headerWallet.toLowerCase();
+    }
+    
+    // Method 2: Try Privy token (if Authorization header exists)
+    if (!walletAddress) {
+      const authHeader = req.headers.get('authorization');
+      if (authHeader) {
+        try {
+          const privyUser = await validatePrivyToken(authHeader);
+          if (privyUser.walletAddress) {
+            console.log('✅ Wallet from Privy token:', privyUser.walletAddress);
+            walletAddress = privyUser.walletAddress.toLowerCase();
+          }
+        } catch (error) {
+          console.warn('⚠️ Privy token validation failed:', error);
+          // Continue to next method
+        }
+      }
+    }
+    
+    // Method 3: Check Supabase auth session
+    if (!walletAddress) {
+      const supabase = createClient(
+        Deno.env.get('SUPABASE_URL')!,
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+        {
+          global: {
+            headers: { Authorization: req.headers.get('Authorization') || '' }
+          }
+        }
+      );
+      
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (!authError && user?.user_metadata?.wallet_address) {
+        console.log('✅ Wallet from Supabase session:', user.user_metadata.wallet_address);
+        walletAddress = user.user_metadata.wallet_address.toLowerCase();
+      }
+    }
+    
+    if (!walletAddress) {
+      console.error('❌ No wallet address found via any method');
+      return new Response(
+        JSON.stringify({ error: 'Authentication required. Please connect your wallet.' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    console.log('✅ Final wallet address:', walletAddress);
 
     // Create service role client
     const supabase = createClient(

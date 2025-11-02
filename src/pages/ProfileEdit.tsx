@@ -137,36 +137,57 @@ const ProfileEdit = () => {
     
     setRequestingVerification(true);
     try {
-      const token = await getAccessToken();
+      console.log('🔍 Requesting verification for:', fullAddress);
+      
+      // Get auth headers if available
+      const headers = await getAuthHeaders().catch(() => ({}));
+      
       const { data, error } = await supabase.functions.invoke('request-verification-simple', {
         headers: {
-          Authorization: `Bearer ${token}`,
-          'x-privy-token': token,
+          ...headers,
           'x-wallet-address': fullAddress.toLowerCase(),
+          'Content-Type': 'application/json',
         },
         body: { 
-          message: verificationMessage,
-          wallet_address: fullAddress
+          message: verificationMessage || null,
+          wallet_address: fullAddress.toLowerCase()
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Supabase function error:', error);
+        throw error;
+      }
       
       // Check if response indicates an error
       if (data && typeof data === 'object' && 'error' in data) {
-        throw new Error((data as any).error);
+        console.error('❌ Function returned error:', data);
+        throw new Error((data as any).error || 'Unknown error from verification function');
+      }
+
+      if (!data || (typeof data === 'object' && !('success' in data))) {
+        console.warn('⚠️ Unexpected response format:', data);
       }
 
       setVerificationStatus('pending');
+      setVerificationMessage('');
       toast({
         title: "Verification Requested",
         description: "Your request has been submitted for review",
       });
+      
+      // Refresh verification status
+      checkVerificationRequest();
     } catch (error: any) {
-      console.error('Error requesting verification:', error);
+      console.error('❌ Error requesting verification:', error);
+      console.error('Error details:', {
+        message: error.message,
+        name: error.name,
+        stack: error.stack,
+      });
       toast({
         title: "Request Failed",
-        description: error.message || "Failed to submit verification request",
+        description: error.message || "Failed to submit verification request. Please try again.",
         variant: "destructive",
       });
     } finally {

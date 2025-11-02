@@ -54,7 +54,7 @@ const Header = () => {
 
   return (
     <header 
-      className="w-full glass z-30 border-b border-neon-green/10 pt-safe px-4 transition-all duration-300"
+      className="w-full max-w-full glass z-30 border-b border-neon-green/10 pt-safe px-4 transition-all duration-300 overflow-x-hidden"
       style={{
         paddingLeft: typeof window !== 'undefined' && window.innerWidth >= 768 ? 'var(--sidebar-width, 16rem)' : '1rem',
         position: 'fixed',

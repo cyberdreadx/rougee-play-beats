@@ -113,62 +113,112 @@ export const AppTutorial = ({ onComplete }: AppTutorialProps) => {
     if (status === STATUS.FINISHED || status === STATUS.SKIPPED) {
       setRun(false);
       localStorage.setItem('hasSeenTutorial', 'true');
+      
+      // Force cleanup and fix any overflow issues
+      setTimeout(() => {
+        // Remove any Joyride overlays/spotlights that might remain
+        const joyrideOverlays = document.querySelectorAll('[class*="react-joyride"]');
+        joyrideOverlays.forEach((el) => {
+          if (el instanceof HTMLElement) {
+            el.style.display = 'none';
+          }
+        });
+        
+        // Ensure body/html don't have overflow
+        document.documentElement.style.overflowX = 'hidden';
+        document.body.style.overflowX = 'hidden';
+        document.documentElement.style.maxWidth = '100vw';
+        document.body.style.maxWidth = '100vw';
+        
+        // Remove any inline styles that might cause overflow
+        const root = document.getElementById('root');
+        if (root) {
+          root.style.overflowX = 'hidden';
+          root.style.maxWidth = '100vw';
+        }
+      }, 100);
+      
       onComplete?.();
     }
   };
 
   return (
-    <Joyride
-      steps={steps}
-      run={run}
-      continuous
-      showProgress
-      showSkipButton
-      scrollToFirstStep
-      disableScrolling={false}
-      spotlightClicks
-      disableOverlayClose
-      callback={handleJoyrideCallback}
-      styles={{
-        options: {
-          primaryColor: '#00ff9f',
-          textColor: '#ffffff',
-          backgroundColor: '#1a1a1a',
-          overlayColor: 'rgba(0, 0, 0, 0.8)',
-          arrowColor: '#1a1a1a',
-          zIndex: 10000,
-        },
-        tooltip: {
-          borderRadius: 12,
-          padding: 20,
-          fontSize: 14,
-          fontFamily: 'monospace',
-        },
-        buttonNext: {
-          backgroundColor: '#00ff9f',
-          color: '#000',
-          fontWeight: 'bold',
-          fontFamily: 'monospace',
-          borderRadius: 8,
-          padding: '8px 16px',
-        },
-        buttonBack: {
-          color: '#888',
-          fontFamily: 'monospace',
-        },
-        buttonSkip: {
-          color: '#888',
-          fontFamily: 'monospace',
-        },
-      }}
-      locale={{
-        back: 'Back',
-        close: 'Close',
-        last: 'Finish',
-        next: 'Next',
-        skip: 'Skip Tour',
-      }}
-    />
+    <>
+      <Joyride
+        steps={steps}
+        run={run}
+        continuous
+        showProgress
+        showSkipButton
+        scrollToFirstStep
+        disableScrolling={false}
+        spotlightClicks
+        disableOverlayClose
+        callback={handleJoyrideCallback}
+        styles={{
+          options: {
+            primaryColor: '#00ff9f',
+            textColor: '#ffffff',
+            backgroundColor: '#1a1a1a',
+            overlayColor: 'rgba(0, 0, 0, 0.8)',
+            arrowColor: '#1a1a1a',
+            zIndex: 10000,
+          },
+          tooltip: {
+            borderRadius: 12,
+            padding: 20,
+            fontSize: 14,
+            fontFamily: 'monospace',
+            maxWidth: '90vw',
+            width: 'auto',
+          },
+          tooltipContainer: {
+            maxWidth: '90vw',
+            overflow: 'hidden',
+          },
+          overlay: {
+            overflow: 'hidden',
+          },
+          buttonNext: {
+            backgroundColor: '#00ff9f',
+            color: '#000',
+            fontWeight: 'bold',
+            fontFamily: 'monospace',
+            borderRadius: 8,
+            padding: '8px 16px',
+          },
+          buttonBack: {
+            color: '#888',
+            fontFamily: 'monospace',
+          },
+          buttonSkip: {
+            color: '#888',
+            fontFamily: 'monospace',
+          },
+        }}
+        locale={{
+          back: 'Back',
+          close: 'Close',
+          last: 'Finish',
+          next: 'Next',
+          skip: 'Skip Tour',
+        }}
+      />
+      {/* Force overflow fix after tutorial */}
+      {!run && (
+        <style>{`
+          html, body, #root {
+            overflow-x: hidden !important;
+            max-width: 100vw !important;
+            position: relative !important;
+          }
+          body > * {
+            max-width: 100vw !important;
+            overflow-x: hidden !important;
+          }
+        `}</style>
+      )}
+    </>
   );
 };
 

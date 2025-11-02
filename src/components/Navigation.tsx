@@ -137,7 +137,7 @@ const Navigation = ({ activeTab = "DISCOVER", onTabChange }: NavigationProps) =>
   return (
     <>
       {/* Desktop Sidebar Navigation */}
-      <nav className={`hidden md:flex fixed left-0 top-0 bottom-0 z-50 flex-col bg-black/40 backdrop-blur-2xl border-r border-white/10 shadow-[4px_0_32px_0_rgba(0,255,159,0.1)] transition-all duration-300 ${
+      <nav className={`hidden md:flex fixed left-0 top-0 bottom-0 z-50 flex-col bg-black/40 backdrop-blur-2xl border-r border-white/10 shadow-[4px_0_32px_0_rgba(0,255,159,0.1)] transition-all duration-300 overflow-x-hidden ${
         isSidebarCollapsed ? 'w-20' : 'w-64'
       }`}>
         {/* Logo/Header */}
@@ -228,7 +228,7 @@ const Navigation = ({ activeTab = "DISCOVER", onTabChange }: NavigationProps) =>
 
       {/* Mobile Bottom Navigation - Futuristic Cyber Style */}
       <nav 
-        className={`md:hidden fixed bottom-0 left-0 right-0 z-50 transition-transform duration-300 ${
+        className={`md:hidden fixed bottom-0 left-0 right-0 z-50 transition-transform duration-300 w-full max-w-full overflow-x-hidden ${
           isMobileNavVisible ? 'translate-y-0' : 'translate-y-full'
         }`}
         style={{ 

@@ -57,17 +57,21 @@ export default function GoLive() {
     role: 'host'
   });
 
-  // Redirect if not an artist
+  // Redirect if not an artist or verified
   useEffect(() => {
-    if (!isArtist) {
+    // Allow if user is an artist OR verified OR has any profile
+    const canGoLive = isArtist || profile?.verified || profile;
+    
+    if (!canGoLive && fullAddress) {
+      console.log('🔒 Go Live access denied:', { isArtist, verified: profile?.verified, hasProfile: !!profile });
       toast({
-        title: 'Artists Only',
-        description: 'Only verified artists can go live.',
+        title: 'Artist Profile Required',
+        description: 'Please create an artist profile to go live.',
         variant: 'destructive'
       });
-      navigate('/');
+      navigate('/become-artist');
     }
-  }, [isArtist, navigate]);
+  }, [isArtist, profile, fullAddress, navigate]);
 
   // Play local video preview
   useEffect(() => {

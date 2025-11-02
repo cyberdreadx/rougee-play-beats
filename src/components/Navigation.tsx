@@ -16,7 +16,7 @@ const Navigation = ({ activeTab = "DISCOVER", onTabChange }: NavigationProps) =>
   const navigate = useNavigate();
   const location = useLocation();
   const { fullAddress } = useWallet();
-  const { isArtist } = useCurrentUserProfile();
+  const { isArtist, profile } = useCurrentUserProfile();
   
   // Sidebar collapse state
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -64,7 +64,7 @@ const Navigation = ({ activeTab = "DISCOVER", onTabChange }: NavigationProps) =>
     { name: "TRENDING", path: "/", icon: TrendingUp },
     { name: "GLTCH FEED", path: "/feed", icon: Radio },
     { name: "DISCOVER", path: "/discover", icon: Compass },
-    ...(isArtist 
+    ...(isArtist || profile?.verified || profile?.artist_name
       ? [
           { name: "MY PROFILE", path: `/artist/${fullAddress}`, icon: User },
           { name: "GO LIVE", path: "/go-live", icon: Video, highlight: true }
@@ -90,7 +90,7 @@ const Navigation = ({ activeTab = "DISCOVER", onTabChange }: NavigationProps) =>
 
   // Mobile sidebar items (accessed via hamburger menu)
   const mobileSidebarItems = [
-    ...(isArtist 
+    ...(isArtist || profile?.verified || profile?.artist_name
       ? [
           { name: "MY PROFILE", path: `/artist/${fullAddress}`, icon: User },
           { name: "GO LIVE", path: "/go-live", icon: Video, highlight: true }

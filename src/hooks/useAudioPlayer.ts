@@ -10,6 +10,7 @@ interface Song {
   cover_cid: string | null;
   play_count: number;
   created_at: string;
+  ai_usage?: 'none' | 'partial' | 'full' | null;
 }
 
 export const useAudioPlayer = () => {
@@ -65,6 +66,11 @@ export const useAudioPlayer = () => {
   const playNextAvailableSong = useCallback(async () => {
     
     try {
+      // Get AI filter from localStorage
+      const savedFilter = localStorage.getItem('audioPlayer_aiFilter') || 'all';
+      // Migrate old 'no-ai-partial' to 'partial'
+      const aiFilter = savedFilter === 'no-ai-partial' ? 'partial' : savedFilter as 'all' | 'no-ai' | 'partial';
+      
       // Fetch songs from the database, excluding the current song
       let query = supabase
         .from('songs')
@@ -85,11 +91,25 @@ export const useAudioPlayer = () => {
         return;
       }
 
-
       if (songs && songs.length > 0) {
-        // Pick a random song from the available songs
-        const randomIndex = Math.floor(Math.random() * songs.length);
-        const nextSong = songs[randomIndex];
+        // Apply AI filter
+        const filteredSongs = songs.filter(song => {
+          if (aiFilter === 'all') return true;
+          if (aiFilter === 'no-ai') {
+            return song.ai_usage === 'none' || !song.ai_usage;
+          }
+          if (aiFilter === 'partial') {
+            return song.ai_usage === 'partial';
+          }
+          return true;
+        });
+
+        // If no songs match the filter, show all songs as fallback
+        const songsToChooseFrom = filteredSongs.length > 0 ? filteredSongs : songs;
+        
+        // Pick a random song from the filtered songs
+        const randomIndex = Math.floor(Math.random() * songsToChooseFrom.length);
+        const nextSong = songsToChooseFrom[randomIndex];
         
         
         if (nextSong) {

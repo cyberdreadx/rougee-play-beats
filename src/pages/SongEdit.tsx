@@ -6,8 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { useWallet } from "@/hooks/useWallet";
-import { Loader2, Save, ArrowLeft } from "lucide-react";
+import { Loader2, Save, ArrowLeft, Shield } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { usePrivyToken } from "@/hooks/usePrivyToken";
@@ -41,6 +42,7 @@ const SongEdit = () => {
   const [downloadEnabled, setDownloadEnabled] = useState(false);
   const [downloadType, setDownloadType] = useState<'free' | 'purchase_usdc' | 'holders_only' | 'disabled'>('disabled');
   const [downloadPriceUsdc, setDownloadPriceUsdc] = useState("0");
+  const [nsfw, setNsfw] = useState(false);
 
   useEffect(() => {
     if (isPrivyReady && !isConnected) {
@@ -96,6 +98,7 @@ const SongEdit = () => {
       setDownloadEnabled(data.download_enabled ?? false);
       setDownloadType((data.download_type as any) || 'disabled');
       setDownloadPriceUsdc(data.download_price_usdc?.toString() || "0");
+      setNsfw(data.nsfw ?? false);
     } catch (error) {
       console.error("Error fetching song:", error);
       toast({
@@ -128,6 +131,7 @@ const SongEdit = () => {
       const updates: any = {
         download_enabled: downloadEnabled,
         download_type: downloadType,
+        nsfw: nsfw,
         updated_at: new Date().toISOString(),
       };
 
@@ -236,9 +240,33 @@ const SongEdit = () => {
           </div>
         </Card>
 
-        {/* Download Settings Card */}
+        {/* Song Settings Card */}
         <Card className="console-bg tech-border p-6 mt-6">
-          <h2 className="text-xl font-mono font-bold neon-text mb-4">Download Settings</h2>
+          <h2 className="text-xl font-mono font-bold neon-text mb-4">Song Settings</h2>
+          
+          {/* NSFW Toggle */}
+          <div className="flex items-center justify-between p-4 rounded-lg border border-white/10 bg-black/20 mb-6">
+            <div className="flex items-center gap-3">
+              <Shield className="w-5 h-5 text-red-400" />
+              <div>
+                <Label htmlFor="nsfw" className="font-mono text-base font-semibold cursor-pointer block">
+                  18+ Only (NSFW)
+                </Label>
+                <p className="text-xs text-muted-foreground font-mono mt-0.5">
+                  Mark this song as not safe for work / 18+ content only
+                </p>
+              </div>
+            </div>
+            <Switch
+              id="nsfw"
+              checked={nsfw}
+              onCheckedChange={setNsfw}
+              disabled={updating}
+              className="data-[state=checked]:bg-red-500"
+            />
+          </div>
+
+          <h3 className="text-lg font-mono font-bold neon-text mb-4">Download Settings</h3>
           
           <div className="space-y-4">
             <div className="flex items-center gap-3">

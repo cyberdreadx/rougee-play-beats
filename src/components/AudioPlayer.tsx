@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Card } from "@/components/ui/card";
-import { Play, Pause, Volume2, VolumeX, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, CheckCircle, Music, X, ChevronRight, ChevronLeft } from "lucide-react";
+import { Play, Pause, Volume2, VolumeX, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, CheckCircle, Music, X, ChevronRight, ChevronLeft, Filter, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { getIPFSGatewayUrl, getIPFSGatewayUrls } from "@/lib/ipfs";
 import { useToast } from "@/hooks/use-toast";
@@ -25,6 +25,7 @@ interface Song {
   play_count: number;
   created_at: string;
   ticker?: string | null;
+  ai_usage?: 'none' | 'partial' | 'full' | null;
 }
 
 interface Ad {
@@ -81,6 +82,23 @@ const AudioPlayer = ({
   const [currentCoverUrlIndex, setCurrentCoverUrlIndex] = useState(0);
   const [isMinimized, setIsMinimized] = useState(initialMinimized);
   const hasUserInteractedRef = useRef(false); // Track if user has manually toggled minimized state
+  
+  // AI Filter state - persisted in localStorage
+  type AiFilter = 'all' | 'no-ai' | 'partial';
+  const [aiFilter, setAiFilter] = useState<AiFilter>(() => {
+    const saved = localStorage.getItem('audioPlayer_aiFilter');
+    // Migrate old 'no-ai-partial' to 'partial'
+    if (saved === 'no-ai-partial') {
+      localStorage.setItem('audioPlayer_aiFilter', 'partial');
+      return 'partial';
+    }
+    return (saved as AiFilter) || 'all';
+  });
+  
+  // Save filter to localStorage when it changes
+  useEffect(() => {
+    localStorage.setItem('audioPlayer_aiFilter', aiFilter);
+  }, [aiFilter]);
   
   // Update minimized state when initialMinimized changes (e.g., new song on feed page)
   useEffect(() => {
@@ -901,6 +919,79 @@ const AudioPlayer = ({
             </span>
           </div>
         </div>
+        
+        {/* AI Filter Controls - Mobile */}
+        <div className="px-3 pb-3 flex flex-col gap-2">
+          <label className="flex items-center gap-2 cursor-pointer group">
+            <div className={`relative w-4 h-4 rounded border-2 transition-all duration-300 ${
+              aiFilter === 'all' 
+                ? 'bg-neon-green/20 border-neon-green shadow-[0_0_10px_rgba(0,255,159,0.5)]' 
+                : 'bg-black/40 border-white/20 group-hover:border-neon-green/40'
+            }`}>
+              {aiFilter === 'all' && (
+                <Check className="absolute inset-0 w-full h-full p-0.5 text-neon-green" />
+              )}
+            </div>
+            <span className={`font-mono text-[10px] uppercase tracking-wider transition-colors ${
+              aiFilter === 'all' ? 'text-neon-green' : 'text-white/50 group-hover:text-white/70'
+            }`}>
+              ALL
+            </span>
+            <input
+              type="radio"
+              name="aiFilter"
+              checked={aiFilter === 'all'}
+              onChange={() => setAiFilter('all')}
+              className="sr-only"
+            />
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer group">
+            <div className={`relative w-4 h-4 rounded border-2 transition-all duration-300 ${
+              aiFilter === 'partial' 
+                ? 'bg-neon-green/20 border-neon-green shadow-[0_0_10px_rgba(0,255,159,0.5)]' 
+                : 'bg-black/40 border-white/20 group-hover:border-neon-green/40'
+            }`}>
+              {aiFilter === 'partial' && (
+                <Check className="absolute inset-0 w-full h-full p-0.5 text-neon-green" />
+              )}
+            </div>
+            <span className={`font-mono text-[10px] uppercase tracking-wider transition-colors ${
+              aiFilter === 'partial' ? 'text-neon-green' : 'text-white/50 group-hover:text-white/70'
+            }`}>
+              PARTIAL AI
+            </span>
+            <input
+              type="radio"
+              name="aiFilter"
+              checked={aiFilter === 'partial'}
+              onChange={() => setAiFilter('partial')}
+              className="sr-only"
+            />
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer group">
+            <div className={`relative w-4 h-4 rounded border-2 transition-all duration-300 ${
+              aiFilter === 'no-ai' 
+                ? 'bg-neon-green/20 border-neon-green shadow-[0_0_10px_rgba(0,255,159,0.5)]' 
+                : 'bg-black/40 border-white/20 group-hover:border-neon-green/40'
+            }`}>
+              {aiFilter === 'no-ai' && (
+                <Check className="absolute inset-0 w-full h-full p-0.5 text-neon-green" />
+              )}
+            </div>
+            <span className={`font-mono text-[10px] uppercase tracking-wider transition-colors ${
+              aiFilter === 'no-ai' ? 'text-neon-green' : 'text-white/50 group-hover:text-white/70'
+            }`}>
+              NO AI
+            </span>
+            <input
+              type="radio"
+              name="aiFilter"
+              checked={aiFilter === 'no-ai'}
+              onChange={() => setAiFilter('no-ai')}
+              className="sr-only"
+            />
+          </label>
+        </div>
       </div>
 
       {/* Desktop Full Player */}
@@ -1065,6 +1156,82 @@ const AudioPlayer = ({
             className="w-20"
             onValueChange={handleVolumeChange}
           />
+        </div>
+      </div>
+      
+      {/* AI Filter Controls - Desktop */}
+      <div className="hidden md:block px-4 pb-3 border-t border-white/10 pt-2">
+        <div className="flex items-center gap-4 justify-center">
+          <Filter className="w-3.5 h-3.5 text-neon-green/50 flex-shrink-0" />
+          <label className="flex items-center gap-2 cursor-pointer group">
+            <div className={`relative w-4 h-4 rounded border-2 transition-all duration-300 ${
+              aiFilter === 'all' 
+                ? 'bg-neon-green/20 border-neon-green shadow-[0_0_10px_rgba(0,255,159,0.5)]' 
+                : 'bg-black/40 border-white/20 group-hover:border-neon-green/40'
+            }`}>
+              {aiFilter === 'all' && (
+                <Check className="absolute inset-0 w-full h-full p-0.5 text-neon-green" />
+              )}
+            </div>
+            <span className={`font-mono text-xs uppercase tracking-wider transition-colors ${
+              aiFilter === 'all' ? 'text-neon-green' : 'text-white/50 group-hover:text-white/70'
+            }`}>
+              ALL
+            </span>
+            <input
+              type="radio"
+              name="aiFilter"
+              checked={aiFilter === 'all'}
+              onChange={() => setAiFilter('all')}
+              className="sr-only"
+            />
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer group">
+            <div className={`relative w-4 h-4 rounded border-2 transition-all duration-300 ${
+              aiFilter === 'partial' 
+                ? 'bg-neon-green/20 border-neon-green shadow-[0_0_10px_rgba(0,255,159,0.5)]' 
+                : 'bg-black/40 border-white/20 group-hover:border-neon-green/40'
+            }`}>
+              {aiFilter === 'partial' && (
+                <Check className="absolute inset-0 w-full h-full p-0.5 text-neon-green" />
+              )}
+            </div>
+            <span className={`font-mono text-xs uppercase tracking-wider transition-colors ${
+              aiFilter === 'partial' ? 'text-neon-green' : 'text-white/50 group-hover:text-white/70'
+            }`}>
+              PARTIAL AI
+            </span>
+            <input
+              type="radio"
+              name="aiFilter"
+              checked={aiFilter === 'partial'}
+              onChange={() => setAiFilter('partial')}
+              className="sr-only"
+            />
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer group">
+            <div className={`relative w-4 h-4 rounded border-2 transition-all duration-300 ${
+              aiFilter === 'no-ai' 
+                ? 'bg-neon-green/20 border-neon-green shadow-[0_0_10px_rgba(0,255,159,0.5)]' 
+                : 'bg-black/40 border-white/20 group-hover:border-neon-green/40'
+            }`}>
+              {aiFilter === 'no-ai' && (
+                <Check className="absolute inset-0 w-full h-full p-0.5 text-neon-green" />
+              )}
+            </div>
+            <span className={`font-mono text-xs uppercase tracking-wider transition-colors ${
+              aiFilter === 'no-ai' ? 'text-neon-green' : 'text-white/50 group-hover:text-white/70'
+            }`}>
+              NO AI
+            </span>
+            <input
+              type="radio"
+              name="aiFilter"
+              checked={aiFilter === 'no-ai'}
+              onChange={() => setAiFilter('no-ai')}
+              className="sr-only"
+            />
+          </label>
         </div>
       </div>
     </Card>

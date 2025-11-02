@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Music, Upload, AlertTriangle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -250,6 +251,7 @@ export default function UploadMusic() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [confirmRights, setConfirmRights] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [nsfw, setNsfw] = useState(false);
   const generationInProgress = useRef(false);
 
   // Cleanup audio preview URL on unmount
@@ -532,6 +534,7 @@ export default function UploadMusic() {
         description,
         ticker,
         aiUsage,
+        nsfw,
         aiCoverPrompt: selectedGeneratedCover ? aiCoverPrompt : null
       }));
 
@@ -569,6 +572,7 @@ export default function UploadMusic() {
       setIsAISectionExpanded(false);
       setAudioPreviewUrl(null);
       setIsPlaying(false);
+      setNsfw(false);
       setCopyrightWarning({ show: false, detectedInfo: null, violationCount: 0 });
 
       // Auto-redirect to home after successful upload
@@ -994,6 +998,28 @@ export default function UploadMusic() {
             <p className="text-xs text-muted-foreground mt-1">
               Indicate if AI was used to create this track
             </p>
+          </div>
+
+          {/* NSFW Toggle */}
+          <div className="flex items-center gap-3 p-4 rounded-lg border border-white/10 bg-black/20">
+            <div className="flex items-center gap-2 flex-1">
+              <Shield className="w-4 h-4 md:w-5 md:h-5 text-red-400" />
+              <div className="flex-1">
+                <Label htmlFor="nsfw" className="font-mono text-sm font-semibold cursor-pointer">
+                  18+ Only (NSFW)
+                </Label>
+                <p className="text-xs text-muted-foreground font-mono mt-0.5">
+                  Mark this song as not safe for work / 18+ content only
+                </p>
+              </div>
+            </div>
+            <Switch
+              id="nsfw"
+              checked={nsfw}
+              onCheckedChange={setNsfw}
+              disabled={uploading || scanning}
+              className="data-[state=checked]:bg-red-500"
+            />
           </div>
 
           {/* Rights confirmation */}

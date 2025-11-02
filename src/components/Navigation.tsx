@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useCurrentUserProfile } from "@/hooks/useCurrentUserProfile";
 import { useWallet } from "@/hooks/useWallet";
-import { Compass, TrendingUp, User, Wallet, Upload, Radio, ArrowLeftRight, HelpCircle, Music, MessageSquare, Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { Compass, TrendingUp, User, Wallet, Upload, Radio, ArrowLeftRight, HelpCircle, Music, MessageSquare, Search, ChevronLeft, ChevronRight, Settings as SettingsIcon } from "lucide-react";
 import MusicBars from "./MusicBars";
 import { useState, useEffect } from "react";
 
@@ -70,6 +70,7 @@ const Navigation = ({ activeTab = "DISCOVER", onTabChange }: NavigationProps) =>
     { name: "WALLET", path: "/wallet", icon: Wallet },
     { name: "SWAP", path: "/swap", icon: ArrowLeftRight },
     { name: "UPLOAD", path: "/upload", icon: Upload },
+    { name: "SETTINGS", path: "/settings", icon: SettingsIcon },
   ];
 
   // Mobile tabs - SoundCloud/Spotify style with labels

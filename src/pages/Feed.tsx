@@ -215,6 +215,18 @@ SongCardFeedSkeleton.displayName = 'SongCardFeedSkeleton';
 
 export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {}) {
   const navigate = useNavigate();
+  
+  // AI Filter state
+  type AiFilter = 'all' | 'no-ai' | 'partial';
+  const [aiFilter, setAiFilter] = useState<AiFilter>(() => {
+    const saved = localStorage.getItem('audioPlayer_aiFilter');
+    // Migrate old 'no-ai-partial' to 'partial'
+    if (saved === 'no-ai-partial') {
+      localStorage.setItem('audioPlayer_aiFilter', 'partial');
+      return 'partial';
+    }
+    return (saved as AiFilter) || 'all';
+  });
   const {
     fullAddress,
     isConnected
@@ -1606,19 +1618,113 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
 
             {/* Songs Tab */}
             <TabsContent value="songs" className="space-y-0 md:space-y-4">
+              {/* AI Filter Controls */}
+              <div className="mb-4 md:mb-6 flex flex-wrap gap-3 md:gap-4 px-4 md:px-0">
+                <label className="flex items-center gap-2 cursor-pointer group">
+                  <div className={`relative w-4 h-4 rounded border-2 transition-all duration-300 ${
+                    aiFilter === 'all' 
+                      ? 'bg-neon-green/20 border-neon-green shadow-[0_0_10px_rgba(0,255,159,0.5)]' 
+                      : 'bg-black/40 border-white/20 group-hover:border-neon-green/40'
+                  }`}>
+                    {aiFilter === 'all' && (
+                      <Check className="absolute inset-0 w-full h-full p-0.5 text-neon-green" />
+                    )}
+                  </div>
+                  <span className={`font-mono text-xs uppercase tracking-wider transition-colors ${
+                    aiFilter === 'all' ? 'text-neon-green' : 'text-white/50 group-hover:text-white/70'
+                  }`}>
+                    ALL
+                  </span>
+                  <input
+                    type="radio"
+                    name="aiFilter"
+                    checked={aiFilter === 'all'}
+                    onChange={() => {
+                      setAiFilter('all');
+                      localStorage.setItem('audioPlayer_aiFilter', 'all');
+                    }}
+                    className="sr-only"
+                  />
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer group">
+                  <div className={`relative w-4 h-4 rounded border-2 transition-all duration-300 ${
+                    aiFilter === 'partial' 
+                      ? 'bg-neon-green/20 border-neon-green shadow-[0_0_10px_rgba(0,255,159,0.5)]' 
+                      : 'bg-black/40 border-white/20 group-hover:border-neon-green/40'
+                  }`}>
+                    {aiFilter === 'partial' && (
+                      <Check className="absolute inset-0 w-full h-full p-0.5 text-neon-green" />
+                    )}
+                  </div>
+                  <span className={`font-mono text-xs uppercase tracking-wider transition-colors ${
+                    aiFilter === 'partial' ? 'text-neon-green' : 'text-white/50 group-hover:text-white/70'
+                  }`}>
+                    PARTIAL AI
+                  </span>
+                  <input
+                    type="radio"
+                    name="aiFilter"
+                    checked={aiFilter === 'partial'}
+                    onChange={() => {
+                      setAiFilter('partial');
+                      localStorage.setItem('audioPlayer_aiFilter', 'partial');
+                    }}
+                    className="sr-only"
+                  />
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer group">
+                  <div className={`relative w-4 h-4 rounded border-2 transition-all duration-300 ${
+                    aiFilter === 'no-ai' 
+                      ? 'bg-neon-green/20 border-neon-green shadow-[0_0_10px_rgba(0,255,159,0.5)]' 
+                      : 'bg-black/40 border-white/20 group-hover:border-neon-green/40'
+                  }`}>
+                    {aiFilter === 'no-ai' && (
+                      <Check className="absolute inset-0 w-full h-full p-0.5 text-neon-green" />
+                    )}
+                  </div>
+                  <span className={`font-mono text-xs uppercase tracking-wider transition-colors ${
+                    aiFilter === 'no-ai' ? 'text-neon-green' : 'text-white/50 group-hover:text-white/70'
+                  }`}>
+                    NO AI
+                  </span>
+                  <input
+                    type="radio"
+                    name="aiFilter"
+                    checked={aiFilter === 'no-ai'}
+                    onChange={() => {
+                      setAiFilter('no-ai');
+                      localStorage.setItem('audioPlayer_aiFilter', 'no-ai');
+                    }}
+                    className="sr-only"
+                  />
+                </label>
+              </div>
+
               {loadingSongs ? (
                 <>
                   {[...Array(5)].map((_, i) => (
                     <SongCardFeedSkeleton key={`skeleton-song-feed-${i}`} />
                   ))}
                 </>
-              ) : songs.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground px-4">
-                  No songs uploaded yet.
-                </div>
-              ) : (
-                songs.map(song => <SongCard key={song.id} song={song} />)
-              )}
+              ) : (() => {
+        // Filter songs based on AI filter
+        const filteredSongs = songs.filter(song => {
+          if (aiFilter === 'all') return true;
+          if (aiFilter === 'no-ai') return song.ai_usage === 'none' || !song.ai_usage;
+          if (aiFilter === 'partial') {
+            return song.ai_usage === 'partial';
+          }
+          return true;
+        });
+
+                return filteredSongs.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground px-4">
+                    No songs match the selected filter.
+                  </div>
+                ) : (
+                  filteredSongs.map(song => <SongCard key={song.id} song={song} />)
+                );
+              })()}
 
               {/* Load More Songs Button */}
               {!loadingSongs && songs.length > 0 && hasMoreSongs && (

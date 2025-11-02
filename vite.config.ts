@@ -48,6 +48,23 @@ export default defineConfig(({ mode }) => ({
     rollupOptions: {
       // Exclude x402-temp example files from build
       external: [/x402-temp/],
+      output: {
+        // Manual chunking to split large vendors
+        manualChunks: {
+          // Core React ecosystem
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          // Wagmi and blockchain
+          'web3-vendor': ['wagmi', 'viem', '@privy-io/react-auth'],
+          // Supabase
+          'supabase-vendor': ['@supabase/supabase-js'],
+          // Agora (new - large SDK)
+          'agora-vendor': ['agora-rtc-sdk-ng'],
+          // UI components
+          'ui-vendor': ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-tabs', '@radix-ui/react-tooltip'],
+          // Charts and visualization
+          'charts-vendor': ['recharts', 'lucide-react'],
+        },
+      },
       onwarn(warning, warn) {
         // Suppress PURE annotation warnings
         if (warning.code === 'INVALID_ANNOTATION' && warning.message.includes('/*#__PURE__*/')) {

@@ -4,6 +4,7 @@
   
 [build.environment]
   NODE_VERSION = "20"
+  NODE_OPTIONS = "--max-old-space-size=4096"
 
 # Redirect all routes to index.html for SPA routing
 [[redirects]]

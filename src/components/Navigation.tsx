@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useCurrentUserProfile } from "@/hooks/useCurrentUserProfile";
 import { useWallet } from "@/hooks/useWallet";
-import { Compass, TrendingUp, User, Wallet, Upload, Radio, ArrowLeftRight, HelpCircle, Music, MessageSquare, Search, ChevronLeft, ChevronRight, Settings as SettingsIcon, Video } from "lucide-react";
+import { Compass, TrendingUp, User, Wallet, Upload, Radio, ArrowLeftRight, HelpCircle, Music, MessageSquare, Search, ChevronLeft, ChevronRight, Settings as SettingsIcon, Video, Menu, X } from "lucide-react";
 import MusicBars from "./MusicBars";
 import { useState, useEffect } from "react";
 
@@ -20,6 +20,9 @@ const Navigation = ({ activeTab = "DISCOVER", onTabChange }: NavigationProps) =>
   
   // Sidebar collapse state
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  
+  // Mobile sidebar state
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   
   // Update CSS variable when sidebar state changes
   useEffect(() => {
@@ -76,18 +79,38 @@ const Navigation = ({ activeTab = "DISCOVER", onTabChange }: NavigationProps) =>
     { name: "SETTINGS", path: "/settings", icon: SettingsIcon },
   ];
 
-  // Mobile tabs - SoundCloud/Spotify style with labels
+  // Mobile tabs - Only essentials (4-5 max for clean UX)
   const mobileTabs = [
     { name: "Trending", path: "/", icon: TrendingUp },
     { name: "Feed", path: "/feed", icon: Radio },
     { name: "Discover", path: "/discover", icon: Compass },
-    { name: "Swap", path: "/swap", icon: ArrowLeftRight },
     { name: "Wallet", path: "/wallet", icon: Wallet },
-    { name: "Settings", path: "/settings", icon: SettingsIcon },
-    { name: "Profile", path: isArtist ? `/artist/${fullAddress}` : "/profile/edit", icon: User },
+    { name: "Menu", path: "#", icon: Menu, isMenu: true }, // Hamburger menu
+  ];
+
+  // Mobile sidebar items (accessed via hamburger menu)
+  const mobileSidebarItems = [
+    ...(isArtist 
+      ? [
+          { name: "MY PROFILE", path: `/artist/${fullAddress}`, icon: User },
+          { name: "GO LIVE", path: "/go-live", icon: Video, highlight: true }
+        ]
+      : [{ name: "BECOME ARTIST", path: "/become-artist", icon: User }]
+    ),
+    { name: "UPLOAD", path: "/upload", icon: Upload },
+    { name: "SWAP", path: "/swap", icon: ArrowLeftRight },
+    { name: "SETTINGS", path: "/settings", icon: SettingsIcon },
+    { name: "PLAYLISTS", path: "/playlists", icon: Music, comingSoon: true },
+    { name: "MESSAGES", path: "/messages", icon: MessageSquare },
   ];
 
   const handleTabClick = (tab: typeof desktopTabs[0]) => {
+    // Handle hamburger menu on mobile
+    if ((tab as any).isMenu) {
+      setIsMobileSidebarOpen(true);
+      return;
+    }
+    
     // Don't navigate if coming soon
     if ((tab as any).comingSoon) {
       return;
@@ -260,6 +283,10 @@ const Navigation = ({ activeTab = "DISCOVER", onTabChange }: NavigationProps) =>
                     relative flex flex-col items-center justify-center gap-1 py-2 px-2 rounded-2xl transition-all duration-300 min-w-[56px] group
                     ${active 
                       ? 'text-neon-green scale-105' 
+                      : (tab as any).isMenu
+                      ? 'text-white/70 hover:text-neon-green active:scale-95'
+                      : (tab as any).highlight
+                      ? 'text-red-500 hover:text-red-400 active:scale-95 animate-pulse'
                       : 'text-white/50 hover:text-white/80 active:scale-95'
                     }
                   `}
@@ -309,6 +336,99 @@ const Navigation = ({ activeTab = "DISCOVER", onTabChange }: NavigationProps) =>
           </div>
         </div>
       </nav>
+
+      {/* Mobile Sidebar Drawer (Hamburger Menu) */}
+      {isMobileSidebarOpen && (
+        <>
+          {/* Backdrop */}
+          <div 
+            className="md:hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] animate-in fade-in duration-200"
+            onClick={() => setIsMobileSidebarOpen(false)}
+          />
+          
+          {/* Sidebar Panel */}
+          <div 
+            className="md:hidden fixed right-0 top-0 bottom-0 w-[280px] bg-black/95 backdrop-blur-2xl border-l border-white/20 z-[70] shadow-[-4px_0_32px_0_rgba(0,255,159,0.2)] animate-in slide-in-from-right duration-300"
+            style={{
+              paddingTop: 'max(env(safe-area-inset-top), 0px)',
+              paddingBottom: 'max(env(safe-area-inset-bottom), 0px)',
+            }}
+          >
+            {/* Header */}
+            <div className="p-4 border-b border-white/10 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <img src="/favicon.png" alt="Logo" className="h-6 w-6" />
+                <span className="font-mono font-bold text-neon-green text-sm tracking-wider">MENU</span>
+              </div>
+              <button
+                onClick={() => setIsMobileSidebarOpen(false)}
+                className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+              >
+                <X className="h-5 w-5 text-white/70" />
+              </button>
+            </div>
+
+            {/* Menu Items */}
+            <div className="p-3 space-y-1 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 80px)' }}>
+              {mobileSidebarItems.map((item) => {
+                const Icon = item.icon;
+                const active = isActive(item);
+                const isComingSoon = (item as any).comingSoon;
+                
+                return (
+                  <button
+                    key={item.name}
+                    onClick={() => {
+                      if (!isComingSoon) {
+                        navigate(item.path);
+                        setIsMobileSidebarOpen(false);
+                      }
+                    }}
+                    disabled={isComingSoon}
+                    className={`
+                      w-full flex items-center gap-3 px-4 py-3 rounded-xl font-mono text-sm transition-all duration-300
+                      ${active
+                        ? 'bg-neon-green/10 text-neon-green border border-neon-green/30 shadow-lg shadow-neon-green/20'
+                        : (item as any).highlight
+                        ? 'bg-red-500/10 text-red-500 border border-red-500/30 hover:bg-red-500/20 hover:border-red-500/50'
+                        : isComingSoon
+                        ? 'text-white/30 cursor-not-allowed'
+                        : 'text-white/70 hover:bg-white/5 hover:text-neon-green border border-transparent'
+                      }
+                    `}
+                  >
+                    <Icon className={`h-5 w-5 flex-shrink-0 ${
+                      active 
+                        ? 'drop-shadow-[0_0_8px_rgba(0,255,159,0.8)]' 
+                        : (item as any).highlight
+                        ? 'drop-shadow-[0_0_8px_rgba(239,68,68,0.8)] animate-pulse'
+                        : ''
+                    }`} />
+                    <span className="flex-1 text-left tracking-wider uppercase text-xs">
+                      {item.name}
+                    </span>
+                    {isComingSoon && (
+                      <span className="text-[8px] px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 uppercase tracking-wide">
+                        Soon
+                      </span>
+                    )}
+                    {active && (
+                      <div className="w-1.5 h-1.5 bg-neon-green rounded-full shadow-[0_0_8px_rgba(0,255,159,1)] animate-pulse" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Footer */}
+            <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-white/10 bg-gradient-to-t from-black/50 to-transparent">
+              <div className="flex justify-center">
+                <MusicBars bars={3} className="text-neon-green/50" />
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </>
   );
 };

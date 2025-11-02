@@ -5,6 +5,9 @@ import type { Database } from './types';
 const SUPABASE_URL = "https://phybdsfwycygroebrsdx.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBoeWJkc2Z3eWN5Z3JvZWJyc2R4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY2NzM5NjksImV4cCI6MjA3MjI0OTk2OX0.wQY7tt0gN1fvRjgHiPJK7I1M9ZhmgTbLNffGvcbWJko";
 
+// Export the anon key for edge function invocations
+export const SUPABASE_ANON_KEY = SUPABASE_PUBLISHABLE_KEY;
+
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 

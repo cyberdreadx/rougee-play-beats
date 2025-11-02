@@ -64,3 +64,6 @@ verify_jwt = false
 
 [functions.request-verification]
 verify_jwt = false
+
+[functions.request-verification-simple]
+verify_jwt = false

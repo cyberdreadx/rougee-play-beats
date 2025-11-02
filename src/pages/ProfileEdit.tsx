@@ -139,8 +139,18 @@ const ProfileEdit = () => {
     try {
       console.log('🔍 Requesting verification for:', fullAddress);
       
-      // Get auth headers if available
-      const headers = await getAuthHeaders().catch(() => ({}));
+      // Get auth headers if available (apikey is handled automatically by supabase client)
+      const headers = await getAuthHeaders().catch((err) => {
+        console.warn('⚠️ Failed to get auth headers:', err);
+        return {};
+      });
+      
+      console.log('📤 Invoking edge function with headers:', {
+        hasAuthorization: !!headers.Authorization,
+        hasPrivyToken: !!headers['x-privy-token'],
+        walletAddress: fullAddress.toLowerCase(),
+        headers: Object.keys(headers),
+      });
       
       const { data, error } = await supabase.functions.invoke('request-verification-simple', {
         headers: {
@@ -153,6 +163,8 @@ const ProfileEdit = () => {
           wallet_address: fullAddress.toLowerCase()
         },
       });
+      
+      console.log('📬 Edge function response:', { data, error, status: error?.context?.status });
 
       if (error) {
         console.error('❌ Supabase function error:', error);

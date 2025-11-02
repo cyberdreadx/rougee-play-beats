@@ -11,6 +11,7 @@ import { useRadioPlayer } from "@/hooks/useRadioPlayer";
 import { useAudioPlayer } from "@/hooks/useAudioPlayer";
 import { AdDisplay } from "@/components/AdDisplay";
 import { PWAUpdatePrompt } from "@/components/PWAUpdatePrompt";
+import { PullToRefresh } from "@/components/PullToRefresh";
 import { useState } from "react";
 import AudioPlayer from "@/components/AudioPlayer";
 import Layout from "@/components/Layout";
@@ -66,6 +67,13 @@ const AppContent = () => {
       radioPlayer.stopRadio();
     }
     audioPlayer.playSong(song);
+  };
+
+  // Pull to refresh handler
+  const handleRefresh = async () => {
+    console.log('🔄 Pull to refresh triggered');
+    // Force reload the current page
+    window.location.reload();
   };
 
   // Show lock screen if locked
@@ -167,6 +175,9 @@ const AppContent = () => {
 
   return (
     <>
+      {/* Pull to Refresh - Only on mobile/PWA */}
+      <PullToRefresh onRefresh={handleRefresh} />
+      
       {radioPlayer.currentAd && (
         <AdDisplay 
           ad={radioPlayer.currentAd} 

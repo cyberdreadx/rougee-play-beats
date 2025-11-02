@@ -113,7 +113,7 @@ const AudioPlayer = ({
   const [showOwnershipPrompt, setShowOwnershipPrompt] = useState(false);
   const [previewTimeRemaining, setPreviewTimeRemaining] = useState(20);
   const { toast } = useToast();
-  const { isPWA, audioSupported, handlePWAAudioPlay } = usePWAAudio();
+  const { isPWA, audioSupported, handlePWAAudioPlay, isAudioUnlocked } = usePWAAudio();
   const { isConnected } = useWallet();
   const { authenticated } = usePrivy();
   const { playStatus, recordPlay, checkPlayStatus } = usePlayTracking(
@@ -484,7 +484,7 @@ const AudioPlayer = ({
   };
   
   // Ensure play/pause runs in a direct user gesture (iOS Safari and PWA requirement)
-  const handlePlayPauseClick = () => {
+  const handlePlayPauseClick = async () => {
     const audio = audioRef.current;
     if (!audio) {
       onPlayPause();
@@ -495,35 +495,54 @@ const AudioPlayer = ({
       try { audio.pause(); } catch {}
       onPlayPause();
     } else {
-      // Direct audio.play() call
-      const playPromise = audio.play();
-      if (playPromise && typeof playPromise.catch === 'function') {
-        playPromise.catch((error) => {
-          console.error('Audio playback error:', error);
-          
-          // Enhanced error handling
-          if (error.name === 'NotAllowedError') {
-            toast({ 
-              title: '🔒 Audio blocked', 
-              description: isPWA ? 'Please tap the play button to start audio in PWA mode' : 'Please tap the play button to start audio', 
-              variant: 'destructive' 
-            });
-          } else if (error.name === 'NotSupportedError') {
-            toast({ 
-              title: '❌ Audio not supported', 
-              description: 'This audio format is not supported', 
-              variant: 'destructive' 
-            });
-          } else {
-            toast({ 
-              title: '❌ Playback failed', 
-              description: error.message || 'Could not play audio', 
-              variant: 'destructive' 
-            });
-          }
-        });
+      // Use PWA-specific handler if in PWA mode, otherwise regular play
+      try {
+        if (isPWA) {
+          console.log('🎵 PWA: Starting playback via PWA handler');
+          await handlePWAAudioPlay(audio);
+        } else {
+          await audio.play();
+        }
+        onPlayPause();
+      } catch (error: any) {
+        console.error('Audio playback error:', error);
+        
+        // Enhanced error handling
+        if (error.name === 'NotAllowedError') {
+          toast({ 
+            title: '🔒 Audio blocked', 
+            description: isPWA ? 'Please tap the play button again to start audio in PWA mode' : 'Please tap the play button to start audio', 
+            variant: 'destructive' 
+          });
+        } else if (error.name === 'NotSupportedError') {
+          toast({ 
+            title: '❌ Audio not supported', 
+            description: 'This audio format is not supported', 
+            variant: 'destructive' 
+          });
+        } else if (error.name === 'AbortError') {
+          // AbortError can happen when switching songs quickly, retry
+          console.log('🔄 AbortError, retrying...');
+          setTimeout(async () => {
+            try {
+              if (isPWA) {
+                await handlePWAAudioPlay(audio);
+              } else {
+                await audio.play();
+              }
+              onPlayPause();
+            } catch (retryError) {
+              console.error('Retry failed:', retryError);
+            }
+          }, 100);
+        } else {
+          toast({ 
+            title: '❌ Playback failed', 
+            description: error.message || 'Could not play audio', 
+            variant: 'destructive' 
+          });
+        }
       }
-      onPlayPause();
     }
   };
   
@@ -1191,26 +1210,33 @@ const AudioPlayer = ({
           console.error('Audio error:', e);
           handleAudioError();
         }}
-        onCanPlay={() => {
+        onCanPlay={async () => {
           const audio = audioRef.current;
           if (audio) {
             // Ensure volume is set correctly when audio loads
             audio.volume = isMuted ? 0 : volume;
             
             if (isPlaying && audio.paused) {
-              // Use the same audio.play() method as regular browser
-              const playPromise = isPWA ? handlePWAAudioPlay(audio) : audio.play();
-              if (playPromise && typeof playPromise.catch === 'function') {
-                playPromise.catch((error) => {
-                  console.error('Audio autoplay blocked:', error);
-                  if (error.name === 'NotAllowedError') {
-                    toast({
-                      title: '🔒 Autoplay blocked',
-                      description: isPWA ? 'Tap play to start audio in PWA mode' : 'Tap play to start audio',
-                      variant: 'destructive'
-                    });
-                  }
-                });
+              // Use PWA-specific handler if in PWA mode
+              try {
+                if (isPWA) {
+                  console.log('🎵 PWA: Auto-playing via PWA handler');
+                  await handlePWAAudioPlay(audio);
+                } else {
+                  await audio.play();
+                }
+              } catch (error: any) {
+                console.error('Audio autoplay blocked:', error);
+                if (error.name === 'NotAllowedError') {
+                  toast({
+                    title: '🔒 Autoplay blocked',
+                    description: isPWA ? 'Tap play to start audio in PWA mode' : 'Tap play to start audio',
+                    variant: 'destructive'
+                  });
+                } else if (error.name !== 'AbortError') {
+                  // Ignore AbortError as it's common when switching songs
+                  console.error('Unexpected autoplay error:', error);
+                }
               }
             }
           }

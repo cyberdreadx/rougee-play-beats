@@ -105,8 +105,25 @@ export function useAgoraStream({
 
       if (error) throw error;
       
-      console.log('🎫 Received Agora token');
-      return data.token;
+      console.log('🎫 Received Agora token:', { 
+        hasToken: !!data?.token, 
+        appId: data?.appId,
+        appIdLength: data?.appId?.length,
+        appIdType: typeof data?.appId,
+        channelName: data?.channelName,
+        fullResponse: data
+      });
+      
+      if (!data?.token) {
+        throw new Error('Invalid token response: missing token');
+      }
+      
+      if (!data?.appId) {
+        console.error('⚠️ No App ID in token response. Supabase secrets may not be set.');
+        throw new Error('Agora App ID not found in server response. Please set AGORA_APP_ID in Supabase secrets.');
+      }
+      
+      return { token: data.token, appId: data.appId };
     } catch (error: any) {
       console.error('❌ Failed to get Agora token:', error);
       toast({
@@ -128,8 +145,14 @@ export function useAgoraStream({
     }
 
     try {
-      const token = await getToken(targetChannel, targetUserId);
-      await joinChannel(client, token, targetChannel, targetUserId);
+      const { token, appId } = await getToken(targetChannel, targetUserId);
+      
+      if (!appId) {
+        throw new Error('Agora App ID not found. Please configure VITE_AGORA_APP_ID or check server configuration.');
+      }
+      
+      console.log('🔌 Joining channel with App ID:', appId);
+      await joinChannel(client, token, targetChannel, targetUserId, appId);
       setIsJoined(true);
       
       toast({

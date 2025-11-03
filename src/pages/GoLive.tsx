@@ -35,8 +35,10 @@ export default function GoLive() {
   const [viewerCount, setViewerCount] = useState(0);
   const [chatMessages, setChatMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState('');
-  const [previewTracks, setPreviewTracks] = useState<{ audio: any; video: any } | null>(null);
+  const [previewTracks, setPreviewTracks] = useState<{ audioTrack: any; videoTrack: any } | null>(null);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
   
   const localVideoRef = useRef<HTMLDivElement>(null);
 
@@ -59,7 +61,7 @@ export default function GoLive() {
     role: 'host'
   });
 
-  // Redirect if not connected
+  // Only check if wallet is connected - that's it!
   useEffect(() => {
     if (!fullAddress) {
       toast({
@@ -68,35 +70,73 @@ export default function GoLive() {
         variant: 'destructive'
       });
       navigate('/');
-      return;
     }
-    
-    // Allow going live if user has any profile data or is connected
-    // The check is very lenient - if you're here and have a wallet, you can go live
-    console.log('🎬 Go Live access check:', { 
-      fullAddress, 
-      isArtist, 
-      verified: profile?.verified, 
-      hasArtistName: !!profile?.artist_name,
-      hasProfile: !!profile 
-    });
-  }, [fullAddress, isArtist, profile, navigate]);
+    // If you have a wallet, you're good to go! No other checks.
+  }, [fullAddress, navigate]);
 
   // Initialize camera preview on mount
   useEffect(() => {
+    let isMounted = true;
+    let currentTracks: { audioTrack: any; videoTrack: any } | null = null;
+    
     const initPreview = async () => {
-      if (previewTracks) return; // Already initialized
+      if (!isMounted) return;
       
       setIsLoadingPreview(true);
+      setPreviewError(null);
       console.log('🎥 Initializing camera preview...');
       
       try {
+        // Check if browser supports getUserMedia
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          throw new Error('Your browser does not support camera/microphone access.');
+        }
+        
         // Import Agora utilities
-        const { createLocalTracks } = await import('@/lib/agora');
+        const { createLocalTracks, getCameras, getMicrophones } = await import('@/lib/agora');
         
-        // Request camera and microphone permissions
-        const tracks = await createLocalTracks();
+        // Check available devices first
+        try {
+          const [cameras, mics] = await Promise.all([
+            getCameras(),
+            getMicrophones()
+          ]);
+          console.log('📹 Available devices:', { cameras: cameras.length, mics: mics.length });
+          
+          if (cameras.length === 0 && mics.length === 0) {
+            throw new Error('No camera or microphone found. Please connect a device and refresh.');
+          }
+        } catch (deviceError) {
+          console.warn('⚠️ Could not enumerate devices:', deviceError);
+          // Continue anyway - might be permission issue
+        }
         
+        // Clean up any existing tracks first
+        if (currentTracks) {
+          console.log('🧹 Cleaning up existing tracks before creating new ones...');
+          currentTracks.audioTrack?.stop();
+          currentTracks.audioTrack?.close();
+          currentTracks.videoTrack?.stop();
+          currentTracks.videoTrack?.close();
+          currentTracks = null;
+        }
+        
+        // Request camera and microphone permissions with explicit device selection
+        const tracks = await createLocalTracks(
+          { ANS: true, AEC: true }, // Audio config
+          { encoderConfig: '720p_2' } // Video config
+        );
+        
+        if (!isMounted) {
+          // Component unmounted, cleanup
+          tracks.audioTrack?.stop();
+          tracks.audioTrack?.close();
+          tracks.videoTrack?.stop();
+          tracks.videoTrack?.close();
+          return;
+        }
+        
+        currentTracks = tracks;
         console.log('✅ Camera preview tracks created:', tracks);
         setPreviewTracks(tracks);
         
@@ -106,30 +146,52 @@ export default function GoLive() {
           console.log('✅ Video preview playing');
         }
       } catch (error: any) {
+        if (!isMounted) return;
+        
         console.error('❌ Failed to initialize preview:', error);
+        
+        let errorMessage = 'Please allow camera and microphone access to go live.';
+        
+        if (error.name === 'NotAllowedError' || error.message?.includes('NotAllowedError')) {
+          errorMessage = 'Camera/microphone permission denied. Please allow access in your browser settings and refresh.';
+        } else if (error.name === 'NotFoundError' || error.message?.includes('NotFoundError')) {
+          errorMessage = 'No camera or microphone found. Please connect a device and refresh.';
+        } else if (error.name === 'NotReadableError' || error.message?.includes('NotReadableError')) {
+          errorMessage = 'Camera/microphone is already in use by another application. Please close other apps using your camera/mic and refresh.';
+        } else if (error.message) {
+          errorMessage = error.message;
+        }
+        
+        setPreviewError(errorMessage);
         toast({
           title: 'Camera/Mic Access Required',
-          description: error.message || 'Please allow camera and microphone access to go live.',
+          description: errorMessage,
           variant: 'destructive'
         });
       } finally {
-        setIsLoadingPreview(false);
+        if (isMounted) {
+          setIsLoadingPreview(false);
+        }
       }
     };
     
-    initPreview();
+    // Only initialize if we have a wallet connection
+    if (fullAddress) {
+      initPreview();
+    }
     
     // Cleanup on unmount
     return () => {
-      if (previewTracks) {
-        console.log('🧹 Cleaning up preview tracks');
-        previewTracks.audioTrack?.stop();
-        previewTracks.audioTrack?.close();
-        previewTracks.videoTrack?.stop();
-        previewTracks.videoTrack?.close();
+      isMounted = false;
+      if (currentTracks) {
+        console.log('🧹 Cleaning up preview tracks on unmount');
+        currentTracks.audioTrack?.stop();
+        currentTracks.audioTrack?.close();
+        currentTracks.videoTrack?.stop();
+        currentTracks.videoTrack?.close();
       }
     };
-  }, []); // Run once on mount
+  }, [fullAddress, retryKey]); // Re-run if wallet connection changes or retry is triggered
 
   // Toggle video preview
   const handleToggleVideo = () => {
@@ -343,7 +405,28 @@ export default function GoLive() {
                     </div>
                   </div>
                 )}
-                {!previewTracks && !isLoadingPreview && (
+                {previewError && !isLoadingPreview && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90 p-4">
+                    <VideoOff className="h-16 w-16 text-red-500 mb-4" />
+                    <p className="font-mono text-sm text-red-400 text-center mb-4 max-w-md">
+                      {previewError}
+                    </p>
+                    <Button
+                      onClick={() => {
+                        setPreviewError(null);
+                        setPreviewTracks(null);
+                        // Trigger re-initialization by incrementing retryKey
+                        setRetryKey(prev => prev + 1);
+                      }}
+                      variant="outline"
+                      className="font-mono"
+                    >
+                      <Radio className="h-4 w-4 mr-2" />
+                      Retry
+                    </Button>
+                  </div>
+                )}
+                {!previewTracks && !isLoadingPreview && !previewError && (
                   <div className="absolute inset-0 flex items-center justify-center">
                     <VideoOff className="h-16 w-16 text-muted-foreground" />
                   </div>

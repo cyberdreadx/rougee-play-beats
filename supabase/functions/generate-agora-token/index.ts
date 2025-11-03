@@ -1,9 +1,6 @@
 // @deno-types="npm:@types/node"
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-
-// Agora token generation using agora-token package
-// Note: This is a simplified version. In production, install the proper Deno-compatible version
-// or use the Agora REST API for token generation
+import { buildTokenWithUid, Role } from "./agora-token-builder.ts";
 
 serve(async (req) => {
   // Handle CORS
@@ -37,10 +34,21 @@ serve(async (req) => {
     const appId = Deno.env.get('AGORA_APP_ID');
     const appCertificate = Deno.env.get('AGORA_APP_CERTIFICATE');
 
+    console.log('🔑 Checking Agora credentials:', {
+      hasAppId: !!appId,
+      appIdLength: appId?.length,
+      hasCertificate: !!appCertificate,
+      certificateLength: appCertificate?.length,
+      certificatePrefix: appCertificate?.substring(0, 8) + '...'
+    });
+
     if (!appId || !appCertificate) {
-      console.error('❌ Agora credentials not configured');
+      console.error('❌ Agora credentials not configured', {
+        hasAppId: !!appId,
+        hasCertificate: !!appCertificate
+      });
       return new Response(
-        JSON.stringify({ error: 'Server configuration error' }),
+        JSON.stringify({ error: 'Server configuration error: Missing App ID or Certificate' }),
         { 
           status: 500,
           headers: { 
@@ -51,39 +59,32 @@ serve(async (req) => {
       );
     }
 
-    // Token generation logic
-    // For now, we'll use a simple approach that works with Agora's requirements
-    // In production, you'd use the official agora-token package
+    // Token generation using proper Agora algorithm
+    console.log('🎫 Generating Agora token:', { channelName, userId, role });
     
     const currentTimestamp = Math.floor(Date.now() / 1000);
     const expirationTimeInSeconds = 3600; // 1 hour
     const privilegeExpiredTs = currentTimestamp + expirationTimeInSeconds;
     
-    // Simplified token generation (replace with proper SDK in production)
-    // For MVP, we can use Agora's REST API or a simpler approach
-    const tokenData = {
-      appId,
-      channelName,
-      userId: String(userId),
-      role: role === 'host' ? 1 : 2, // 1 = publisher (host), 2 = subscriber (audience)
-      expireTime: privilegeExpiredTs
-    };
-
-    console.log('🎫 Generating Agora token:', { channelName, userId, role });
-
-    // For MVP: Return a temporary token structure
-    // In production, implement proper token generation using Agora's algorithm
-    // or call Agora's REST API endpoint
+    const agoraRole = role === 'host' ? Role.PUBLISHER : Role.SUBSCRIBER;
     
-    // Simple base64 encoding for MVP (NOT SECURE FOR PRODUCTION)
-    const tokenPayload = btoa(JSON.stringify(tokenData));
-    const tempToken = `agora_temp_${tokenPayload}`;
+    const token = await buildTokenWithUid(
+      appId,
+      appCertificate,
+      channelName,
+      userId,
+      agoraRole,
+      privilegeExpiredTs
+    );
 
-    console.log('✅ Token generated successfully');
+    console.log('✅ Token generated successfully', { 
+      tokenLength: token.length,
+      tokenPrefix: token.substring(0, 20) + '...'
+    });
 
     return new Response(
       JSON.stringify({ 
-        token: tempToken,
+        token: token,
         channelName,
         appId,
         userId: String(userId),

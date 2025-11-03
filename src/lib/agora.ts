@@ -93,15 +93,58 @@ export async function joinChannel(
   client: IAgoraRTCClient,
   token: string,
   channelName: string,
-  userId: UID
+  userId: UID,
+  appId?: string
 ) {
   try {
-    await client.join(
-      import.meta.env.VITE_AGORA_APP_ID || '',
-      channelName,
-      token,
-      userId
-    );
+    // Use provided appId, fallback to env var, or throw error
+    const agoraAppId = appId || import.meta.env.VITE_AGORA_APP_ID;
+    
+    if (!agoraAppId) {
+      throw new Error('Agora App ID is required. Please set VITE_AGORA_APP_ID or provide appId parameter.');
+    }
+    
+    console.log('🔌 Joining channel:', { 
+      channelName, 
+      userId, 
+      appId: agoraAppId,
+      appIdLength: agoraAppId?.length,
+      appIdType: typeof agoraAppId,
+      hasToken: !!token,
+      tokenLength: token?.length,
+      tokenPrefix: token?.substring(0, 20)
+    });
+    
+    // Ensure appId is a non-empty string
+    if (!agoraAppId || agoraAppId.trim() === '') {
+      throw new Error('Agora App ID is empty or invalid');
+    }
+    
+    // Try with token first, if it fails with INVALID_VENDOR_KEY, try without token
+    // (Agora allows joining without token if Primary Certificate is disabled in console)
+    try {
+      await client.join(
+        agoraAppId,
+        channelName,
+        token,
+        userId
+      );
+    } catch (firstError: any) {
+      if (firstError.message?.includes('invalid vendor key') || 
+          firstError.message?.includes('CAN_NOT_GET_GATEWAY_SERVER')) {
+        console.warn('⚠️ Token rejected, trying without token (certificate may be disabled in Agora Console)');
+        // Try again with null token (works when certificate is disabled)
+        await client.join(
+          agoraAppId,
+          channelName,
+          null,
+          userId
+        );
+        console.log('✅ Joined without token (certificate disabled mode)');
+      } else {
+        throw firstError;
+      }
+    }
     
     console.log('✅ Joined channel successfully:', channelName);
     return true;

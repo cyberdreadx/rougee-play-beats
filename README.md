@@ -53,6 +53,7 @@
 - **wagmi** - React hooks for Ethereum
 - **Web3Modal** - Multi-wallet connection
 - **viem** - TypeScript interface for Ethereum
+- **Base Mini App** - Native Base App integration
 
 ---
 
@@ -217,11 +218,30 @@ This project is open source and available under the MIT License.
 
 ---
 
+## 📱 Base Mini App
+
+ROUGEE.PLAY is configured as a Base Mini App, allowing it to run natively within the Base App ecosystem.
+
+### Features
+- **Native Integration** - Runs seamlessly within Base App
+- **Wallet Integration** - Leverage Base App's built-in wallet
+- **Easy Sharing** - Share content directly within Base App
+- **Instant Access** - No downloads required
+
+### Setup
+See [BASE_MINI_APP_SETUP.md](./BASE_MINI_APP_SETUP.md) for detailed setup instructions.
+
+### Manifest
+The Base Mini App manifest is located at `/.well-known/farcaster.json` and is automatically served by the app.
+
+---
+
 ## 🔗 Links
 
 - **Live App**: [Coming Soon]
 - **Lovable Project**: https://lovable.dev/projects/edbd29f5-fe8e-435d-b3d2-8111ac95287a
 - **GitHub**: https://github.com/cyberdreadx/rougee-play-beats
+- **Base Mini App Docs**: [BASE_MINI_APP_SETUP.md](./BASE_MINI_APP_SETUP.md)
 
 ---
 

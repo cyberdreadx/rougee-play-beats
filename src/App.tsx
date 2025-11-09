@@ -12,6 +12,7 @@ import { useAudioPlayer } from "@/hooks/useAudioPlayer";
 import { AdDisplay } from "@/components/AdDisplay";
 import { PWAUpdatePrompt } from "@/components/PWAUpdatePrompt";
 import { PullToRefresh } from "@/components/PullToRefresh";
+import { BaseMiniAppInit } from "@/components/BaseMiniAppInit";
 import { useState } from "react";
 import AudioPlayer from "@/components/AudioPlayer";
 import Layout from "@/components/Layout";
@@ -41,6 +42,7 @@ import Post from "./pages/Post";
 import Settings from "./pages/Settings";
 import GoLive from "./pages/GoLive";
 import WatchStream from "./pages/WatchStream";
+import Whitepaper from "./pages/Whitepaper";
 import { LockCodeScreen } from "@/components/LockCodeScreen";
 import { useLockCode } from "@/hooks/useLockCode";
 import { useWallet } from "@/hooks/useWallet";
@@ -225,6 +227,7 @@ const AppContent = () => {
           <Route path="/tiers" element={<Tiers />} />
           <Route path="/messages" element={<Messages />} />
           <Route path="/how-it-works" element={<HowItWorks />} />
+          <Route path="/whitepaper" element={<Whitepaper />} />
           <Route path="/terms-of-service" element={<TermsOfService />} />
           <Route path="/privacy-policy" element={<PrivacyPolicy />} />
           <Route path="/cookie-policy" element={<CookiePolicy />} />
@@ -279,6 +282,7 @@ const App = () => (
             <Toaster />
             <Sonner />
             <PWAUpdatePrompt />
+            <BaseMiniAppInit />
             <BrowserRouter>
               <ScrollToTop />
               <AppContent />

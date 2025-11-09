@@ -12,6 +12,13 @@
   to = "/index.html"
   status = 200
 
+# Ensure Base Mini App manifest is accessible
+[[redirects]]
+  from = "/.well-known/farcaster.json"
+  to = "/.well-known/farcaster.json"
+  status = 200
+  force = true
+
 # Optional: Headers for security and caching
 [[headers]]
   for = "/*"

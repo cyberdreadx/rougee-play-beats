@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@coinbase/x402": "^0.7.0",
+    "@farcaster/miniapp-sdk": "^0.2.1",
     "@hookform/resolvers": "^3.10.0",
     "@keetanetwork/keetanet-client": "^0.14.11",
     "@privy-io/react-auth": "^3.0.1",

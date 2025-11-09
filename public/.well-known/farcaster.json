@@ -1,0 +1,32 @@
+{
+  "accountAssociation": {
+    "header": "",
+    "payload": "",
+    "signature": ""
+  },
+  "baseBuilder": {
+    "ownerAddress": "0x"
+  },
+  "miniapp": {
+    "version": "1",
+    "name": "ROUGEE.PLAY",
+    "homeUrl": "https://rougee.app",
+    "iconUrl": "https://rougee.app/icons/manifest-icon-512.maskable.png",
+    "splashImageUrl": "https://rougee.app/rougee-new-og.jpg",
+    "splashBackgroundColor": "#000000",
+    "webhookUrl": "https://rougee.app/api/webhook",
+    "subtitle": "Stream. Launch. Trade. Own.",
+    "description": "Decentralized music platform. Stream, trade, and support artists on the blockchain.",
+    "screenshotUrls": [
+      "https://rougee.app/rougee-new-og.jpg"
+    ],
+    "primaryCategory": "music",
+    "tags": ["music", "blockchain", "nft", "trading", "streaming"],
+    "heroImageUrl": "https://rougee.app/rougee-new-og.jpg",
+    "tagline": "Stream music. Own music. Be music.",
+    "ogTitle": "ROUGEE.PLAY - Decentralized Music Platform",
+    "ogDescription": "Decentralized music platform. Stream, trade, and support artists on the blockchain.",
+    "ogImageUrl": "https://rougee.app/rougee-new-og.jpg",
+    "noindex": false
+  }
+}

@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Card } from "@/components/ui/card";
-import { Play, Pause, Volume2, VolumeX, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, CheckCircle, Music, X, ChevronRight, ChevronLeft, Filter, Check, Settings } from "lucide-react";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Play, Pause, Volume2, VolumeX, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, CheckCircle, Music, X, ChevronRight, ChevronLeft, Filter, Check, Settings, ExternalLink } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { getIPFSGatewayUrl, getIPFSGatewayUrls } from "@/lib/ipfs";
 import { useToast } from "@/hooks/use-toast";
@@ -83,6 +84,7 @@ const AudioPlayer = ({
   const [isMinimized, setIsMinimized] = useState(initialMinimized);
   const hasUserInteractedRef = useRef(false); // Track if user has manually toggled minimized state
   const [showAiFilterMenu, setShowAiFilterMenu] = useState(false); // Toggle AI filter settings menu
+  const [showExpandedArt, setShowExpandedArt] = useState(false); // Toggle expanded album art modal
   
   // AI Filter state - persisted in localStorage
   type AiFilter = 'all' | 'no-ai' | 'partial';
@@ -689,15 +691,15 @@ const AudioPlayer = ({
 
       {/* Full player view */}
       {!isMinimized && (
-    <Card className={`fixed ${isMobileNavVisible ? 'bottom-[calc(4.5rem+env(safe-area-inset-bottom))]' : 'bottom-0'} md:bottom-0 md:left-[var(--sidebar-width,16rem)] right-0 z-50 bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl overflow-hidden transition-all duration-300 w-full max-w-full`}>
+    <Card className={`fixed ${isMobileNavVisible ? 'bottom-[calc(4.5rem+env(safe-area-inset-bottom))]' : 'bottom-0'} md:bottom-0 md:left-[var(--sidebar-width,16rem)] right-0 z-50 bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl overflow-visible transition-all duration-300 w-full max-w-full`}>
 
       {/* Animated gradient background */}
       <div className="absolute inset-0 bg-gradient-to-r from-neon-green/10 via-transparent to-neon-green/10 animate-pulse opacity-60" />
 
-      {/* Top marquee header - scrolls across entire player width */}
-      <div className="relative z-10 border-b border-white/10 px-3 py-1">
+      {/* Top marquee header - scrolls across entire player width - Mobile only */}
+      <div className="relative z-10 border-b border-white/10 px-3 py-1 md:hidden">
         <div className="marquee-container">
-          <div className="marquee font-mono text-xs md:text-sm text-muted-foreground">
+          <div className="marquee font-mono text-xs text-muted-foreground">
             <span className="text-foreground font-semibold">{displayTitle}</span>
             <span className="mx-2">—</span>
             <span>{displayArtist}</span>
@@ -755,7 +757,8 @@ const AudioPlayer = ({
           {coverCid && (
             <div
               className="relative w-16 h-16 rounded-lg overflow-hidden border border-neon-green/30 shadow-lg flex-shrink-0 cursor-pointer hover:border-neon-green/60 transition-colors"
-              onClick={() => !isAd && currentSong && navigate(`/song/${currentSong.id}`)}
+              onClick={() => setShowExpandedArt(true)}
+              onDoubleClick={() => !isAd && currentSong && navigate(`/song/${currentSong.id}`)}
             >
               {coverImageError && (() => {
                 try {
@@ -1028,14 +1031,42 @@ const AudioPlayer = ({
         )}
       </div>
 
-      {/* Desktop Full Player */}
-      <div className="hidden md:flex items-center gap-4 p-4 relative z-10">
-        {/* Left info area with cover art */}
-        <div className="flex items-center gap-4 min-w-0 flex-1">
+      {/* Desktop Full Player - Compact single row layout */}
+      <div className="hidden md:flex items-center gap-2 py-1.5 px-3 relative z-10">
+        {/* Close and Dock buttons - Desktop */}
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => {
+              hasUserInteractedRef.current = true;
+              setIsMinimized(true);
+            }}
+            className="h-7 w-7 rounded-full hover:bg-white/10 text-muted-foreground hover:text-foreground"
+            title="Minimize player"
+          >
+            <ChevronRight className="h-3.5 w-3.5" />
+          </Button>
+          {onClose && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onClose}
+              className="h-7 w-7 rounded-full hover:bg-white/10 text-muted-foreground hover:text-foreground"
+              title="Close player"
+            >
+              <X className="h-3.5 w-3.5" />
+            </Button>
+          )}
+        </div>
+        
+        {/* Left info area with cover art and title/artist */}
+        <div className="flex items-center gap-2 min-w-0 flex-1">
           {displayCover && (
             <div 
-              className="relative w-20 h-20 rounded-lg overflow-hidden border border-neon-green/30 shadow-lg shadow-neon-green/20 cursor-pointer hover:border-neon-green/60 transition-all hover:scale-105"
-              onClick={() => !isAd && currentSong && navigate(`/song/${currentSong.id}`)}
+              className="relative w-12 h-12 rounded-lg overflow-hidden border border-neon-green/30 shadow-lg shadow-neon-green/20 cursor-pointer hover:border-neon-green/60 transition-all hover:scale-105 flex-shrink-0"
+              onClick={() => setShowExpandedArt(true)}
+              onDoubleClick={() => !isAd && currentSong && navigate(`/song/${currentSong.id}`)}
             >
               <img 
                 src={displayCover}
@@ -1047,149 +1078,140 @@ const AudioPlayer = ({
               )}
             </div>
           )}
+          {/* Scrolling title/artist info - Desktop */}
+          <div className="flex-1 min-w-0 overflow-hidden">
+            <div className="marquee-container">
+              <div className="marquee font-mono text-[10px] text-muted-foreground">
+                <span className="text-foreground font-semibold">{displayTitle}</span>
+                <span className="mx-2">—</span>
+                <span>{displayArtist}</span>
+                {!isAd && currentSong?.ticker && (
+                  <span className="ml-2 text-neon-green">${currentSong.ticker}</span>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Controls + Trade button (center column) */}
-        <div className="flex flex-col items-center gap-2 flex-[2] max-w-3xl mx-auto">
+        {/* Controls + Progress bar - Single row on desktop */}
+        <div className="flex items-center gap-2 flex-[2] max-w-3xl mx-auto min-w-0">
           {/* Main control buttons */}
-          <div className="flex items-center gap-3">
-            {onShuffle && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={onShuffle}
-                className={`h-8 w-8 transition-colors ${shuffleEnabled ? 'text-neon-green' : 'text-muted-foreground hover:text-foreground'}`}
-              >
-                <Shuffle className="w-4 h-4" />
-              </Button>
-            )}
-            
-            {onPrevious && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={onPrevious}
-                className="h-9 w-9 text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <SkipBack className="w-5 h-5" />
-              </Button>
-            )}
-            
+          {onShuffle && (
             <Button
               variant="ghost"
               size="icon"
-              onClick={handlePlayPauseClick}
-              className="h-12 w-12 rounded-full bg-neon-green/20 hover:bg-neon-green/30 border-2 border-neon-green/50 transition-all hover:scale-110 shadow-lg shadow-neon-green/20"
+              onClick={onShuffle}
+              className={`h-7 w-7 flex-shrink-0 transition-colors ${shuffleEnabled ? 'text-neon-green' : 'text-muted-foreground hover:text-foreground'}`}
             >
-              {isPlaying ? (
-                <Pause className="w-6 h-6 text-neon-green" />
+              <Shuffle className="w-3.5 h-3.5" />
+            </Button>
+          )}
+          
+          {onPrevious && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onPrevious}
+              className="h-7 w-7 flex-shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <SkipBack className="w-3.5 h-3.5" />
+            </Button>
+          )}
+          
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handlePlayPauseClick}
+            className="h-9 w-9 flex-shrink-0 rounded-full bg-neon-green/20 hover:bg-neon-green/30 border-2 border-neon-green/50 transition-all hover:scale-110 shadow-lg shadow-neon-green/20"
+          >
+            {isPlaying ? (
+              <Pause className="w-4 h-4 text-neon-green" />
+            ) : (
+              <Play className="w-4 h-4 text-neon-green fill-neon-green" />
+            )}
+          </Button>
+
+          {onNext && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => {
+                onNext();
+              }}
+              className="h-7 w-7 flex-shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <SkipForward className="w-3.5 h-3.5" />
+            </Button>
+          )}
+
+          {onRepeat && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onRepeat}
+              className={`h-7 w-7 flex-shrink-0 transition-colors ${repeatMode !== 'off' ? 'text-neon-green' : 'text-muted-foreground hover:text-foreground'}`}
+            >
+              {repeatMode === 'one' ? (
+                <Repeat1 className="w-3.5 h-3.5" />
               ) : (
-                <Play className="w-6 h-6 text-neon-green fill-neon-green" />
+                <Repeat className="w-3.5 h-3.5" />
               )}
             </Button>
+          )}
 
-            {onNext && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => {
-                  onNext();
-                }}
-                className="h-9 w-9 text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <SkipForward className="w-5 h-5" />
-              </Button>
-            )}
-
-            {onRepeat && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={onRepeat}
-                className={`h-8 w-8 transition-colors ${repeatMode !== 'off' ? 'text-neon-green' : 'text-muted-foreground hover:text-foreground'}`}
-              >
-                {repeatMode === 'one' ? (
-                  <Repeat1 className="w-4 h-4" />
-                ) : (
-                  <Repeat className="w-4 h-4" />
-                )}
-              </Button>
-            )}
-            {currentSong && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => navigate(`/song/${currentSong.id}`)}
-                className="h-8 px-3 font-mono text-xs ml-2"
-              >
-                Trade
-              </Button>
-            )}
-          </div>
-
-          {/* Progress bar */}
-          <div className="flex items-center gap-2 w-full">
-            <span className="font-mono text-xs text-muted-foreground min-w-[40px] text-right">
+          {/* Progress bar - Inline with controls */}
+          <div className="flex items-center gap-1 flex-1 min-w-0">
+            <span className="font-mono text-[10px] text-muted-foreground min-w-[28px] text-right flex-shrink-0">
               {formatTime(currentTime)}
             </span>
             <Slider
               value={[currentTime]}
               max={duration || 100}
               step={1}
-              className="flex-1"
+              className="flex-1 min-w-0"
               onValueChange={handleSeek}
             />
-            <span className="font-mono text-xs text-muted-foreground min-w-[40px]">
+            <span className="font-mono text-[10px] text-muted-foreground min-w-[28px] flex-shrink-0">
               {formatTime(duration)}
             </span>
           </div>
 
-          {/* Preview indicator for non-authenticated users */}
-          {!authenticated && isPlaying && currentSong && (
-            <div className="flex items-center gap-2 text-xs text-yellow-500">
-              <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" />
-              <span>Preview: {previewTimeRemaining}s remaining</span>
-            </div>
-          )}
-
-          {/* Play limit indicator for authenticated users */}
-          {authenticated && isPlaying && currentSong && playStatus && (
-            <div className="flex items-center gap-2 text-xs">
-              {playStatus.isOwner ? (
-                <div className="flex items-center gap-2 text-green-500">
-                  <div className="w-2 h-2 bg-green-500 rounded-full" />
-                  <span>Owned - Unlimited plays</span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 text-blue-500">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
-                  <span>Free plays: {playStatus.remainingPlays}/{playStatus.maxFreePlays}</span>
-                </div>
-              )}
-            </div>
+          {currentSong && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate(`/song/${currentSong.id}`)}
+              className="h-7 px-2 font-mono text-xs flex-shrink-0"
+            >
+              Trade
+            </Button>
           )}
         </div>
 
-        {/* Volume */}
-        <div className="flex items-center gap-2 justify-end flex-1">
+        {/* Volume - Desktop */}
+        <div className="flex items-center gap-2 justify-end flex-shrink-0 min-w-[140px]">
           <Button
             variant="ghost"
-            size="sm"
+            size="icon"
             onClick={toggleMute}
+            className="h-7 w-7 flex-shrink-0 hover:bg-white/10"
           >
             {isMuted ? (
-              <VolumeX className="w-4 h-4" />
+              <VolumeX className="w-4 h-4 text-muted-foreground" />
             ) : (
-              <Volume2 className="w-4 h-4" />
+              <Volume2 className="w-4 h-4 text-muted-foreground" />
             )}
           </Button>
           <Slider
             value={[isMuted ? 0 : volume]}
             max={1}
             step={0.1}
-            className="w-20"
+            className="w-24 flex-shrink-0"
             onValueChange={handleVolumeChange}
           />
+          <span className="font-mono text-[10px] text-muted-foreground min-w-[32px] flex-shrink-0 text-right">
+            {Math.round((isMuted ? 0 : volume) * 100)}%
+          </span>
         </div>
       </div>
     </Card>
@@ -1355,6 +1377,97 @@ const AudioPlayer = ({
           </Card>
         </div>
       )}
+
+      {/* Expanded Album Art Modal */}
+      <Dialog open={showExpandedArt} onOpenChange={setShowExpandedArt}>
+        <DialogContent className="max-w-4xl p-0 bg-black/95 border border-neon-green/20">
+          <div className="relative">
+            {/* Album Art */}
+            {displayCover ? (
+              <div className="relative w-full aspect-square overflow-hidden">
+                <img 
+                  src={displayCover}
+                  alt={displayTitle}
+                  className="w-full h-full object-cover"
+                />
+                {/* Gradient overlay for text readability */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent" />
+                
+                {/* Song Info Overlay */}
+                <div className="absolute bottom-0 left-0 right-0 p-6 md:p-8">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <h2 className="font-mono text-2xl md:text-3xl font-bold text-white mb-2 line-clamp-2">
+                        {displayTitle}
+                      </h2>
+                      <p className="font-mono text-lg md:text-xl text-muted-foreground mb-3">
+                        {displayArtist}
+                      </p>
+                      {!isAd && currentSong?.ticker && (
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-sm text-neon-green bg-neon-green/20 px-3 py-1 rounded border border-neon-green/50">
+                            ${currentSong.ticker}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Action Buttons */}
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {!isAd && currentSong && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setShowExpandedArt(false);
+                            navigate(`/song/${currentSong.id}`);
+                          }}
+                          className="bg-black/40 border-white/20 hover:bg-black/60 hover:border-neon-green/50"
+                        >
+                          <ExternalLink className="h-4 w-4 mr-2" />
+                          View Song
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setShowExpandedArt(false)}
+                        className="bg-black/40 border border-white/20 hover:bg-black/60 hover:border-neon-green/50"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="relative w-full aspect-square bg-gradient-to-br from-neon-green/20 to-purple-500/20 flex items-center justify-center">
+                <Music className="h-24 w-24 text-neon-green/50" />
+                <div className="absolute bottom-0 left-0 right-0 p-6 md:p-8">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <h2 className="font-mono text-2xl md:text-3xl font-bold text-white mb-2">
+                        {displayTitle}
+                      </h2>
+                      <p className="font-mono text-lg md:text-xl text-muted-foreground">
+                        {displayArtist}
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setShowExpandedArt(false)}
+                      className="bg-black/40 border border-white/20 hover:bg-black/60"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 };

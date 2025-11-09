@@ -15,6 +15,7 @@ const Footer = () => {
     ],
     resources: [
       { name: "How It Works", path: "/how-it-works" },
+      { name: "Whitepaper", path: "/whitepaper" },
       { name: "Documentation", href: "https://rougee-web3.gitbook.io/rougee-web3-documentation/" },
       { name: "Support", href: "https://discord.gg/Vumf5tcMTp" },
       { name: "Terms", path: "/terms-of-service" },

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -34,39 +34,43 @@ export const LockCodeKeypad = ({
     }
   }, [resetKey]);
 
-  const handleNumberPress = (num: string) => {
-    // Prevent rapid input - if already processing, ignore
-    if (isProcessing || code.length >= 4) {
-      return;
-    }
+  const handleNumberPress = useCallback((num: string) => {
+    // Prevent rapid input - check current state
+    setCode((prev) => {
+      // Prevent rapid input - if already processing or code is complete, ignore
+      if (isProcessing || prev.length >= 4) {
+        return prev;
+      }
 
-    // Set processing flag to prevent rapid clicks
-    setIsProcessing(true);
-    
-    const newCode = code + num;
-    setCode(newCode);
-    
-    // Auto-submit when 4 digits entered
-    if (newCode.length === 4) {
-      setTimeout(() => {
-        onComplete(newCode);
-        setIsProcessing(false);
-      }, 100);
-    } else {
-      // Release processing flag after a short delay to prevent rapid input
-      setTimeout(() => {
-        setIsProcessing(false);
-      }, 150);
-    }
-  };
+      // Set processing flag to prevent rapid clicks
+      setIsProcessing(true);
+      
+      const newCode = prev + num;
+      
+      // Auto-submit when 4 digits entered
+      if (newCode.length === 4) {
+        setTimeout(() => {
+          onComplete(newCode);
+          setIsProcessing(false);
+        }, 100);
+      } else {
+        // Release processing flag after a short delay to prevent rapid input
+        setTimeout(() => {
+          setIsProcessing(false);
+        }, 150);
+      }
+      
+      return newCode;
+    });
+  }, [isProcessing, onComplete]);
 
-  const handleDelete = () => {
+  const handleDelete = useCallback(() => {
     setCode((prev) => prev.slice(0, -1));
-  };
+  }, []);
 
-  const handleClear = () => {
+  const handleClear = useCallback(() => {
     setCode("");
-  };
+  }, []);
 
   // Reset code when error message changes
   useEffect(() => {
@@ -77,6 +81,50 @@ export const LockCodeKeypad = ({
       return () => clearTimeout(timer);
     }
   }, [errorMessage]);
+
+  // Keyboard input support
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Prevent default behavior for number keys to avoid input field issues
+      if (event.key >= '0' && event.key <= '9') {
+        event.preventDefault();
+        
+        // Don't process if already processing or code is complete
+        if (isProcessing || code.length >= 4) {
+          return;
+        }
+        
+        handleNumberPress(event.key);
+      } 
+      // Handle Backspace/Delete
+      else if (event.key === 'Backspace' || event.key === 'Delete') {
+        event.preventDefault();
+        if (code.length > 0) {
+          handleDelete();
+        }
+      }
+      // Handle Escape to clear
+      else if (event.key === 'Escape') {
+        event.preventDefault();
+        if (code.length > 0) {
+          handleClear();
+        }
+      }
+      // Handle Enter to submit (if 4 digits entered)
+      else if (event.key === 'Enter' && code.length === 4) {
+        event.preventDefault();
+        onComplete(code);
+      }
+    };
+
+    // Add event listener
+    window.addEventListener('keydown', handleKeyDown);
+
+    // Cleanup
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [code, isProcessing, handleNumberPress, handleDelete, handleClear, onComplete]);
 
   return (
     <div className="w-full max-w-md mx-auto space-y-6">

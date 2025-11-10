@@ -18,6 +18,7 @@ interface UsePlayTrackingReturn {
   isLoading: boolean;
   recordPlay: (songId: string, durationSeconds?: number) => Promise<boolean>;
   checkPlayStatus: (songId: string) => Promise<void>;
+  refetchBalance: () => void;
   error: string | null;
 }
 
@@ -29,7 +30,7 @@ export const usePlayTracking = (songId?: string, songTokenAddress?: Address): Us
   const [error, setError] = useState<string | null>(null);
   
   // Check token balance if token address is provided
-  const { balance: tokenBalance } = useSongTokenBalance(
+  const { balance: tokenBalance, refetch: refetchBalance } = useSongTokenBalance(
     songTokenAddress,
     fullAddress as Address | undefined
   );
@@ -229,20 +230,52 @@ export const usePlayTracking = (songId?: string, songTokenAddress?: Address): Us
     }
   }, [fullAddress, checkPlayStatus, getAuthHeaders, tokenBalance]);
 
-  // Check play status when songId or wallet address changes
+  // Check play status when songId, wallet address, or token balance changes
   useEffect(() => {
     if (songId && fullAddress) {
       checkPlayStatus(songId);
     } else {
       setPlayStatus(null);
     }
-  }, [songId, fullAddress, checkPlayStatus]);
+  }, [songId, fullAddress, tokenBalance, checkPlayStatus]);
+  
+  // Also check play status when token balance changes (e.g., after purchase)
+  useEffect(() => {
+    if (songId && fullAddress) {
+      // Small delay to ensure balance has fully updated
+      const timer = setTimeout(() => {
+        checkPlayStatus(songId);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [tokenBalance, songId, fullAddress, checkPlayStatus]);
+  
+  // Periodic check for ownership changes (e.g., after purchase) - every 2 seconds if not owned
+  useEffect(() => {
+    if (!songId || !fullAddress) return;
+    
+    // Only poll if we don't already own (to detect when ownership changes after purchase)
+    const shouldPoll = !playStatus || !playStatus.isOwner;
+    
+    if (shouldPoll) {
+      const interval = setInterval(() => {
+        // Refetch balance first, then check play status
+        refetchBalance();
+        setTimeout(() => {
+          checkPlayStatus(songId);
+        }, 500);
+      }, 2000); // Check every 2 seconds
+      
+      return () => clearInterval(interval);
+    }
+  }, [songId, fullAddress, playStatus?.isOwner, refetchBalance, checkPlayStatus]);
 
   return {
     playStatus,
     isLoading,
     recordPlay,
     checkPlayStatus,
+    refetchBalance,
     error
   };
 };

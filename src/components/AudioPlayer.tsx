@@ -119,7 +119,7 @@ const AudioPlayer = ({
   const { isPWA, audioSupported, handlePWAAudioPlay, isAudioUnlocked } = usePWAAudio();
   const { isConnected } = useWallet();
   const { authenticated } = usePrivy();
-  const { playStatus, recordPlay, checkPlayStatus } = usePlayTracking(
+  const { playStatus, recordPlay, checkPlayStatus, refetchBalance } = usePlayTracking(
     currentSong?.id,
     currentSong?.token_address as `0x${string}` | undefined
   );

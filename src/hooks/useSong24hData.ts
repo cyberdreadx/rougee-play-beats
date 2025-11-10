@@ -266,21 +266,12 @@ export const useSong24hData = (tokenAddress: Address | null, _bondingSupplyStr?:
     calculate24hData();
   }, [tokenAddress, publicClient, refreshTrigger, bypassCache]);
 
-  // Set up auto-refetch every 15 seconds (separate effect to avoid re-creating interval)
-  useEffect(() => {
-    if (!tokenAddress) return;
-    
-    const intervalId = setInterval(() => {
-      console.log('🔄 useSong24hData: Auto-refreshing 24h data for', tokenAddress);
-      // Invalidate cache and trigger refresh
-      invalidate24hDataCache(tokenAddress);
-      setRefreshTrigger(prev => prev + 1);
-    }, 15 * 1000); // 15 seconds
-    
-    return () => {
-      clearInterval(intervalId);
-    };
-  }, [tokenAddress]); // Only depend on tokenAddress, not refreshTrigger
+  // Auto-refresh disabled - only fetch on mount or when dependencies change
+  // Data uses 5-second cache and will refresh when:
+  // 1. User navigates to a different song
+  // 2. Cache expires (5 seconds)
+  // 3. Manual refetch is called
+  // This prevents excessive RPC calls while still keeping data reasonably fresh
 
   // Function to manually trigger a refresh (useful after purchases)
   const refetch = useCallback(() => {

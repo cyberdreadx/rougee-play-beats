@@ -93,15 +93,9 @@ export const useSongTradesFromDB = (
   useEffect(() => {
     fetchTrades();
     
-    // Set up auto-refresh every 3 seconds for real-time updates
-    const intervalId = setInterval(() => {
-      console.log('🔄 useSongTradesFromDB: Auto-refreshing trades');
-      fetchTrades();
-    }, 3 * 1000); // 3 seconds
-    
-    return () => {
-      clearInterval(intervalId);
-    };
+    // Auto-refresh disabled - only fetch on mount or when dependencies change
+    // Data will refresh when user buys/sells via the trade form
+    // If you need real-time updates, implement Supabase real-time subscriptions instead
   }, [fetchTrades]);
 
   return {

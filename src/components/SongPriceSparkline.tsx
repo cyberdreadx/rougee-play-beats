@@ -213,17 +213,9 @@ export const SongPriceSparkline = ({
     // Fetch immediately
     fetchTradeHistory();
     
-    // Set up auto-refresh every 3 seconds for real-time updates
-    intervalId = setInterval(() => {
-      console.log('🔄 SongPriceSparkline: Auto-refreshing chart data');
-      fetchTradeHistory();
-    }, 3 * 1000); // 3 seconds
-    
-    return () => {
-      if (intervalId) {
-        clearInterval(intervalId);
-      }
-    };
+    // Auto-refresh disabled - only fetch on mount or when dependencies change
+    // Data will refresh when user buys/sells or navigates to different song
+    // No cleanup needed
   }, [tokenAddress, publicClient, prices.xrge, priceInXRGE, timeframeHours, bondingSupply]);
   
   // Don't render if no meaningful data - wait for data to load first

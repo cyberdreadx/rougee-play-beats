@@ -269,29 +269,10 @@ const SongTradingHistory = ({
     }
   }, [trades, onVolumeCalculated]);
 
-  // Auto-refresh: use database refetch if available, otherwise blockchain
-  useEffect(() => {
-    if (dbTrades.length > 0) {
-      // Database has data - just use its auto-refresh (handled by useSongTradesFromDB)
-      return;
-    }
-    
-    // Fallback: blockchain refresh only if no database data
-    let intervalId: NodeJS.Timeout | null = null;
-    
-    intervalId = setInterval(() => {
-      console.log('🔄 SongTradingHistory: Auto-refreshing from blockchain');
-      fetchTradingHistoryFromBlockchain();
-      // Also try database again in case trades were indexed
-      refetchDB();
-    }, 3 * 1000); // 3 seconds
-    
-    return () => {
-      if (intervalId) {
-        clearInterval(intervalId);
-      }
-    };
-  }, [dbTrades.length, fetchTradingHistoryFromBlockchain, refetchDB, refreshTrigger]);
+  // Auto-refresh disabled - only fetch on mount or when song changes
+  // Data will refresh when user buys/sells via the trade form
+  // For real-time updates, implement Supabase real-time subscriptions instead
+  // (Auto-refresh interval removed - was causing excessive requests every 3 seconds)
   
   // Trigger blockchain fetch when refreshTrigger changes (manual refresh)
   useEffect(() => {

@@ -10,6 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { MessageCircle, Share2, Image as ImageIcon, Send, CheckCircle, Check, CircleCheckBig, Music, Loader2, Play, Pause, Lock, ChevronsUpDown, X, Plus } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { getIPFSGatewayUrl } from '@/lib/ipfs';
+import { IPFSImage } from '@/components/IPFSImage';
 import StoriesBar from '@/components/StoriesBar';
 import LikeButton from '@/components/LikeButton';
 import { usePrivy } from '@privy-io/react-auth';
@@ -1288,11 +1289,10 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
                     >
                       {post.profiles?.avatar_cid ? (
                         <div className="relative">
-                          <img 
-                            src={getIPFSGatewayUrl(post.profiles.avatar_cid)} 
+                          <IPFSImage 
+                            cid={post.profiles.avatar_cid}
                             alt="Avatar" 
-                            loading="lazy" 
-                            decoding="async" 
+                            fallback="/placeholder-avatar.png"
                             className="w-10 h-10 md:w-12 md:h-12 rounded-full object-cover border-2 border-neon-green/20 group-hover/avatar:border-neon-green/60 transition-all duration-300" 
                           />
                           <div className="absolute inset-0 rounded-full bg-neon-green/0 group-hover/avatar:bg-neon-green/10 transition-colors duration-300" />
@@ -1579,7 +1579,7 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
                               className="cursor-pointer hover:opacity-80 transition-opacity"
                               onClick={() => navigate(`/artist/${comment.wallet_address}`)}
                             >
-                              {comment.profiles?.avatar_cid ? <img src={getIPFSGatewayUrl(comment.profiles.avatar_cid)} alt="Avatar" className="w-8 h-8 rounded-full object-cover flex-shrink-0" /> : <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                              {comment.profiles?.avatar_cid ? <IPFSImage cid={comment.profiles.avatar_cid} alt="Avatar" fallback="/placeholder-avatar.png" className="w-8 h-8 rounded-full object-cover flex-shrink-0" /> : <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
                                   <span className="text-primary text-xs">
                                     {comment.profiles?.artist_name?.[0] || '?'}
                                   </span>

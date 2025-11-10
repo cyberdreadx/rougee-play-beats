@@ -245,13 +245,13 @@ interface Song {
   const isThisSongPlaying = isCurrentSong && isPlaying;
   
   
-  // Get current price from bonding curve with auto-refresh for real-time trending
-  const { price: priceData } = useSongPrice(song.token_address as Address, true);
+  // Get current price from bonding curve (no auto-refresh to reduce RPC calls)
+  const { price: priceData } = useSongPrice(song.token_address as Address, false);
   const priceInXRGE = priceData ? parseFloat(priceData) : undefined;
   
-  // Get metadata and supply using proper hooks with auto-refresh for real-time trending
+  // Get metadata and supply using proper hooks (no auto-refresh to reduce RPC calls)
   const { metadata: metadataData, isLoading: metadataLoading, error: metadataError } = useSongMetadata(song.token_address as Address);
-  const { supply: bondingSupply, isLoading: supplyLoading, error: supplyError } = useBondingCurveSupply(song.token_address as Address, true);
+  const { supply: bondingSupply, isLoading: supplyLoading, error: supplyError } = useBondingCurveSupply(song.token_address as Address, false);
   
   
   
@@ -481,21 +481,21 @@ const SongRow = memo(({ song, index, onStatsUpdate, playSong, currentSong, isPla
   const isCurrentSong = currentSong?.id === song.id;
   const isThisSongPlaying = isCurrentSong && isPlaying;
   
-  // Get current price from bonding curve with auto-refresh for real-time trending
-  const { price: priceData } = useSongPrice(song.token_address as Address, true);
+  // Get current price from bonding curve (no auto-refresh to reduce RPC calls)
+  const { price: priceData } = useSongPrice(song.token_address as Address, false);
   const priceInXRGE = priceData ? parseFloat(priceData) : undefined;
   
-  // Get metadata and supply using proper hooks with auto-refresh for real-time trending
+  // Get metadata and supply using proper hooks (no auto-refresh to reduce RPC calls)
   const { metadata: metadataData, isLoading: metadataLoading } = useSongMetadata(song.token_address as Address);
-  const { supply: bondingSupply, isLoading: supplyLoading } = useBondingCurveSupply(song.token_address as Address, true);
+  const { supply: bondingSupply, isLoading: supplyLoading } = useBondingCurveSupply(song.token_address as Address, false);
   
   
   // Convert bondingSupply to a stable string value to prevent infinite loops
   const bondingSupplyStr = bondingSupply ? bondingSupply.toString() : null;
   
   // Use shared 24h data hook for consistent data between mobile and desktop
-  // bypassCache=true ensures real-time trending data (no caching)
-  const { priceChange24h, volume24h } = useSong24hData(song.token_address as Address, bondingSupplyStr, true);
+  // Enable caching (5s cache) to improve performance and reduce RPC calls
+  const { priceChange24h, volume24h } = useSong24hData(song.token_address as Address, bondingSupplyStr, false);
   
   // EXACTLY match SongTrade page calculations
   const currentPrice = priceInXRGE && prices.xrge ? priceInXRGE * prices.xrge : undefined;
@@ -540,12 +540,12 @@ const SongRow = memo(({ song, index, onStatsUpdate, playSong, currentSong, isPla
       onClick={() => navigate(`/song/${song.id}`)}
       style={style}
     >
-      <TableCell className="font-mono text-muted-foreground w-12">
+      <TableCell className="font-mono text-muted-foreground w-8 py-2 text-xs">
         #{index + 1}
       </TableCell>
       
-      <TableCell>
-        <div className="flex items-center gap-3">
+      <TableCell className="py-2">
+        <div className="flex items-center gap-2">
           {/* Play button */}
           {playSong && song.audio_cid && (
             <button
@@ -553,12 +553,12 @@ const SongRow = memo(({ song, index, onStatsUpdate, playSong, currentSong, isPla
                 e.stopPropagation();
                 playSong(song);
               }}
-              className="w-8 h-8 rounded-full bg-neon-green hover:bg-neon-green/80 active:bg-neon-green/70 flex items-center justify-center transition-all hover:scale-110 active:scale-95 flex-shrink-0"
+              className="w-7 h-7 rounded-full bg-neon-green hover:bg-neon-green/80 active:bg-neon-green/70 flex items-center justify-center transition-all hover:scale-110 active:scale-95 flex-shrink-0"
             >
               {isThisSongPlaying ? (
-                <Pause className="w-4 h-4 text-black fill-black" />
+                <Pause className="w-3.5 h-3.5 text-black fill-black" />
               ) : (
-                <Play className="w-4 h-4 text-black fill-black ml-0.5" />
+                <Play className="w-3.5 h-3.5 text-black fill-black ml-0.5" />
               )}
             </button>
           )}
@@ -568,11 +568,11 @@ const SongRow = memo(({ song, index, onStatsUpdate, playSong, currentSong, isPla
               <img
                 src={getIPFSGatewayUrl(song.cover_cid)}
                 alt={song.title}
-                className="w-10 h-10 rounded object-cover"
+                className="w-8 h-8 rounded object-cover"
               />
             ) : (
-              <div className="w-10 h-10 rounded bg-neon-green/10 flex items-center justify-center">
-                <Music className="w-5 h-5 text-neon-green" />
+              <div className="w-8 h-8 rounded bg-neon-green/10 flex items-center justify-center">
+                <Music className="w-4 h-4 text-neon-green" />
               </div>
             )}
             {index < 3 && (
@@ -582,20 +582,20 @@ const SongRow = memo(({ song, index, onStatsUpdate, playSong, currentSong, isPla
             )}
           </div>
           <div className="min-w-0 flex-1">
-            <div className="text-sm font-semibold flex items-center gap-2 flex-wrap">
-              <span>{song.title}</span>
+            <div className="text-xs font-semibold flex items-center gap-1.5 flex-wrap">
+              <span className="truncate max-w-[200px]">{song.title}</span>
               {song.ticker && (
-                <span className="text-xs text-neon-green font-mono flex-shrink-0">${song.ticker}</span>
+                <span className="text-[10px] text-neon-green font-mono flex-shrink-0">${song.ticker}</span>
               )}
               <AiBadge aiUsage={song.ai_usage} size="sm" />
               {change24h > 50 && (
-                <span className="text-[10px] bg-green-500/20 text-green-400 px-2 py-0.5 rounded-full font-mono font-bold flex-shrink-0">
+                <span className="text-[9px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded-full font-mono font-bold flex-shrink-0">
                   🚀 HOT
                 </span>
               )}
             </div>
             <div 
-              className="text-sm text-muted-foreground hover:text-neon-green transition-colors cursor-pointer"
+              className="text-[11px] text-muted-foreground hover:text-neon-green transition-colors cursor-pointer truncate"
               onClick={(e) => {
                 e.stopPropagation();
                 if (song.wallet_address) navigate(`/artist/${song.wallet_address}`);
@@ -608,14 +608,14 @@ const SongRow = memo(({ song, index, onStatsUpdate, playSong, currentSong, isPla
       </TableCell>
       
       {/* Chart Column - Only render when we have price data */}
-      <TableCell>
+      <TableCell className="py-2">
         {song.token_address && priceInXRGE !== undefined && bondingSupplyStr ? (
-          <div className="w-32 h-10">
+          <div className="w-24 h-7">
             <SongPriceSparkline 
               tokenAddress={song.token_address || undefined}
               bondingSupply={bondingSupplyStr || undefined}
               priceInXRGE={typeof priceInXRGE === 'number' ? priceInXRGE : undefined}
-              height={40}
+              height={28}
               showPercentChange={false}
               timeframeHours={24}
               percentChange={priceChange24h !== null ? priceChange24h : undefined}
@@ -623,41 +623,41 @@ const SongRow = memo(({ song, index, onStatsUpdate, playSong, currentSong, isPla
             />
           </div>
         ) : (
-          <div className="w-32 h-10 flex items-center justify-center">
+          <div className="w-24 h-7 flex items-center justify-center">
             <div className="text-[8px] text-muted-foreground animate-pulse">...</div>
           </div>
         )}
       </TableCell>
       
-      <TableCell>
+      <TableCell className="py-2">
         {song.audio_cid ? (
           <TrendingWaveform songId={song.id} audioCid={song.audio_cid} />
         ) : (
-          <div className="w-full h-4 bg-muted/20 rounded flex items-center justify-center">
-            <span className="text-xs text-muted-foreground">—</span>
+          <div className="w-full h-3 bg-muted/20 rounded flex items-center justify-center">
+            <span className="text-[10px] text-muted-foreground">—</span>
           </div>
         )}
       </TableCell>
       
-      <TableCell className="font-mono text-right">
+      <TableCell className="font-mono text-right py-2">
         {song.token_address ? (
           <div>
-            <div className="font-semibold text-sm">
+            <div className="font-semibold text-xs">
               ${currentPrice ? (currentPrice < 0.000001 ? currentPrice.toFixed(10) : currentPrice < 0.01 ? currentPrice.toFixed(8) : currentPrice.toFixed(6)) : '$0.000000'}
             </div>
-            <div className="text-xs text-muted-foreground font-mono">
+            <div className="text-[10px] text-muted-foreground font-mono">
               {priceInXRGE ? (priceInXRGE < 0.000001 ? priceInXRGE.toFixed(10) : priceInXRGE.toFixed(8)) : '0.00000000'} XRGE
             </div>
           </div>
         ) : (
-          <span className="text-muted-foreground text-sm">Not deployed</span>
+          <span className="text-muted-foreground text-[10px]">Not deployed</span>
         )}
       </TableCell>
       
-      <TableCell className={`font-mono text-right font-semibold text-sm ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
+      <TableCell className={`font-mono text-right font-semibold text-xs py-2 ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
         {song.token_address ? (
-          <div className="flex items-center justify-end gap-1">
-            {isPositive ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+          <div className="flex items-center justify-end gap-0.5">
+            {isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
             <span className="whitespace-nowrap">{isPositive ? '+' : ''}{Math.abs(change24h) < 0.01 ? change24h.toFixed(2) : change24h.toFixed(1)}%</span>
           </div>
         ) : (
@@ -665,33 +665,33 @@ const SongRow = memo(({ song, index, onStatsUpdate, playSong, currentSong, isPla
         )}
       </TableCell>
       
-      <TableCell className="font-mono text-right">
+      <TableCell className="font-mono text-right py-2">
         {song.token_address && volumeUSD > 0 ? (
           <div>
-            <div className="font-semibold text-sm">
+            <div className="font-semibold text-xs">
               ${volumeUSD < 1 ? volumeUSD.toFixed(4) : volumeUSD.toLocaleString(undefined, {maximumFractionDigits: 2})}
             </div>
-            <div className="text-xs text-muted-foreground font-mono">
+            <div className="text-[10px] text-muted-foreground font-mono">
               {volumeXRGE < 1000 ? volumeXRGE.toFixed(2) : volumeXRGE.toLocaleString(undefined, {maximumFractionDigits: 2})} XRGE
             </div>
           </div>
         ) : (
-          <span className="text-muted-foreground text-xs">$0</span>
+          <span className="text-muted-foreground text-[10px]">$0</span>
         )}
       </TableCell>
       
-      <TableCell className="font-mono text-right">
+      <TableCell className="font-mono text-right py-2">
         {song.token_address && marketCap > 0 ? (
-          <div className="font-semibold text-sm">
+          <div className="font-semibold text-xs">
             ${marketCap < 1 ? marketCap.toFixed(6) : marketCap.toLocaleString(undefined, {maximumFractionDigits: 2})}
           </div>
         ) : (
-          <span className="text-muted-foreground text-xs">$0</span>
+          <span className="text-muted-foreground text-[10px]">$0</span>
         )}
       </TableCell>
       
-      <TableCell className="font-mono text-right text-muted-foreground">
-        <Flame className="w-4 h-4 inline mr-1 text-orange-500" />
+      <TableCell className="font-mono text-right text-muted-foreground py-2 text-xs">
+        <Flame className="w-3 h-3 inline mr-0.5 text-orange-500" />
         {song.play_count}
       </TableCell>
     </TableRow>
@@ -825,13 +825,13 @@ const SongCard = memo(({ song, index, onStatsUpdate, playSong, currentSong, isPl
   const isCurrentSong = currentSong?.id === song.id;
   const isThisSongPlaying = isCurrentSong && isPlaying;
   
-  // Get current price from bonding curve with auto-refresh for real-time trending
-  const { price: priceInXRGENumber } = useSongPrice(song.token_address as Address, true);
+  // Get current price from bonding curve (no auto-refresh to reduce RPC calls)
+  const { price: priceInXRGENumber } = useSongPrice(song.token_address as Address, false);
   const priceInXRGE = priceInXRGENumber ? parseFloat(priceInXRGENumber) : undefined;
   
-  // Get metadata and supply using proper hooks with auto-refresh for real-time trending
+  // Get metadata and supply using proper hooks (no auto-refresh to reduce RPC calls)
   const { metadata: metadataData, isLoading: metadataLoading } = useSongMetadata(song.token_address as Address);
-  const { supply: bondingSupply, isLoading: supplyLoading } = useBondingCurveSupply(song.token_address as Address, true);
+  const { supply: bondingSupply, isLoading: supplyLoading } = useBondingCurveSupply(song.token_address as Address, false);
   
   
   const bondingSupplyStr = bondingSupply ? bondingSupply.toString() : null;
@@ -974,14 +974,18 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
   const [songStats, setSongStats] = useState<Map<string, { volume: number; change: number; marketCap: number; price: number }>>(new Map());
   const [sortField, setSortField] = useState<SortField>('trending');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
-  const [displayLimit, setDisplayLimit] = useState<number | null>(50); // Start with 50 to load all data, user can change
+  const [displayLimit, setDisplayLimit] = useState<number | null>(20); // Start with TOP 20 for faster initial load
   const [timeFilter, setTimeFilter] = useState<'24H' | '7D' | '30D' | 'ALL'>('ALL');
+  const [visibleCount, setVisibleCount] = useState(5); // Start with 5 items visible
+  const [totalVolumeUSD, setTotalVolumeUSD] = useState<number>(0); // True total across all songs
+  const [calculatingVolume, setCalculatingVolume] = useState(false);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const searchQuery = searchParams.get('search');
+  const { prices } = useTokenPrices();
+  const publicClient = usePublicClient();
   
-  // Calculate aggregated stats from individual song stats
-  const totalVolume = Array.from(songStats.values()).reduce((sum, stat) => sum + stat.volume, 0);
+  // Calculate aggregated stats from individual song stats (for Top Gainer only)
   const topGainerPercent = Array.from(songStats.values()).reduce((max, stat) => Math.max(max, stat.change), 0);
   
   const handleStatsUpdate = (songId: string, volume: number, change: number, marketCap: number, price: number) => {
@@ -1039,14 +1043,14 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
               .not("artist_name", "is", null)
               .ilike("artist_name", searchTerm)
               .order("total_plays", { ascending: false })
-              .limit(50),
+              .limit(100),
             supabase
               .from("songs")
               .select("id, title, artist, wallet_address, audio_cid, cover_cid, play_count, ticker, genre, created_at, token_address, ai_usage")
               .not("token_address", "is", null) // Only show deployed songs
               .or(`title.ilike.%${searchQuery}%,artist.ilike.%${searchQuery}%,genre.ilike.%${searchQuery}%,ticker.ilike.%${searchQuery}%`)
               .order("play_count", { ascending: false })
-              .limit(50)
+              .limit(100) // Fetch more than displayLimit to allow user to view all
           ]);
 
           if (artistsResponse.error) throw artistsResponse.error;
@@ -1063,13 +1067,13 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
               .not("artist_name", "is", null)
               .gt("total_songs", 0)
               .order("total_plays", { ascending: false })
-              .limit(50),
+              .limit(100),
             supabase
               .from("songs")
               .select("id, title, artist, wallet_address, audio_cid, cover_cid, play_count, ticker, genre, created_at, token_address, ai_usage")
               .not("token_address", "is", null) // Only show deployed songs
               .order("play_count", { ascending: false })
-              .limit(50)
+              .limit(100) // Fetch more than displayLimit to allow user to view all
           ]);
 
           if (artistsResponse.error) throw artistsResponse.error;
@@ -1087,6 +1091,141 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
 
     fetchTrendingData();
   }, [searchQuery]);
+
+  // Calculate true total volume across ALL songs (not just visible ones)
+  useEffect(() => {
+    let mounted = true;
+    
+    const calculateTotalVolume = async () => {
+      if (!prices.xrge || prices.xrge === 0) {
+        console.log('⏳ Waiting for XRGE price...');
+        return;
+      }
+      
+      try {
+        setCalculatingVolume(true);
+        console.log('💰 Calculating total volume across all songs...');
+        
+        // Fetch ALL songs with token addresses from database
+        const { data: allSongs, error } = await supabase
+          .from('songs')
+          .select('id, token_address')
+          .not('token_address', 'is', null)
+          .limit(1000); // Reasonable limit
+        
+        if (error) {
+          console.error('❌ Error fetching songs:', error);
+          if (mounted) setTotalVolumeUSD(0);
+          return;
+        }
+        
+        if (!allSongs || allSongs.length === 0) {
+          console.log('⚠️ No songs with token addresses found');
+          if (mounted) setTotalVolumeUSD(0);
+          return;
+        }
+        
+        console.log(`💰 Fetched ${allSongs.length} songs with token addresses`);
+        
+        // Check if song_trades table exists, if not use song_purchases as fallback
+        // song_trades uses trade_timestamp (BIGINT Unix milliseconds), not created_at
+        const twentyFourHoursAgo = Date.now() - (24 * 60 * 60 * 1000); // Unix timestamp in milliseconds
+        
+        // Try song_trades first (if it exists)
+        let allTrades: any[] = [];
+        let tradesError: any = null;
+        
+        // Query song_trades - trade_timestamp is BIGINT (Unix milliseconds)
+        // Note: Supabase might need the value as a string for BIGINT comparison
+        const { data: tradesData, error: tradesErr } = await supabase
+          .from('song_trades')
+          .select('song_id, xrge_amount, trade_timestamp')
+          .in('song_id', allSongs.map(s => s.id))
+          .gte('trade_timestamp', twentyFourHoursAgo) // BIGINT comparison
+          .limit(10000);
+        
+        if (tradesErr) {
+          console.error('❌ Error fetching song_trades:', tradesErr);
+          console.warn('⚠️ Trying fallback to song_purchases...');
+          
+          // Fallback: Try to get any trades without time filter to see if table exists
+          const { data: allTradesCheck, error: checkErr } = await supabase
+            .from('song_trades')
+            .select('id')
+            .limit(1);
+          
+          if (checkErr) {
+            console.error('❌ song_trades table does not exist or is inaccessible:', checkErr);
+            if (mounted) setTotalVolumeUSD(0);
+            return;
+          }
+          
+          // Table exists but query failed - try without time filter
+          console.warn('⚠️ Time-filtered query failed, trying all trades...');
+          const { data: allTradesData, error: allTradesErr } = await supabase
+            .from('song_trades')
+            .select('song_id, xrge_amount, trade_timestamp')
+            .in('song_id', allSongs.map(s => s.id))
+            .limit(10000);
+          
+          if (allTradesErr) {
+            console.error('❌ Error fetching all trades:', allTradesErr);
+            if (mounted) setTotalVolumeUSD(0);
+            return;
+          }
+          
+          // Filter in JavaScript instead
+          allTrades = (allTradesData || []).filter((trade: any) => {
+            const timestamp = typeof trade.trade_timestamp === 'string' 
+              ? parseInt(trade.trade_timestamp) 
+              : trade.trade_timestamp;
+            return timestamp >= twentyFourHoursAgo;
+          });
+        } else {
+          allTrades = tradesData || [];
+        }
+        
+        console.log(`💰 Found ${allTrades.length} trades in last 24h`);
+        
+        if (allTrades.length === 0) {
+          console.warn('⚠️ No trades found in last 24h - total volume will be 0');
+        }
+        
+        // Sum up 24h volume per song
+        const volumeBySong: Record<string, number> = {};
+        allTrades.forEach(trade => {
+          if (trade.song_id && trade.xrge_amount) {
+            const amount = typeof trade.xrge_amount === 'string' ? parseFloat(trade.xrge_amount) : trade.xrge_amount;
+            volumeBySong[trade.song_id] = (volumeBySong[trade.song_id] || 0) + amount;
+          }
+        });
+        
+        // Calculate total volume in USD
+        const totalVolumeXRGE = Object.values(volumeBySong).reduce((sum, vol) => sum + vol, 0);
+        const totalVolumeInUSD = totalVolumeXRGE * prices.xrge;
+        
+        console.log(`💰 Total 24h Volume: ${totalVolumeXRGE.toFixed(2)} XRGE = $${totalVolumeInUSD.toLocaleString()}`);
+        
+        if (mounted) {
+          setTotalVolumeUSD(totalVolumeInUSD);
+        }
+      } catch (error) {
+        console.error('❌ Error calculating total volume:', error);
+        if (mounted) setTotalVolumeUSD(0);
+      } finally {
+        if (mounted) {
+          setCalculatingVolume(false);
+        }
+      }
+    };
+    
+    // Calculate on mount and when XRGE price changes (but only once per price change)
+    calculateTotalVolume();
+    
+    return () => {
+      mounted = false;
+    };
+  }, [prices.xrge]); // Removed calculatingVolume from dependencies to prevent infinite loop
 
   // Sort songs based on selected field (reactive to songStats changes)
   const sortedSongs = useMemo(() => {
@@ -1131,10 +1270,12 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
     return sorted;
   }, [songs, sortField, sortDirection, songStats, calculateTrendingScore]);
   
-  // Separate displayed songs (applies displayLimit)
+  // Separate displayed songs (applies displayLimit and visibleCount for lazy loading)
   const displayedSongs = useMemo(() => {
-    return displayLimit ? sortedSongs.slice(0, displayLimit) : sortedSongs;
-  }, [sortedSongs, displayLimit]);
+    const limited = displayLimit ? sortedSongs.slice(0, displayLimit) : sortedSongs;
+    // Only show visibleCount items for lazy loading
+    return limited.slice(0, visibleCount);
+  }, [sortedSongs, displayLimit, visibleCount]);
   
   // Get top 5 songs for cycling featured card - only recalc when songs list or calculation function changes
   // Note: calculateTrendingScore already depends on songStats, so we don't need songStats here
@@ -1171,6 +1312,30 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
   useEffect(() => {
     localStorage.setItem('trending_autoCycle_paused', String(isAutoCyclePaused));
   }, [isAutoCyclePaused]);
+
+  // Infinite scroll: Load more songs as user scrolls
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollPosition = window.innerHeight + window.scrollY;
+      const pageHeight = document.documentElement.scrollHeight;
+      
+      // When user scrolls to 80% of the page, load 5 more items
+      if (scrollPosition >= pageHeight * 0.8) {
+        const totalAvailable = displayLimit ? Math.min(sortedSongs.length, displayLimit) : sortedSongs.length;
+        if (visibleCount < totalAvailable) {
+          setVisibleCount(prev => Math.min(prev + 5, totalAvailable));
+        }
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [visibleCount, sortedSongs.length, displayLimit]);
+
+  // Reset visible count when displayLimit or sortedSongs changes
+  useEffect(() => {
+    setVisibleCount(5); // Reset to 5 items when filters change
+  }, [displayLimit, sortField, sortDirection, searchQuery]);
 
   // Cycle through top 5 songs every 8 seconds (only when not paused)
   useEffect(() => {
@@ -1271,9 +1436,13 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
               <div className="group relative bg-gradient-to-br from-white/5 to-white/0 backdrop-blur-xl border border-white/10 rounded-xl p-5 shadow-[0_4px_16px_0_rgba(168,85,247,0.1)] hover:bg-white/10 hover:border-purple-400/30 hover:shadow-[0_8px_32px_0_rgba(168,85,247,0.25)] transition-all duration-300 overflow-hidden">
                 <div className="absolute top-0 right-0 w-20 h-20 bg-purple-500/10 rounded-full blur-2xl group-hover:bg-purple-500/20 transition-all" />
                 <BarChart3 className="w-5 h-5 text-purple-400/70 mb-2" />
-                <div className="text-xs text-muted-foreground font-mono mb-1">TOTAL VOLUME</div>
+                <div className="text-xs text-muted-foreground font-mono mb-1">TOTAL VOLUME (24H)</div>
                 <div className="text-3xl font-bold font-mono text-purple-400 drop-shadow-[0_0_8px_rgba(168,85,247,0.6)]">
-                  ${totalVolume > 0 ? totalVolume.toLocaleString(undefined, {maximumFractionDigits: 0}) : '...'}
+                  {calculatingVolume ? (
+                    <span className="animate-pulse">...</span>
+                  ) : (
+                    `$${totalVolumeUSD > 0 ? totalVolumeUSD.toLocaleString(undefined, {maximumFractionDigits: 0}) : '0'}`
+                  )}
                 </div>
               </div>
               <div className="group relative bg-gradient-to-br from-white/5 to-white/0 backdrop-blur-xl border border-white/10 rounded-xl p-5 shadow-[0_4px_16px_0_rgba(249,115,22,0.1)] hover:bg-white/10 hover:border-orange-400/30 hover:shadow-[0_8px_32px_0_rgba(249,115,22,0.25)] transition-all duration-300 overflow-hidden">
@@ -1640,17 +1809,30 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    displayedSongs.map((song, index) => (
-                      <SongRow 
-                        key={song.id} 
-                        song={song} 
-                        index={index} 
-                        onStatsUpdate={handleStatsUpdate} 
-                        playSong={playSong} 
-                        currentSong={currentSong} 
-                        isPlaying={isPlaying} 
-                      />
-                    ))
+                    <>
+                      {displayedSongs.map((song, index) => (
+                        <SongRow 
+                          key={song.id} 
+                          song={song} 
+                          index={index} 
+                          onStatsUpdate={handleStatsUpdate}
+                          playSong={playSong}
+                          currentSong={currentSong}
+                          isPlaying={isPlaying}
+                        />
+                      ))}
+                      {/* Loading indicator for infinite scroll */}
+                      {!loading && visibleCount < (displayLimit ? Math.min(sortedSongs.length, displayLimit) : sortedSongs.length) && (
+                        <TableRow>
+                          <TableCell colSpan={9} className="text-center py-4">
+                            <div className="flex items-center justify-center gap-2 text-muted-foreground font-mono text-sm">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <span>Loading more songs...</span>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </>
                   )}
                 </TableBody>
               </Table>
@@ -1679,17 +1861,28 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
                   </div>
                 </div>
               ) : (
-                displayedSongs.map((song, index) => (
-                  <SongCard 
-                    key={song.id} 
-                    song={song} 
-                    index={index} 
-                    onStatsUpdate={handleStatsUpdate} 
-                    playSong={playSong} 
-                    currentSong={currentSong} 
-                    isPlaying={isPlaying} 
-                  />
-                ))
+                <>
+                  {displayedSongs.map((song, index) => (
+                    <SongCard 
+                      key={song.id} 
+                      song={song}
+                      index={index}
+                      onStatsUpdate={handleStatsUpdate}
+                      playSong={playSong}
+                      currentSong={currentSong}
+                      isPlaying={isPlaying}
+                    />
+                  ))}
+                  {/* Loading indicator for infinite scroll */}
+                  {!loading && visibleCount < (displayLimit ? Math.min(sortedSongs.length, displayLimit) : sortedSongs.length) && (
+                    <div className="text-center py-4">
+                      <div className="flex items-center justify-center gap-2 text-muted-foreground font-mono text-sm">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>Loading more...</span>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </TabsContent>

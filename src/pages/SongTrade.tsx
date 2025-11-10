@@ -356,8 +356,9 @@ const SongTrade = ({ playSong, currentSong, isPlaying }: SongTradeProps) => {
     
     setLoadingHolders(true);
     try {
-      // Use database query first (same as Artist page approach)
-      console.log('🔍 Fetching holders for song:', songId);
+      console.log('🔍 Fetching holders for token:', songTokenAddress);
+      
+      // Get database purchases (for fallback if needed)
       const { data: purchases, error: purchasesError } = await supabase
         .from('song_purchases')
         .select('buyer_wallet_address')
@@ -367,18 +368,70 @@ const SongTrade = ({ playSong, currentSong, isPlaying }: SongTradeProps) => {
         console.error('Error fetching purchases:', purchasesError);
       }
       
-      console.log('📊 Found purchases:', purchases?.length || 0, 'for song:', songId);
-      console.log('📊 Purchase data:', purchases);
-      
       const uniqueHolders = new Set(purchases?.map(p => p.buyer_wallet_address.toLowerCase()) || []);
       console.log('👥 Unique holders from database:', uniqueHolders.size);
       
-      // If we have database purchases, use that count
-      if (uniqueHolders.size > 0) {
-        setHolderCount(uniqueHolders.size);
+      // Use Basescan API V2 to get accurate holder list (V1 is deprecated)
+      try {
+        // Using V2 endpoint: https://docs.etherscan.io/api-reference/token-endpoints/token-endpoints-v2#get-token-holder-list-by-contract-address
+        // API key from environment variable - set in .env.local for development
+        // For production (Netlify), set VITE_BASESCAN_API_KEY in environment variables
+        const basescanApiKey = import.meta.env.VITE_BASESCAN_API_KEY || '';
+        const basescanUrl = `https://api.basescan.org/v2/api?chainid=8453&module=token&action=tokenholderlist&contractaddress=${songTokenAddress}&page=1&offset=100&apikey=${basescanApiKey}`;
+        
+        console.log('📡 Querying Basescan API V2 for holders...');
+        console.log('🔗 Token address:', songTokenAddress);
+        console.log('🔗 Full URL:', basescanUrl);
+        
+        const response = await fetch(basescanUrl);
+        console.log('📡 Basescan API response status:', response.status, response.statusText);
+        
+        if (!response.ok) {
+          throw new Error(`Basescan API returned ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        console.log('📡 Basescan API V2 response:', data);
+        
+        if (data.status === '1' && data.result && Array.isArray(data.result)) {
+          console.log('✅ Basescan returned', data.result.length, 'holders');
+          console.log('✅ Holders data:', data.result);
+          
+          const holdersList = data.result
+            .map((holder: any) => ({
+              address: holder.TokenHolderAddress.toLowerCase(),
+              balance: (Number(holder.TokenHolderQuantity) / 1e18).toFixed(2),
+              rawBalance: BigInt(holder.TokenHolderQuantity),
+              percentage: 0 // Will calculate below
+            }))
+            .filter((h: any) => h.rawBalance > BigInt(0))
+            .sort((a: any, b: any) => Number(b.rawBalance - a.rawBalance));
+          
+          // Calculate percentages
+          const totalHeld = holdersList.reduce((sum: bigint, h: any) => sum + h.rawBalance, BigInt(0));
+          const formattedHolders = holdersList.map((h: any) => ({
+            address: h.address,
+            balance: h.balance,
+            percentage: totalHeld > BigInt(0) 
+              ? (Number(h.rawBalance * BigInt(10000) / totalHeld) / 100)
+              : 0
+          }));
+          
+          console.log('✅ Final holders from Basescan:', formattedHolders.length);
+          setHolders(formattedHolders.slice(0, 10));
+          setHolderCount(formattedHolders.length);
+          setLoadingHolders(false);
+          return; // Exit early with Basescan data
+        } else {
+          console.warn('⚠️ Basescan API returned no data or error:', data.message || 'Unknown error');
+          console.warn('⚠️ Full response data:', data);
+        }
+      } catch (basescanError) {
+        console.error('❌ Basescan API failed, falling back to blockchain query:', basescanError);
+        console.error('❌ Error details:', basescanError instanceof Error ? basescanError.message : basescanError);
       }
       
-      // Try to get detailed holder balances from blockchain for the top holders list
+      // Fallback: Try blockchain query if Basescan fails
       if (publicClient) {
         try {
           // Get all Transfer events to calculate detailed holder balances
@@ -394,18 +447,31 @@ const SongTrade = ({ playSong, currentSong, isPlaying }: SongTradeProps) => {
             }
           ] as const;
           
-          const { data: songData } = await supabase
-            .from('songs')
-            .select('created_at')
-            .eq('id', songId)
-            .single();
-          
-          const currentBlock = await publicClient.getBlockNumber();
-          const blocksSinceCreation = songData?.created_at 
-            ? Math.min(Math.floor((Date.now() - new Date(songData.created_at).getTime()) / 2000), 100000)
-            : 50000;
-          
-          const fromBlock = currentBlock - BigInt(blocksSinceCreation);
+        const { data: songData } = await supabase
+          .from('songs')
+          .select('created_at')
+          .eq('id', songId)
+          .single();
+        
+        const currentBlock = await publicClient.getBlockNumber();
+        // Use a VERY large block range to ensure we catch ALL historical transfers
+        // Base produces ~43,200 blocks per day
+        // If we have creation date, calculate exact blocks since creation
+        // Otherwise, use 2 million blocks (~46 days) to be safe
+        let blocksSinceCreation: number;
+        if (songData?.created_at) {
+          const msElapsed = Date.now() - new Date(songData.created_at).getTime();
+          const secondsElapsed = msElapsed / 1000;
+          // Base: ~2 second block time
+          blocksSinceCreation = Math.floor(secondsElapsed / 2);
+          console.log('📅 Song created:', songData.created_at, '→', blocksSinceCreation, 'blocks ago');
+        } else {
+          blocksSinceCreation = 2000000; // ~46 days fallback
+          console.log('⚠️ No creation date, using fallback:', blocksSinceCreation, 'blocks');
+        }
+        
+        const fromBlock = currentBlock - BigInt(blocksSinceCreation);
+        console.log('🔗 Scanning blocks:', fromBlock.toString(), '→', currentBlock.toString(), '(', blocksSinceCreation, 'blocks )');
           
           const logs = await publicClient.getLogs({
             address: songTokenAddress,
@@ -414,8 +480,9 @@ const SongTrade = ({ playSong, currentSong, isPlaying }: SongTradeProps) => {
             toBlock: 'latest'
           });
 
-          // Track holder balances
+          // Track ALL addresses that ever received tokens (for balance checking)
           const holderBalances: Record<string, bigint> = {};
+          const allAddressesThatReceivedTokens = new Set<string>();
           
           console.log('🔗 Processing', logs.length, 'transfer logs...');
           
@@ -429,12 +496,16 @@ const SongTrade = ({ playSong, currentSong, isPlaying }: SongTradeProps) => {
             
             if (from && from !== zeroAddress) {
               holderBalances[from] = (holderBalances[from] || BigInt(0)) - value;
+              allAddressesThatReceivedTokens.add(from);
             }
             
             if (to && to !== zeroAddress) {
               holderBalances[to] = (holderBalances[to] || BigInt(0)) + value;
+              allAddressesThatReceivedTokens.add(to);
             }
           }
+          
+          console.log('📊 Found', allAddressesThatReceivedTokens.size, 'unique addresses that ever received tokens');
           
           console.log('📊 Holder balances after processing:', Object.keys(holderBalances).length, 'addresses');
           console.log('📊 Balances:', Object.entries(holderBalances).map(([addr, bal]) => ({ 
@@ -458,12 +529,21 @@ const SongTrade = ({ playSong, currentSong, isPlaying }: SongTradeProps) => {
           console.log('✅ Holders with positive balance:', holdersWithBalance.length);
           console.log('✅ Final holders:', holdersWithBalance.map(h => ({ address: h.address, balance: h.balance })));
           
-          // If we're missing holders, try direct balance checks for all addresses that ever held tokens
-          if (holdersWithBalance.length < 2 && Object.keys(holderBalances).length >= 2) {
-            console.log('🔍 Missing holders detected, checking current balances...');
+          // Always verify with direct balance checks to ensure we don't miss any holders
+          // Check ALL addresses that ever received tokens (not just those with tracked balances)
+          // This ensures we catch holders even if our block range is incomplete
+          const allPotentialHolders = new Set([
+            ...allAddressesThatReceivedTokens, // ALL addresses from transfer logs
+            ...uniqueHolders                    // Plus any from database
+          ]);
+          
+          console.log('🔍 Checking balances for', allPotentialHolders.size, 'potential holders (', allAddressesThatReceivedTokens.size, 'addresses from transfers +', uniqueHolders.size, 'from database)');
+          
+          if (allPotentialHolders.size >= 1) {
+            console.log('🔍 Running direct balance checks for ALL addresses that ever received tokens...');
             
             const directBalanceChecks = await Promise.all(
-              Object.keys(holderBalances).map(async (address) => {
+              Array.from(allPotentialHolders).map(async (address) => {
                 try {
                   const currentBalance = await publicClient.readContract({
                     address: songTokenAddress,
@@ -503,7 +583,7 @@ const SongTrade = ({ playSong, currentSong, isPlaying }: SongTradeProps) => {
               }))
               .sort((a, b) => Number(b.rawBalance - a.rawBalance));
             
-            if (directHolders.length > holdersWithBalance.length) {
+            if (directHolders.length >= holdersWithBalance.length) {
               // Calculate percentages for direct holders
               const totalHeld = directHolders.reduce((sum, h) => sum + h.rawBalance, BigInt(0));
               const formattedDirectHolders = directHolders.map(h => ({
@@ -514,7 +594,7 @@ const SongTrade = ({ playSong, currentSong, isPlaying }: SongTradeProps) => {
                   : 0
               }));
               
-              console.log('✅ Using direct balance checks:', directHolders.length, 'holders');
+              console.log('✅ Using direct balance checks:', directHolders.length, 'holders (was', holdersWithBalance.length, 'from transfers)');
               setHolders(formattedDirectHolders.slice(0, 10));
               setHolderCount(formattedDirectHolders.length);
               return; // Exit early with direct balance results

@@ -322,8 +322,16 @@ const AudioPlayer = ({
   const lastSongIdRef = useRef<string | null>(null);
   
   useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    
     // Only reset if the song actually changed (not just the object reference)
     if (currentSong && currentSong.id !== lastSongIdRef.current) {
+      // Pause any currently playing audio before switching songs to prevent conflicts
+      if (!audio.paused) {
+        audio.pause();
+      }
+      
       lastSongIdRef.current = currentSong.id;
       lastKnownTimeRef.current = 0; // Reset tracked time for new song
       
@@ -338,7 +346,7 @@ const AudioPlayer = ({
         currentTime: 0,
         duration: 0,
         currentSongId: currentSong.id,
-        isPlaying 
+        isPlaying: false // Reset playing state when song changes to prevent conflicts
       });
       
       // Refresh play status when song changes (to get updated play count)
@@ -544,42 +552,49 @@ const AudioPlayer = ({
     const audio = audioRef.current;
     if (!audio) return;
 
+    // Prevent duplicate plays - check if audio is already playing
     if (isPlaying) {
-      const title = currentAd?.title || currentSong?.title || 'Audio';
-      toast({
-        title: '▶️ Playing',
-        description: title,
-      });
-      
-      // Direct audio.play() call - works in both browser and PWA
-      const playPromise = audio.play();
-      if (playPromise !== undefined) {
-        playPromise.catch(error => {
-          console.error("Audio playback error:", error);
-          
-          if (error.name === 'NotAllowedError') {
-            toast({
-              title: '🔒 Audio blocked',
-              description: 'Please tap the play button to start audio',
-              variant: 'destructive',
-            });
-          } else if (error.name === 'NotSupportedError') {
-            toast({
-              title: '❌ Audio format not supported',
-              description: 'This audio format is not supported',
-              variant: 'destructive',
-            });
-          } else {
-            toast({
-              title: '❌ Playback failed',
-              description: error.message || 'Could not play audio',
-              variant: 'destructive',
-            });
-          }
+      // Only play if not already playing
+      if (audio.paused) {
+        const title = currentAd?.title || currentSong?.title || 'Audio';
+        toast({
+          title: '▶️ Playing',
+          description: title,
         });
+        
+        // Direct audio.play() call - works in both browser and PWA
+        const playPromise = audio.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(error => {
+            console.error("Audio playback error:", error);
+            
+            if (error.name === 'NotAllowedError') {
+              toast({
+                title: '🔒 Audio blocked',
+                description: 'Please tap the play button to start audio',
+                variant: 'destructive',
+              });
+            } else if (error.name === 'NotSupportedError') {
+              toast({
+                title: '❌ Audio format not supported',
+                description: 'This audio format is not supported',
+                variant: 'destructive',
+              });
+            } else {
+              toast({
+                title: '❌ Playback failed',
+                description: error.message || 'Could not play audio',
+                variant: 'destructive',
+              });
+            }
+          });
+        }
       }
     } else {
-      audio.pause();
+      // Only pause if actually playing
+      if (!audio.paused) {
+        audio.pause();
+      }
     }
   }, [isPlaying, currentSong?.id, currentSong?.title, currentAd, toast]);
 

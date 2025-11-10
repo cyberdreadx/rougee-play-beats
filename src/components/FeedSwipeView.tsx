@@ -196,7 +196,9 @@ export default function FeedSwipeView({
             title: songItem.title,
             artist: songItem.artist,
             audio_cid: songItem.audio_cid,
-            cover_cid: songItem.cover_cid
+            cover_cid: songItem.cover_cid,
+            token_address: songItem.token_address, // Include token_address for ownership detection
+            wallet_address: songItem.wallet_address // Include wallet_address for creator check
           });
           playTimeoutRef.current = null;
         }, 300);
@@ -375,7 +377,9 @@ export default function FeedSwipeView({
                           title: song.title,
                           artist: song.artist,
                           audio_cid: song.audio_cid,
-                          cover_cid: song.cover_cid
+                          cover_cid: song.cover_cid,
+                          token_address: song.token_address, // Include token_address for ownership detection
+                          wallet_address: song.wallet_address // Include wallet_address for creator check
                         });
                       }
                     }}

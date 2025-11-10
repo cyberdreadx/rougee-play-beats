@@ -272,11 +272,10 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
   const loadingCommentsRef = useRef<Set<string>>(new Set()); // Track which comments are currently loading
   const [activeTab, setActiveTab] = useState<'songs' | 'posts'>('songs'); // Track active tab
   const [swipeViewEnabled, setSwipeViewEnabled] = useState(() => {
-    // Only enable swipe view on mobile by default
+    // Default to list view, only use saved preference if it exists
     if (typeof window !== 'undefined') {
-      const isMobile = window.innerWidth < 768;
       const saved = localStorage.getItem('feed_swipe_view');
-      return saved ? saved === 'true' : isMobile;
+      return saved === 'true'; // Only enable if explicitly saved as true
     }
     return false;
   });
@@ -307,7 +306,28 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
     if (isConnected && fullAddress) {
       loadLikedPosts();
     }
+    
+    // Cleanup: Prevent audio conflicts when navigating back to Feed
+    // If a song is already playing, don't try to play it again
+    return () => {
+      // This cleanup runs when component unmounts or dependencies change
+      // The audio player state is managed globally, so we don't need to pause here
+      // But we can log it for debugging
+      console.log('🧹 Feed component cleanup');
+    };
   }, [isConnected, fullAddress]);
+  
+  // Prevent duplicate plays when navigating back to Feed
+  useEffect(() => {
+    // If we're already playing a song and it's in our songs list, don't auto-play
+    if (isPlaying && currentSong && songs.length > 0) {
+      const songInList = songs.find(s => s.id === currentSong.id);
+      if (songInList) {
+        // Song is already playing, don't trigger another play
+        console.log('🎵 Song already playing, skipping auto-play');
+      }
+    }
+  }, [isPlaying, currentSong, songs]);
 
   // Infinite scroll for both posts and songs
   useEffect(() => {

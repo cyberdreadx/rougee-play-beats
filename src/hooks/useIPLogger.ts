@@ -18,6 +18,10 @@ export const useIPLogger = (action: string) => {
 
     try {
       const token = await getAccessToken();
+      if (!token) {
+        // No token available, skip logging
+        return;
+      }
       
       await supabase.functions.invoke('log-ip', {
         headers: {
@@ -29,7 +33,8 @@ export const useIPLogger = (action: string) => {
       });
     } catch (error) {
       // Silently fail - don't interrupt user experience
-      console.error('IP logging failed:', error);
+      // IP logging is not critical, so we don't want to block the page
+      console.warn('IP logging failed (non-critical):', error);
     }
   };
 

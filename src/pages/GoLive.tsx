@@ -193,6 +193,20 @@ export default function GoLive() {
     };
   }, [fullAddress, retryKey]); // Re-run if wallet connection changes or retry is triggered
 
+  // Play live video track when stream is live
+  useEffect(() => {
+    if (isPublishing && localVideoTrack && localVideoRef.current) {
+      // Stop preview track if it's still playing
+      if (previewTracks?.videoTrack) {
+        previewTracks.videoTrack.stop();
+      }
+      
+      // Play the live video track
+      localVideoTrack.play(localVideoRef.current);
+      console.log('✅ Live video track playing');
+    }
+  }, [isPublishing, localVideoTrack, previewTracks]);
+
   // Toggle video preview
   const handleToggleVideo = () => {
     if (previewTracks?.videoTrack) {
@@ -233,6 +247,26 @@ export default function GoLive() {
       supabase.removeChannel(channel);
     };
   }, [streamId]);
+
+  // Heartbeat: Update stream's updated_at timestamp every 30 seconds to show it's still active
+  useEffect(() => {
+    if (!streamId || !isPublishing) return;
+
+    const heartbeatInterval = setInterval(async () => {
+      try {
+        await supabase
+          .from('live_streams')
+          .update({ updated_at: new Date().toISOString() })
+          .eq('id', streamId);
+      } catch (error) {
+        console.error('❌ Failed to send heartbeat:', error);
+      }
+    }, 30000); // Every 30 seconds
+
+    return () => {
+      clearInterval(heartbeatInterval);
+    };
+  }, [streamId, isPublishing]);
 
   // Subscribe to chat messages
   useEffect(() => {

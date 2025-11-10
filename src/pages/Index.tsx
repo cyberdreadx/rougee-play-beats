@@ -425,6 +425,11 @@ const Index = ({ playSong, currentSong, isPlaying, isRadioMode, onToggleRadio }:
           </div>
         </div>
 
+        {/* Live Streams */}
+        <div className="px-4 md:px-6 mb-8">
+          <LiveStreams />
+        </div>
+
         {/* Trending Songs Grid */}
         {loadingFeatured ? (
           <div className="px-4 md:px-6 mb-8">

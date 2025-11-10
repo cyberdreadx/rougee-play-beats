@@ -91,7 +91,7 @@ export async function createScreenTrack(
 // Join a channel
 export async function joinChannel(
   client: IAgoraRTCClient,
-  token: string,
+  token: string | null,
   channelName: string,
   userId: UID,
   appId?: string
@@ -120,28 +120,64 @@ export async function joinChannel(
       throw new Error('Agora App ID is empty or invalid');
     }
     
-    // Try with token first, if it fails with INVALID_VENDOR_KEY, try without token
-    // (Agora allows joining without token if Primary Certificate is disabled in console)
+    // Try with token first, if it fails, try without token
+    // (Agora allows joining without token if Primary Certificate is disabled/static key mode)
     try {
-      await client.join(
-        agoraAppId,
-        channelName,
-        token,
-        userId
-      );
-    } catch (firstError: any) {
-      if (firstError.message?.includes('invalid vendor key') || 
-          firstError.message?.includes('CAN_NOT_GET_GATEWAY_SERVER')) {
-        console.warn('⚠️ Token rejected, trying without token (certificate may be disabled in Agora Console)');
-        // Try again with null token (works when certificate is disabled)
+      // If token is provided and not empty, try with token first
+      if (token && token.trim() !== '') {
         await client.join(
           agoraAppId,
           channelName,
-          null,
+          token,
           userId
         );
-        console.log('✅ Joined without token (certificate disabled mode)');
+        console.log('✅ Joined with token');
       } else {
+        // No token provided, join without token (static key mode)
+        // For static key mode, we need to pass null or undefined
+        // Try with null first
+        try {
+          await client.join(
+            agoraAppId,
+            channelName,
+            null,
+            userId
+          );
+          console.log('✅ Joined without token (static key mode with null)');
+        } catch (nullError: any) {
+          // If null doesn't work, the App ID might be invalid
+          throw nullError;
+        }
+      }
+    } catch (firstError: any) {
+      const errorMessage = firstError.message || '';
+      const isTokenError = errorMessage.includes('invalid vendor key') || 
+                          errorMessage.includes('CAN_NOT_GET_GATEWAY_SERVER') ||
+                          errorMessage.includes('dynamic use static key');
+      
+      if (isTokenError && token && token.trim() !== '') {
+        console.warn('⚠️ Token rejected, trying without token (static key mode or certificate disabled)');
+        // Try again without token - works when using static keys
+        // Try with null first
+        try {
+          await client.join(
+            agoraAppId,
+            channelName,
+            null,
+            userId
+          );
+          console.log('✅ Joined without token (static key mode with null)');
+        } catch (nullError: any) {
+          // If null doesn't work, the App ID might be invalid or project configuration is wrong
+          const errorMsg = nullError.message || firstError.message || 'Unknown error';
+          if (errorMsg.includes('dynamic use static key') || errorMsg.includes('invalid vendor key')) {
+            throw new Error(`Invalid Agora App ID or project configuration. Please verify your App ID "${agoraAppId}" in Agora Console. Error: ${errorMsg}`);
+          } else {
+            throw nullError;
+          }
+        }
+      } else {
+        // If it's not a token error, or if we already tried without token, throw the error
         throw firstError;
       }
     }

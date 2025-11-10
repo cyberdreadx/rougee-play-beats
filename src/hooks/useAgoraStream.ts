@@ -145,14 +145,30 @@ export function useAgoraStream({
     }
 
     try {
-      const { token, appId } = await getToken(targetChannel, targetUserId);
+      // Get App ID from environment or token response
+      let token: string | null = null;
+      let appId: string | undefined = import.meta.env.VITE_AGORA_APP_ID;
+      
+      // Try to get token first (for dynamic token mode)
+      try {
+        const tokenData = await getToken(targetChannel, targetUserId);
+        token = tokenData.token;
+        appId = tokenData.appId || appId; // Use token response App ID if available
+      } catch (tokenError: any) {
+        // If token generation fails, we'll use static key mode (no token)
+        console.warn('⚠️ Token generation failed, using static key mode (no token):', tokenError.message);
+        // Keep appId from env var, token stays null
+      }
       
       if (!appId) {
         throw new Error('Agora App ID not found. Please configure VITE_AGORA_APP_ID or check server configuration.');
       }
       
-      console.log('🔌 Joining channel with App ID:', appId);
-      await joinChannel(client, token, targetChannel, targetUserId, appId);
+      // For static key mode, pass null explicitly (not empty string)
+      const tokenToUse = token || null;
+      
+      console.log('🔌 Joining channel with App ID:', appId, tokenToUse ? 'with token' : 'without token (static key mode)');
+      await joinChannel(client, tokenToUse, targetChannel, targetUserId, appId);
       setIsJoined(true);
       
       toast({
@@ -163,9 +179,18 @@ export function useAgoraStream({
       return true;
     } catch (error: any) {
       console.error('❌ Failed to join channel:', error);
+      
+      // Provide more helpful error messages
+      let errorMessage = error.message || 'Failed to join stream';
+      if (error.message?.includes('invalid vendor key') || error.message?.includes('can not find appid')) {
+        errorMessage = 'Invalid Agora App ID. Please verify your App ID in Agora Console and update VITE_AGORA_APP_ID.';
+      } else if (error.message?.includes('dynamic use static key')) {
+        errorMessage = 'Agora project is configured for static keys. Please disable Primary Certificate in Agora Console or use a project with dynamic tokens enabled.';
+      }
+      
       toast({
         title: 'Connection Failed',
-        description: error.message || 'Failed to join stream',
+        description: errorMessage,
         variant: 'destructive'
       });
       throw error;

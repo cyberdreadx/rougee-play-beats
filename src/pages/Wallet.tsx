@@ -9,7 +9,7 @@ import { useSongPrice } from "@/hooks/useSongBondingCurve";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Wallet as WalletIcon, Copy, Check, CreditCard, ArrowDownToLine, RefreshCw, Send, Music2, ArrowLeftRight, Plus, Network, Trash2, QrCode, Settings, Download, X, ChevronDown, ChevronUp } from "lucide-react";
+import { Loader2, Wallet as WalletIcon, Copy, Check, CreditCard, ArrowDownToLine, RefreshCw, Send, Music2, ArrowLeftRight, Plus, Network, Trash2, QrCode, Settings, Download, X, ChevronDown, ChevronUp, Play, Pause, Filter, SortAsc, SortDesc, Grid, List, User } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useBalance, useReadContract, useSendTransaction, useWriteContract, useWaitForTransactionReceipt, useAccount } from "wagmi";
 import { supabase } from "@/integrations/supabase/client";
@@ -28,7 +28,8 @@ import { useDualWallet } from "@/contexts/DualWalletContext";
 import { KeetaWalletDialog } from "@/components/KeetaWalletDialog";
 import { KeetaQRCode } from "@/components/KeetaQRCode";
 import keetaLogo from "@/assets/tokens/kta.png";
-import { Play, Pause } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const XRGE_TOKEN_ADDRESS = "0x147120faEC9277ec02d957584CFCD92B56A24317" as const;
 const KTA_TOKEN_ADDRESS = "0xc0634090F2Fe6c6d75e61Be2b949464aBB498973" as const;
@@ -50,6 +51,7 @@ interface SongTokenItemProps {
     id: string;
     title: string;
     artist?: string;
+    genre?: string | null;
     ticker?: string;
     token_address: string;
     cover_cid?: string;
@@ -133,8 +135,9 @@ interface SongTokenItemProps {
     }
   }, [isError, song.ticker, song.token_address, error, song.id, onBalanceLoaded]);
   
-  // Only render if user has a balance
-  if (balance === 0) return null;
+  // Only render if user has a balance (but show while loading to allow balance check)
+  // After balance is checked, hide if balance is 0
+  if (!balanceLoading && balance === 0) return null;
   
   const handleSendClick = (e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent navigation to song page
@@ -154,140 +157,171 @@ interface SongTokenItemProps {
   
   return (
     <Card
-      className="group relative overflow-hidden bg-white/5 backdrop-blur-xl border border-white/10 shadow-[0_4px_16px_0_rgba(0,255,159,0.1)] hover:bg-white/8 hover:border-neon-green/30 active:bg-white/10 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+      className="group relative overflow-hidden bg-gradient-to-br from-white/5 via-white/3 to-white/0 backdrop-blur-xl border border-white/10 shadow-[0_4px_16px_0_rgba(0,255,159,0.1)] hover:bg-gradient-to-br hover:from-white/8 hover:via-white/5 hover:to-white/2 hover:border-neon-green/30 active:bg-white/10 transition-all duration-300 hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
       onClick={onClick}
     >
-      <div className="flex flex-col sm:flex-row gap-4 p-4">
-        {/* Song Image - Larger and more prominent */}
-        <div className="relative flex-shrink-0">
-          {song.cover_cid ? (
-            <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-xl overflow-hidden ring-2 ring-border group-hover:ring-neon-green/50 transition-all duration-300">
-              <img
-                src={getIPFSGatewayUrl(song.cover_cid)}
-                alt={song.title}
-                className="w-full h-full object-cover"
-              />
-              {/* Play overlay button */}
-              {playSong && (
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={handlePlayClick}
-                    className="h-12 w-12 rounded-full bg-neon-green/20 hover:bg-neon-green/30 border-2 border-neon-green/50 backdrop-blur-sm"
-                  >
-                    {isCurrentlyPlaying ? (
-                      <Pause className="h-6 w-6 text-neon-green fill-neon-green" />
-                    ) : (
-                      <Play className="h-6 w-6 text-neon-green fill-neon-green" />
-                    )}
-                  </Button>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-xl bg-gradient-to-br from-neon-green/20 to-purple-500/20 flex items-center justify-center ring-2 ring-border group-hover:ring-neon-green/50 transition-all duration-300">
-              <span className="text-2xl font-mono font-bold text-neon-green">
-                {song.ticker?.[0] || '?'}
-              </span>
-              {/* Play overlay button for fallback */}
-              {playSong && (
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center rounded-xl">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={handlePlayClick}
-                    className="h-12 w-12 rounded-full bg-neon-green/20 hover:bg-neon-green/30 border-2 border-neon-green/50 backdrop-blur-sm"
-                  >
-                    {isCurrentlyPlaying ? (
-                      <Pause className="h-6 w-6 text-neon-green fill-neon-green" />
-                    ) : (
-                      <Play className="h-6 w-6 text-neon-green fill-neon-green" />
-                    )}
-                  </Button>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-        
-        {/* Song Info and Details */}
-        <div className="flex-1 min-w-0 flex flex-col justify-between gap-3">
-          {/* Song Title and Ticker */}
-          <div className="min-w-0">
-            <div className="flex items-start gap-2 mb-1">
-              <h3 className="text-base sm:text-lg font-bold font-mono group-hover:text-neon-green transition-colors break-words flex-1">
-                {song.title}
-              </h3>
-              <AiBadge aiUsage={song.ai_usage} size="sm" className="flex-shrink-0 mt-0.5" />
-            </div>
-            <p className="text-xs sm:text-sm text-muted-foreground font-mono">
-              {song.ticker || 'Unknown'}
-            </p>
-            {song.artist && (
-              <p className="text-xs text-muted-foreground/70 font-mono mt-1">
-                by {song.artist}
-              </p>
+      <div className="p-3 sm:p-4">
+        <div className="flex gap-3 sm:gap-4">
+          {/* Song Image - Compact on mobile, larger on desktop */}
+          <div className="relative flex-shrink-0">
+            {song.cover_cid ? (
+              <div className="relative w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-lg sm:rounded-xl overflow-hidden ring-1 ring-white/20 group-hover:ring-neon-green/50 transition-all duration-300 shadow-md">
+                <img
+                  src={getIPFSGatewayUrl(song.cover_cid)}
+                  alt={song.title}
+                  className="w-full h-full object-cover"
+                />
+                {/* Play overlay button */}
+                {playSong && (
+                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={handlePlayClick}
+                      className="h-8 w-8 sm:h-10 sm:w-10 md:h-12 md:w-12 rounded-full bg-neon-green/30 hover:bg-neon-green/40 border border-neon-green/60 backdrop-blur-sm"
+                    >
+                      {isCurrentlyPlaying ? (
+                        <Pause className="h-4 w-4 sm:h-5 sm:w-5 text-neon-green fill-neon-green" />
+                      ) : (
+                        <Play className="h-4 w-4 sm:h-5 sm:w-5 text-neon-green fill-neon-green" />
+                      )}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="relative w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-lg sm:rounded-xl bg-gradient-to-br from-neon-green/20 to-purple-500/20 flex items-center justify-center ring-1 ring-border group-hover:ring-neon-green/50 transition-all duration-300">
+                <span className="text-xl sm:text-2xl font-mono font-bold text-neon-green">
+                  {song.ticker?.[0] || '?'}
+                </span>
+                {/* Play overlay button for fallback */}
+                {playSong && (
+                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center rounded-lg sm:rounded-xl">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={handlePlayClick}
+                      className="h-8 w-8 sm:h-10 sm:w-10 md:h-12 md:w-12 rounded-full bg-neon-green/30 hover:bg-neon-green/40 border border-neon-green/60 backdrop-blur-sm"
+                    >
+                      {isCurrentlyPlaying ? (
+                        <Pause className="h-4 w-4 sm:h-5 sm:w-5 text-neon-green fill-neon-green" />
+                      ) : (
+                        <Play className="h-4 w-4 sm:h-5 sm:w-5 text-neon-green fill-neon-green" />
+                      )}
+                    </Button>
+                  </div>
+                )}
+              </div>
             )}
           </div>
           
-          {/* Balance, Value, and Actions */}
-          <div className="flex items-end justify-between gap-3">
-            {/* Balance and Price Info */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-baseline gap-2 mb-1">
-                <p className="text-lg sm:text-xl font-bold font-mono text-neon-green">
-                  {formatCompactNumber(balance)}
-                </p>
-                <span className="text-xs text-muted-foreground font-mono">tokens</span>
+          {/* Song Info and Details - Better responsive layout */}
+          <div className="flex-1 min-w-0 flex flex-col justify-between">
+            {/* Top Section: Title, Ticker, Artist */}
+            <div className="min-w-0 space-y-0.5 sm:space-y-1 mb-2 sm:mb-3">
+              <div className="flex items-start gap-1.5 sm:gap-2">
+                <h3 className="text-sm sm:text-base md:text-lg font-bold font-mono group-hover:text-neon-green transition-colors line-clamp-1 flex-1">
+                  {song.title}
+                </h3>
+                <AiBadge aiUsage={song.ai_usage} size="sm" className="flex-shrink-0" />
               </div>
-              {valueUSD > 0 ? (
-                <>
-                  <p className="text-sm font-semibold font-mono text-foreground">
-                    ${valueUSD.toLocaleString(undefined, {maximumFractionDigits: 2})}
-                  </p>
-                  {priceUSD > 0 && (
-                    <p className="text-xs text-muted-foreground/70 font-mono mt-0.5">
-                      ${priceUSD < 0.01 ? priceUSD.toFixed(6) : priceUSD.toFixed(4)}/token
-                    </p>
-                  )}
-                </>
-              ) : (
-                <p className="text-xs text-muted-foreground/60 font-mono italic">
-                  Loading price...
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="text-[10px] sm:text-xs text-muted-foreground/80 font-mono font-semibold uppercase tracking-wide">
+                  ${song.ticker || 'Unknown'}
                 </p>
-              )}
+                {song.artist && (
+                  <>
+                    <span className="text-muted-foreground/50 hidden sm:inline">•</span>
+                    <p className="text-[10px] sm:text-xs text-muted-foreground/60 font-mono line-clamp-1">
+                      {song.artist}
+                    </p>
+                  </>
+                )}
+                {song.genre && (
+                  <>
+                    <span className="text-muted-foreground/50 hidden md:inline">•</span>
+                    <p className="text-[10px] sm:text-xs text-muted-foreground/60 font-mono hidden md:inline">
+                      {song.genre}
+                    </p>
+                  </>
+                )}
+              </div>
             </div>
             
-            {/* Action Buttons */}
-            <div className="flex items-center gap-2 flex-shrink-0">
-              {playSong && (
+            {/* Bottom Section: Balance, Value, Actions */}
+            <div className="flex items-end justify-between gap-2 sm:gap-3">
+              {/* Balance and Price Info - Stacked on mobile */}
+              <div className="flex-1 min-w-0">
+                {valueUSD > 0 ? (
+                  <>
+                    {/* Mobile: Show value first, balance second */}
+                    <div className="sm:hidden">
+                      <p className="text-base font-bold font-mono text-neon-green leading-tight">
+                        ${valueUSD.toLocaleString(undefined, {maximumFractionDigits: 2})}
+                      </p>
+                      <div className="flex items-baseline gap-1.5 mt-0.5">
+                        <p className="text-xs font-semibold font-mono text-foreground/80">
+                          {formatCompactNumber(balance)}
+                        </p>
+                        <span className="text-[9px] text-muted-foreground/60 font-mono uppercase">tokens</span>
+                      </div>
+                    </div>
+                    {/* Desktop: Show balance first, value second */}
+                    <div className="hidden sm:block">
+                      <div className="flex items-baseline gap-2 mb-0.5">
+                        <p className="text-lg md:text-xl font-bold font-mono text-neon-green">
+                          {formatCompactNumber(balance)}
+                        </p>
+                        <span className="text-[10px] text-muted-foreground/70 font-mono uppercase">tokens</span>
+                      </div>
+                      <p className="text-sm md:text-base font-semibold font-mono text-foreground">
+                        ${valueUSD.toLocaleString(undefined, {maximumFractionDigits: 2})}
+                      </p>
+                    </div>
+                    {/* Price per token - Always show on separate line */}
+                    {priceUSD > 0 && (
+                      <p className="text-[9px] sm:text-[10px] text-muted-foreground/60 font-mono mt-0.5">
+                        ${priceUSD < 0.01 ? priceUSD.toFixed(6) : priceUSD.toFixed(4)} each
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-[10px] sm:text-xs text-muted-foreground/60 font-mono italic">
+                    Loading price...
+                  </p>
+                )}
+              </div>
+              
+              {/* Action Buttons - Responsive sizing */}
+              <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
+                {playSong && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handlePlayClick}
+                    className={`h-8 w-8 sm:h-9 sm:w-9 rounded-full transition-all ${
+                      isCurrentlyPlaying
+                        ? 'bg-neon-green/20 text-neon-green border border-neon-green/50'
+                        : 'hover:bg-neon-green/10 hover:text-neon-green'
+                    }`}
+                  >
+                    {isCurrentlyPlaying ? (
+                      <Pause className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                    ) : (
+                      <Play className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                    )}
+                  </Button>
+                )}
                 <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handlePlayClick}
-                  className={`h-9 w-9 rounded-full transition-all ${
-                    isCurrentlyPlaying
-                      ? 'bg-neon-green/20 text-neon-green border border-neon-green/50'
-                      : 'hover:bg-neon-green/10 hover:text-neon-green'
-                  }`}
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSendClick}
+                  className="font-mono text-[10px] sm:text-xs h-8 px-2 sm:px-3 hover:bg-neon-green/10 hover:text-neon-green hover:border-neon-green/50"
                 >
-                  {isCurrentlyPlaying ? (
-                    <Pause className="h-4 w-4" />
-                  ) : (
-                    <Play className="h-4 w-4" />
-                  )}
+                  <Send className="h-3 w-3 sm:h-3.5 sm:w-3.5 sm:mr-1" />
+                  <span className="hidden sm:inline">Send</span>
                 </Button>
-              )}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleSendClick}
-                className="font-mono text-xs hover:bg-neon-green/10 hover:text-neon-green hover:border-neon-green/50"
-              >
-                <Send className="h-3 w-3 mr-1" />
-                Send
-              </Button>
+              </div>
             </div>
           </div>
         </div>
@@ -446,6 +480,10 @@ const Wallet = ({ playSong, currentSong, isPlaying }: WalletProps = {}) => {
   const [ownedSongsMap, setOwnedSongsMap] = useState<Map<string, boolean>>(new Map());
   const [activeTab, setActiveTab] = useState<'balances' | 'music'>('balances');
   const [songValuesMap, setSongValuesMap] = useState<Map<string, number>>(new Map()); // Track song values in USD
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [sortBy, setSortBy] = useState<'artist' | 'genre' | 'date' | 'value'>('artist');
+  const [filterGenre, setFilterGenre] = useState<string | 'all'>('all');
+  const [filterArtist, setFilterArtist] = useState<string | 'all'>('all');
   
   // Song token send dialog state
   const [sendSongDialog, setSendSongDialog] = useState(false);
@@ -468,6 +506,10 @@ const Wallet = ({ playSong, currentSong, isPlaying }: WalletProps = {}) => {
   const [networkSelectorExpanded, setNetworkSelectorExpanded] = useState(true);
   const [walletAddressExpanded, setWalletAddressExpanded] = useState(true);
   const [quickActionsExpanded, setQuickActionsExpanded] = useState(true);
+  const [tokenBalancesExpanded, setTokenBalancesExpanded] = useState(true);
+  const [songTokensExpanded, setSongTokensExpanded] = useState(true);
+  const [totalMusicValueExpanded, setTotalMusicValueExpanded] = useState(true);
+  const [totalBalanceExpanded, setTotalBalanceExpanded] = useState(true);
 
   const { data: balance, isLoading: balanceLoading, refetch: refetchBalance } = useBalance({
     address: fullAddress as `0x${string}`,
@@ -535,38 +577,53 @@ const Wallet = ({ playSong, currentSong, isPlaying }: WalletProps = {}) => {
     }
   }, [hasAnyWallet, isPrivyReady, navigate]);
 
-  useEffect(() => {
-    if (fullAddress) {
-      fetchAllSongs();
+  const fetchAllSongs = useCallback(async () => {
+    console.log('🔄 fetchAllSongs called, fullAddress:', fullAddress);
+    if (!fullAddress) {
+      console.log('⚠️ No fullAddress, skipping fetch');
+      return;
     }
-  }, [fullAddress]);
-  
-  const fetchAllSongs = async () => {
-    if (!fullAddress) return;
     
     setLoadingSongs(true);
     setOwnedSongsMap(new Map()); // Reset map when fetching
     setSongValuesMap(new Map()); // Reset song values when fetching
     try {
+      console.log('📡 Fetching songs from database...');
       // Get all deployed songs with token addresses
       const { data: songs, error } = await supabase
         .from('songs')
-        .select('id, title, artist, ticker, token_address, cover_cid, audio_cid, ai_usage')
-        .not('token_address', 'is', null);
+        .select('id, title, artist, genre, ticker, token_address, cover_cid, audio_cid, ai_usage, created_at')
+        .not('token_address', 'is', null)
+        .order('created_at', { ascending: false });
         
       if (error) {
         console.error('❌ Error fetching songs:', error);
         throw error;
       }
       
+      console.log('✅ Fetched songs:', songs?.length || 0, songs);
       setAllSongs(songs || []);
     } catch (error) {
-      console.error('Error fetching songs:', error);
+      console.error('❌ Error fetching songs:', error);
       setAllSongs([]);
+      toast({
+        title: "Error loading songs",
+        description: "Failed to load songs. Please refresh the page.",
+        variant: "destructive",
+      });
     } finally {
       setLoadingSongs(false);
     }
-  };
+  }, [fullAddress, toast]);
+
+  useEffect(() => {
+    if (fullAddress) {
+      console.log('🎵 Wallet page: fullAddress available, fetching songs');
+      fetchAllSongs();
+    } else {
+      console.log('⚠️ Wallet page: No fullAddress, not fetching songs');
+    }
+  }, [fullAddress, fetchAllSongs]);
 
   // Track owned songs count
   const handleBalanceLoaded = useCallback((songId: string, hasBalance: boolean) => {
@@ -588,6 +645,90 @@ const Wallet = ({ playSong, currentSong, isPlaying }: WalletProps = {}) => {
 
   // Calculate owned songs count from map
   const ownedSongsCount = Array.from(ownedSongsMap.values()).filter(Boolean).length;
+
+  // Filter and organize songs by genre and artist
+  const organizedSongs = useMemo(() => {
+    // Check if balances are still loading
+    const balancesLoading = ownedSongsMap.size < allSongs.length;
+    
+    // If balances are still loading, show all songs (they'll be filtered by balance check in SongTokenItem)
+    // If balances are loaded, only show songs the user owns
+    let songsToOrganize = balancesLoading 
+      ? allSongs  // Show all songs while checking balances
+      : allSongs.filter(song => ownedSongsMap.get(song.id) === true); // Only owned songs after balances loaded
+    
+    // Apply genre filter
+    let filtered = songsToOrganize;
+    if (filterGenre !== 'all') {
+      filtered = filtered.filter(song => song.genre === filterGenre);
+    }
+    
+    // Apply artist filter
+    if (filterArtist !== 'all') {
+      filtered = filtered.filter(song => song.artist === filterArtist);
+    }
+    
+    // Sort songs
+    const sorted = [...filtered].sort((a, b) => {
+      switch (sortBy) {
+        case 'artist':
+          return (a.artist || '').localeCompare(b.artist || '');
+        case 'genre':
+          return (a.genre || '').localeCompare(b.genre || '');
+        case 'date':
+          return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+        case 'value':
+          const aValue = songValuesMap.get(a.id) || 0;
+          const bValue = songValuesMap.get(b.id) || 0;
+          return bValue - aValue;
+        default:
+          return 0;
+      }
+    });
+    
+    // Organize by genre and artist
+    const byGenre: Record<string, Record<string, typeof sorted>> = {};
+    const byArtist: Record<string, typeof sorted> = {};
+    
+    sorted.forEach(song => {
+      const genre = song.genre || 'Unknown Genre';
+      const artist = song.artist || 'Unknown Artist';
+      
+      // Organize by genre
+      if (!byGenre[genre]) {
+        byGenre[genre] = {};
+      }
+      if (!byGenre[genre][artist]) {
+        byGenre[genre][artist] = [];
+      }
+      byGenre[genre][artist].push(song);
+      
+      // Organize by artist
+      if (!byArtist[artist]) {
+        byArtist[artist] = [];
+      }
+      byArtist[artist].push(song);
+    });
+    
+    return { byGenre, byArtist, sorted };
+  }, [allSongs, ownedSongsMap, filterGenre, filterArtist, sortBy, songValuesMap]);
+
+  // Get unique genres and artists for filters
+  const uniqueGenres = useMemo(() => {
+    const genres = new Set<string>();
+    allSongs.forEach(song => {
+      if (song.genre) genres.add(song.genre);
+    });
+    return Array.from(genres).sort();
+  }, [allSongs]);
+
+  const uniqueArtists = useMemo(() => {
+    const artists = new Set<string>();
+    allSongs.forEach(song => {
+      if (song.artist) artists.add(song.artist);
+    });
+    return Array.from(artists).sort();
+  }, [allSongs]);
 
   const copyAddress = async () => {
     const addressToCopy = currentWallet.fullAddress;
@@ -1093,14 +1234,32 @@ const Wallet = ({ playSong, currentSong, isPlaying }: WalletProps = {}) => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-muted-foreground font-mono mb-1">Total Balance</p>
-                  <p className="text-2xl md:text-3xl font-bold font-mono text-neon-green">
-                    ${totalCoinBalance.toLocaleString(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 2 })}
-                  </p>
-                  <p className="text-xs text-muted-foreground/70 font-mono mt-1">
-                    {activeNetwork === 'keeta' ? 'Keeta Network' : 'Base Network'}
-                  </p>
+                  {totalBalanceExpanded && (
+                    <>
+                      <p className="text-2xl md:text-3xl font-bold font-mono text-neon-green">
+                        ${totalCoinBalance.toLocaleString(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 2 })}
+                      </p>
+                      <p className="text-xs text-muted-foreground/70 font-mono mt-1">
+                        {activeNetwork === 'keeta' ? 'Keeta Network' : 'Base Network'}
+                      </p>
+                    </>
+                  )}
                 </div>
-                <WalletIcon className="h-8 w-8 md:h-10 md:w-10 text-neon-green/50" />
+                <div className="flex items-center gap-2">
+                  {totalBalanceExpanded && <WalletIcon className="h-8 w-8 md:h-10 md:w-10 text-neon-green/50" />}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setTotalBalanceExpanded(!totalBalanceExpanded)}
+                    className="h-7 w-7 p-0 hover:bg-white/10"
+                  >
+                    {totalBalanceExpanded ? (
+                      <ChevronUp className="h-4 w-4" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
               </div>
             </Card>
 
@@ -1184,7 +1343,24 @@ const Wallet = ({ playSong, currentSong, isPlaying }: WalletProps = {}) => {
             </Card>
 
             {/* Token Balances Grid - Mobile Optimized */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+            <Card className="p-4 mb-3 bg-white/5 backdrop-blur-xl border border-white/10 shadow-[0_4px_16px_0_rgba(0,255,159,0.1)] rounded-2xl">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-sm font-semibold text-foreground font-mono">Token Balances</p>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setTokenBalancesExpanded(!tokenBalancesExpanded)}
+                  className="h-7 w-7 p-0 hover:bg-white/10"
+                >
+                  {tokenBalancesExpanded ? (
+                    <ChevronUp className="h-4 w-4" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+              {tokenBalancesExpanded && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {activeNetwork === 'keeta' ? (
                 keetaWallet.isConnected ? (
                   <>
@@ -1407,7 +1583,9 @@ const Wallet = ({ playSong, currentSong, isPlaying }: WalletProps = {}) => {
           </Card>
                 </>
               )}
-            </div>
+                </div>
+              )}
+            </Card>
           </>
         )}
 
@@ -1419,14 +1597,32 @@ const Wallet = ({ playSong, currentSong, isPlaying }: WalletProps = {}) => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-muted-foreground font-mono mb-1">Total Music Value</p>
-                  <p className="text-2xl md:text-3xl font-bold font-mono text-neon-green">
-                    ${totalMusicValue.toLocaleString(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 2 })}
-                  </p>
-                  <p className="text-xs text-muted-foreground/70 font-mono mt-1">
-                    {ownedSongsCount} {ownedSongsCount === 1 ? 'song' : 'songs'} • Real-time prices
-                  </p>
+                  {totalMusicValueExpanded && (
+                    <>
+                      <p className="text-2xl md:text-3xl font-bold font-mono text-neon-green">
+                        ${totalMusicValue.toLocaleString(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 2 })}
+                      </p>
+                      <p className="text-xs text-muted-foreground/70 font-mono mt-1">
+                        {ownedSongsCount} {ownedSongsCount === 1 ? 'song' : 'songs'} • Real-time prices
+                      </p>
+                    </>
+                  )}
                 </div>
-                <Music2 className="h-8 w-8 md:h-10 md:w-10 text-neon-green/50" />
+                <div className="flex items-center gap-2">
+                  {totalMusicValueExpanded && <Music2 className="h-8 w-8 md:h-10 md:w-10 text-neon-green/50" />}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setTotalMusicValueExpanded(!totalMusicValueExpanded)}
+                    className="h-7 w-7 p-0 hover:bg-white/10"
+                  >
+                    {totalMusicValueExpanded ? (
+                      <ChevronUp className="h-4 w-4" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
               </div>
             </Card>
 
@@ -1446,8 +1642,22 @@ const Wallet = ({ playSong, currentSong, isPlaying }: WalletProps = {}) => {
                 Real-time prices from bonding curve
               </p>
             </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSongTokensExpanded(!songTokensExpanded)}
+              className="h-7 w-7 p-0 hover:bg-white/10"
+            >
+              {songTokensExpanded ? (
+                <ChevronUp className="h-4 w-4" />
+              ) : (
+                <ChevronDown className="h-4 w-4" />
+              )}
+            </Button>
           </div>
           
+          {songTokensExpanded && (
+            <>
           {loadingSongs ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {[...Array(4)].map((_, i) => (
@@ -1472,23 +1682,186 @@ const Wallet = ({ playSong, currentSong, isPlaying }: WalletProps = {}) => {
           ) : (
             <>
               {/* Always render components to check balances, they'll return null if balance is 0 */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {fullAddress && allSongs.map((song) => (
-                  <SongTokenItem
-                    key={song.id}
-                    song={song}
-                    userAddress={fullAddress}
-                    xrgeUsdPrice={prices.xrge}
-                    onClick={() => navigate(`/song/${song.id}`)}
-                    onBalanceLoaded={handleBalanceLoaded}
-                    onSendClick={handleSongSendClick}
-                    playSong={playSong}
-                    currentSong={currentSong}
-                    isPlaying={isPlaying}
-                    onValueUpdate={handleSongValueUpdate}
-                  />
-                ))}
+              {/* Library Controls - Mobile Optimized */}
+              <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl space-y-3">
+                {/* View Mode Toggle - Full width on mobile */}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 flex-1">
+                    <Button
+                      variant={viewMode === 'grid' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setViewMode('grid')}
+                      className={`font-mono text-[10px] sm:text-xs transition-all flex-1 sm:flex-none h-8 sm:h-9 ${
+                        viewMode === 'grid' 
+                          ? 'bg-neon-green text-black hover:bg-neon-green/90' 
+                          : 'hover:bg-white/10 hover:border-neon-green/50'
+                      }`}
+                    >
+                      <Grid className="h-3.5 w-3.5 sm:h-4 sm:w-4 sm:mr-1" />
+                      <span className="hidden sm:inline">Grid</span>
+                    </Button>
+                    <Button
+                      variant={viewMode === 'list' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setViewMode('list')}
+                      className={`font-mono text-[10px] sm:text-xs transition-all flex-1 sm:flex-none h-8 sm:h-9 ${
+                        viewMode === 'list' 
+                          ? 'bg-neon-green text-black hover:bg-neon-green/90' 
+                          : 'hover:bg-white/10 hover:border-neon-green/50'
+                      }`}
+                    >
+                      <List className="h-3.5 w-3.5 sm:h-4 sm:w-4 sm:mr-1" />
+                      <span className="hidden sm:inline">List</span>
+                    </Button>
+                  </div>
+                  
+                  {/* Sort Dropdown - Compact on mobile */}
+                  <div className="flex-1 sm:flex-none">
+                    <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
+                      <SelectTrigger className="w-full sm:w-[120px] md:w-[140px] font-mono text-[10px] sm:text-xs bg-white/5 border-white/10 hover:border-neon-green/50 h-8 sm:h-9">
+                        <SortAsc className="h-3.5 w-3.5 mr-1 flex-shrink-0" />
+                        <SelectValue placeholder="Sort" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="artist">Artist</SelectItem>
+                        <SelectItem value="genre">Genre</SelectItem>
+                        <SelectItem value="date">Date</SelectItem>
+                        <SelectItem value="value">Value</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                
+                {/* Filters Row - Stack on mobile */}
+                <div className="flex items-center gap-2">
+                  <div className="flex-1">
+                    <Select value={filterGenre} onValueChange={setFilterGenre}>
+                      <SelectTrigger className="w-full font-mono text-[10px] sm:text-xs bg-white/5 border-white/10 hover:border-neon-green/50 h-8 sm:h-9">
+                        <Filter className="h-3.5 w-3.5 mr-1 flex-shrink-0" />
+                        <SelectValue placeholder="Genre" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Genres</SelectItem>
+                        {uniqueGenres.map(genre => (
+                          <SelectItem key={genre} value={genre}>{genre}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="flex-1">
+                    <Select value={filterArtist} onValueChange={setFilterArtist}>
+                      <SelectTrigger className="w-full font-mono text-[10px] sm:text-xs bg-white/5 border-white/10 hover:border-neon-green/50 h-8 sm:h-9">
+                        <User className="h-3.5 w-3.5 mr-1 flex-shrink-0" />
+                        <SelectValue placeholder="Artist" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Artists</SelectItem>
+                        {uniqueArtists.map(artist => (
+                          <SelectItem key={artist} value={artist}>{artist}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
               </div>
+
+              {/* Organized Library View */}
+              {allSongs.length === 0 ? (
+                // No songs loaded yet
+                <div className="text-center py-6">
+                  <Loader2 className="h-5 w-5 animate-spin text-neon-green mx-auto mb-2" />
+                  <p className="text-xs text-muted-foreground/60 font-mono">
+                    Loading songs...
+                  </p>
+                </div>
+              ) : viewMode === 'grid' ? (
+                // Grid view organized by genre
+                <div className="space-y-8">
+                  {ownedSongsMap.size < allSongs.length && (
+                    <div className="text-center py-4 mb-4 bg-muted/30 rounded-lg border border-muted">
+                      <Loader2 className="h-4 w-4 animate-spin text-neon-green mx-auto mb-2 inline-block" />
+                      <p className="text-xs text-muted-foreground/60 font-mono">
+                        Checking balances... {ownedSongsMap.size} / {allSongs.length}
+                      </p>
+                    </div>
+                  )}
+                  {Object.entries(organizedSongs.byGenre).length > 0 ? (
+                    Object.entries(organizedSongs.byGenre).map(([genre, artists]) => (
+                      <div key={genre} className="space-y-6">
+                        <div className="flex items-center gap-3 pb-2 border-b border-white/10">
+                          <div className="p-2 rounded-lg bg-neon-green/10 border border-neon-green/20">
+                            <Music2 className="h-5 w-5 text-neon-green" />
+                          </div>
+                          <h3 className="text-xl font-bold font-mono neon-text">{genre}</h3>
+                          <Badge variant="outline" className="font-mono text-xs border-neon-green/30 bg-neon-green/5 text-neon-green">
+                            {Object.values(artists).flat().length} {Object.values(artists).flat().length === 1 ? 'song' : 'songs'}
+                          </Badge>
+                        </div>
+                        
+                        {Object.entries(artists).map(([artist, songs]) => (
+                          <div key={artist} className="space-y-4 pl-2">
+                            <div className="flex items-center gap-2 mb-2">
+                              <User className="h-4 w-4 text-muted-foreground" />
+                              <h4 className="text-sm font-semibold font-mono text-foreground">{artist}</h4>
+                              <Badge variant="outline" className="font-mono text-xs text-muted-foreground border-white/10 bg-white/5">
+                                {songs.length} {songs.length === 1 ? 'song' : 'songs'}
+                              </Badge>
+                            </div>
+                            
+                            <div className="grid grid-cols-1 gap-3 sm:gap-4">
+                              {fullAddress && songs.map((song) => (
+                                <SongTokenItem
+                                  key={song.id}
+                                  song={song}
+                                  userAddress={fullAddress}
+                                  xrgeUsdPrice={prices.xrge}
+                                  onClick={() => navigate(`/song/${song.id}`)}
+                                  onBalanceLoaded={handleBalanceLoaded}
+                                  onSendClick={handleSongSendClick}
+                                  playSong={playSong}
+                                  currentSong={currentSong}
+                                  isPlaying={isPlaying}
+                                  onValueUpdate={handleSongValueUpdate}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-6">
+                      <p className="text-sm text-muted-foreground font-mono">No songs match your filters</p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                // List view - simple sorted list
+                <div className="space-y-2 sm:space-y-3">
+                  {fullAddress && organizedSongs.sorted.length > 0 ? (
+                    organizedSongs.sorted.map((song) => (
+                      <SongTokenItem
+                        key={song.id}
+                        song={song}
+                        userAddress={fullAddress}
+                        xrgeUsdPrice={prices.xrge}
+                        onClick={() => navigate(`/song/${song.id}`)}
+                        onBalanceLoaded={handleBalanceLoaded}
+                        onSendClick={handleSongSendClick}
+                        playSong={playSong}
+                        currentSong={currentSong}
+                        isPlaying={isPlaying}
+                        onValueUpdate={handleSongValueUpdate}
+                      />
+                    ))
+                  ) : (
+                    <div className="text-center py-6">
+                      <p className="text-sm text-muted-foreground font-mono">No songs match your filters</p>
+                    </div>
+                  )}
+                </div>
+              )}
               
               {/* Show "no tokens" message only after all balances are checked */}
               {ownedSongsMap.size === allSongs.length && ownedSongsCount === 0 && (
@@ -1507,16 +1880,8 @@ const Wallet = ({ playSong, currentSong, isPlaying }: WalletProps = {}) => {
                   </Button>
                 </div>
               )}
-              
-              {/* Show loading message while checking balances */}
-              {ownedSongsMap.size < allSongs.length && (
-                <div className="text-center py-6">
-                  <Loader2 className="h-5 w-5 animate-spin text-neon-green mx-auto mb-2" />
-                  <p className="text-xs text-muted-foreground/60 font-mono">
-                    Checking balances... {ownedSongsMap.size} / {allSongs.length}
-                  </p>
-                </div>
-              )}
+            </>
+          )}
             </>
           )}
         </Card>

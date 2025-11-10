@@ -949,6 +949,11 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
           </div>
         ) : null}
 
+        {/* Live Streams */}
+        <div className="mb-6 md:mb-8 px-0 md:px-0">
+          <LiveStreams />
+        </div>
+
         {/* Time Filter & Section Header */}
         <div className="mb-6 md:mb-8 px-0 md:px-0 relative" style={{ zIndex: 10 }}>
           <div className="flex flex-col gap-4 mb-4 md:mb-6">

@@ -227,8 +227,28 @@ const Header = () => {
                   
                   {/* Disconnect Button */}
                   <DropdownMenuItem
-                    onClick={() => {
-                      logout();
+                    onClick={async () => {
+                      // Clear all lock code sessionStorage entries before logout
+                      // This ensures clean logout without lingering lock code state
+                      const keys = Object.keys(sessionStorage);
+                      keys.forEach(key => {
+                        if (key.startsWith('lock_code_verified_')) {
+                          sessionStorage.removeItem(key);
+                          console.log('🔓 Logout: Cleared lock code sessionStorage:', key);
+                        }
+                      });
+                      
+                      // Also clear localStorage lock code verification if any
+                      const localStorageKeys = Object.keys(localStorage);
+                      localStorageKeys.forEach(key => {
+                        if (key.startsWith('lock_code_verified_')) {
+                          localStorage.removeItem(key);
+                          console.log('🔓 Logout: Cleared lock code localStorage:', key);
+                        }
+                      });
+                      
+                      // Now logout
+                      await logout();
                       toast({
                         title: "Disconnected",
                         description: "Your wallet has been disconnected.",

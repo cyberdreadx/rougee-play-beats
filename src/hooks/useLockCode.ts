@@ -377,10 +377,28 @@ export const useLockCode = () => {
   // Clear lock when wallet disconnects (logout)
   useEffect(() => {
     if (!fullAddress) {
-      // User logged out - clear lock verification
+      // User logged out - clear all lock code verification entries
+      // Clear sessionStorage entries for any wallet address
+      const keys = Object.keys(sessionStorage);
+      keys.forEach(key => {
+        if (key.startsWith('lock_code_verified_')) {
+          sessionStorage.removeItem(key);
+          console.log('🔓 useLockCode: Cleared lock code sessionStorage on logout:', key);
+        }
+      });
+      
+      // Also clear localStorage verification entries if any
+      const localStorageKeys = Object.keys(localStorage);
+      localStorageKeys.forEach(key => {
+        if (key.startsWith('lock_code_verified_')) {
+          localStorage.removeItem(key);
+          console.log('🔓 useLockCode: Cleared lock code localStorage on logout:', key);
+        }
+      });
+      
+      // Reset lock state
       setIsLocked(false);
-      // Note: fullAddress is null here, but we'll clear any stale session data
-      // This effect runs when fullAddress changes to null (logout)
+      console.log('🔓 useLockCode: User logged out, cleared all lock code state');
     }
   }, [fullAddress]);
 

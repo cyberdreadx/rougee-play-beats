@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useWallet } from '@/hooks/useWallet';
 import { supabase } from '@/integrations/supabase/client';
+import { usePrivyToken } from '@/hooks/usePrivyToken';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Send, Loader2, CircleCheckBig } from 'lucide-react';
@@ -30,37 +31,20 @@ interface SongCommentsProps {
 export const SongComments = ({ songId, onCommentCountChange }: SongCommentsProps) => {
   const navigate = useNavigate();
   const { fullAddress, isConnected } = useWallet();
+  const { getAuthHeaders } = usePrivyToken();
   const [comments, setComments] = useState<SongComment[]>([]);
   const [loading, setLoading] = useState(true);
   const [commentText, setCommentText] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const onCommentCountChangeRef = useRef(onCommentCountChange);
+  const lastCountRef = useRef<number>(0);
 
+  // Update ref when callback changes
   useEffect(() => {
-    loadComments();
-    
-    // Subscribe to real-time comment updates
-    const channel = supabase
-      .channel(`comments:${songId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'comments',
-          filter: `song_id=eq.${songId}`,
-        },
-        () => {
-          loadComments();
-        }
-      )
-      .subscribe();
+    onCommentCountChangeRef.current = onCommentCountChange;
+  }, [onCommentCountChange]);
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [songId]);
-
-  const loadComments = async () => {
+  const loadComments = useCallback(async () => {
     try {
       setLoading(true);
       const { data: commentsData, error } = await supabase
@@ -92,15 +76,47 @@ export const SongComments = ({ songId, onCommentCountChange }: SongCommentsProps
 
       setComments(commentsWithProfiles as SongComment[]);
       
-      if (onCommentCountChange) {
-        onCommentCountChange(commentsWithProfiles.length);
+      // Only update comment count if it actually changed
+      const newCount = commentsWithProfiles.length;
+      if (newCount !== lastCountRef.current && onCommentCountChangeRef.current) {
+        lastCountRef.current = newCount;
+        // Use setTimeout to batch updates and prevent infinite loops
+        setTimeout(() => {
+          onCommentCountChangeRef.current?.(newCount);
+        }, 0);
       }
     } catch (error) {
       console.error('Error loading comments:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [songId]);
+
+  useEffect(() => {
+    loadComments();
+    
+    // Subscribe to real-time comment updates
+    const channel = supabase
+      .channel(`comments:${songId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'comments',
+          filter: `song_id=eq.${songId}`,
+        },
+        () => {
+          loadComments();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [songId, loadComments]);
+
 
   const handleSubmitComment = async () => {
     if (!isConnected || !fullAddress) {
@@ -123,10 +139,16 @@ export const SongComments = ({ songId, onCommentCountChange }: SongCommentsProps
 
     try {
       setSubmitting(true);
-      const { error } = await supabase.from('comments').insert({
-        song_id: songId,
-        wallet_address: fullAddress,
-        comment_text: commentText.trim(),
+      
+      // Use edge function to add comment (bypasses RLS)
+      const headers = await getAuthHeaders();
+      const { data, error } = await supabase.functions.invoke('add-song-comment', {
+        headers,
+        body: {
+          songId,
+          commentText: commentText.trim(),
+          walletAddress: fullAddress,
+        },
       });
 
       if (error) throw error;
@@ -136,11 +158,14 @@ export const SongComments = ({ songId, onCommentCountChange }: SongCommentsProps
         title: 'Comment posted',
         description: 'Your comment has been added',
       });
-    } catch (error) {
+      
+      // Reload comments to show the new one
+      await loadComments();
+    } catch (error: any) {
       console.error('Error posting comment:', error);
       toast({
         title: 'Error',
-        description: 'Failed to post comment',
+        description: error.message || 'Failed to post comment',
         variant: 'destructive',
       });
     } finally {

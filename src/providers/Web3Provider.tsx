@@ -143,6 +143,16 @@ export default function Web3Provider({ children }: { children: React.ReactNode }
         },
         externalWallets: {
           requireUserToSwitchChain: true, // Force users to switch to Base
+          // Mobile deep linking is handled automatically by Privy via WalletConnect
+          // When user selects MetaMask/Phantom on mobile, Privy will:
+          // 1. Open the wallet app via deep link (metamask:// or phantom://)
+          // 2. User approves connection in the wallet app
+          // 3. Wallet app redirects back to browser automatically
+          // This works automatically - no additional config needed
+        },
+        // Mobile-specific configuration
+        mfa: {
+          noPromptOnMfaRequired: false, // Show MFA prompt when needed
         },
         appearance: {
           theme: 'dark',

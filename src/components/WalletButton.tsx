@@ -22,6 +22,25 @@ const WalletButton = () => {
   const handleDisconnect = async () => {
     setIsDisconnecting(true);
     try {
+      // Clear all lock code sessionStorage entries before logout
+      // This ensures clean logout without lingering lock code state
+      const keys = Object.keys(sessionStorage);
+      keys.forEach(key => {
+        if (key.startsWith('lock_code_verified_')) {
+          sessionStorage.removeItem(key);
+          console.log('🔓 Logout: Cleared lock code sessionStorage:', key);
+        }
+      });
+      
+      // Also clear localStorage lock code verification if any
+      const localStorageKeys = Object.keys(localStorage);
+      localStorageKeys.forEach(key => {
+        if (key.startsWith('lock_code_verified_')) {
+          localStorage.removeItem(key);
+          console.log('🔓 Logout: Cleared lock code localStorage:', key);
+        }
+      });
+      
       await disconnect();
       logAuthEvent(AuthEventType.LOGOUT_SUCCESS);
       toast({

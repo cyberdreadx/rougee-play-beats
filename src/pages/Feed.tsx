@@ -1,4 +1,4 @@
-import { useState, useEffect, memo } from 'react';
+import React, { useState, useEffect, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useWallet } from '@/hooks/useWallet';
 import { supabase } from '@/integrations/supabase/client';
@@ -446,6 +446,27 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
         setSongs(songsWithProfiles as SongPost[]);
         setSongsPage(1);
       }
+      
+      // Initialize comment counts for all songs
+      // Fetch comment counts in batch to prevent glitching
+      const songIds = songsWithProfiles.map(s => s.id);
+      if (songIds.length > 0) {
+        const { data: commentCountsData } = await supabase
+          .from('comments')
+          .select('song_id')
+          .in('song_id', songIds);
+        
+        // Count comments per song
+        const counts: Record<string, number> = {};
+        commentCountsData?.forEach(comment => {
+          if (comment.song_id) {
+            counts[comment.song_id] = (counts[comment.song_id] || 0) + 1;
+          }
+        });
+        
+        // Update comment counts state
+        setSongCommentCounts(prev => ({ ...prev, ...counts }));
+      }
     } catch (error) {
       console.error('Error loading songs:', error);
       toast({
@@ -586,18 +607,17 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
     }
   };
 
-  const toggleSongComments = (songId: string) => {
-    const isExpanded = expandedSongComments.has(songId);
-    if (isExpanded) {
-      setExpandedSongComments(prev => {
-        const next = new Set(prev);
+  const toggleSongComments = React.useCallback((songId: string) => {
+    setExpandedSongComments(prev => {
+      const next = new Set(prev);
+      if (next.has(songId)) {
         next.delete(songId);
-        return next;
-      });
-    } else {
-      setExpandedSongComments(prev => new Set(prev).add(songId));
-    }
-  };
+      } else {
+        next.add(songId);
+      }
+      return next;
+    });
+  }, []);
   const loadComments = async (postId: string) => {
     try {
       const {
@@ -916,11 +936,15 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
           />
 
           <button 
-            onClick={() => toggleSongComments(song.id)} 
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              toggleSongComments(song.id);
+            }} 
             className="flex items-center gap-1.5 text-sm hover:text-neon-green transition-colors duration-200"
           >
-            <MessageCircle className="w-4 h-4 md:w-5 md:h-5" />
-            <span>{songCommentCounts[song.id] || 0}</span>
+            <MessageCircle className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" />
+            <span className="font-mono min-w-[20px] text-right">{songCommentCounts[song.id] ?? 0}</span>
           </button>
 
           {song.token_address && (
@@ -939,10 +963,15 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
         {expandedSongComments.has(song.id) && (
           <div className="mt-4 pt-4 border-t border-primary/10">
             <SongComments 
+              key={song.id} 
               songId={song.id} 
-              onCommentCountChange={(count) => {
-                setSongCommentCounts(prev => ({ ...prev, [song.id]: count }));
-              }}
+              onCommentCountChange={React.useCallback((count: number) => {
+                setSongCommentCounts(prev => {
+                  // Only update if count actually changed to prevent unnecessary re-renders
+                  if (prev[song.id] === count) return prev;
+                  return { ...prev, [song.id]: count };
+                });
+              }, [song.id])}
             />
           </div>
         )}

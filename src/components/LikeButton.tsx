@@ -29,10 +29,20 @@ export default function LikeButton({
 
   // Always fetch the public like count; only check personal like state when connected
   useEffect(() => {
-    fetchLikeCount();
-    if (isConnected && address) {
-      checkIfLiked();
-    }
+    let mounted = true;
+    
+    const loadData = async () => {
+      await fetchLikeCount();
+      if (isConnected && address && mounted) {
+        await checkIfLiked();
+      }
+    };
+    
+    loadData();
+    
+    return () => {
+      mounted = false;
+    };
   }, [songId, isConnected, address]);
 
   const checkIfLiked = async () => {
@@ -172,7 +182,7 @@ export default function LikeButton({
         />
       </Button>
       {showCount && (
-        <span className="font-mono text-sm text-muted-foreground min-w-[30px]">
+        <span className="font-mono text-sm text-muted-foreground min-w-[30px] text-right tabular-nums">
           {likeCount}
         </span>
       )}

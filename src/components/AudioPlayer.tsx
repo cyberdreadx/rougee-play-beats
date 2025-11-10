@@ -349,13 +349,17 @@ const AudioPlayer = ({
         isPlaying: false // Reset playing state when song changes to prevent conflicts
       });
       
-      // Refresh play status when song changes (to get updated play count)
+      // Refresh play status when song changes (to get updated play count and ownership)
       if (authenticated && currentSong.id) {
-        // Small delay to ensure database has been updated by increment_play_count
+        // Check immediately and also after a delay to catch any updates
+        checkPlayStatus(currentSong.id);
         const timer = setTimeout(() => {
           checkPlayStatus(currentSong.id);
         }, 500);
         return () => clearTimeout(timer);
+      } else if (currentSong.id) {
+        // Even if not authenticated, check play status (for non-auth users)
+        checkPlayStatus(currentSong.id);
       }
     }
   }, [currentSong?.id, authenticated, checkPlayStatus]); // Only reset when song ID changes, not when isPlaying changes

@@ -179,7 +179,32 @@ export const usePlayTracking = (songId?: string, songTokenAddress?: Address): Us
       if (result.playStatus) {
         const status = result.playStatus;
         const hasTokens = tokenBalance && parseFloat(tokenBalance) > 0;
-        const isOwner = hasTokens || (status.is_owner ?? false);
+        
+        // Also check if user is the song creator (wallet_address matches)
+        let isCreator = false;
+        if (fullAddress) {
+          try {
+            const { data: songData } = await supabase
+              .from('songs')
+              .select('wallet_address')
+              .eq('id', targetSongId)
+              .maybeSingle();
+            
+            if (songData?.wallet_address) {
+              isCreator = songData.wallet_address.toLowerCase() === fullAddress.toLowerCase();
+              console.log('🎵 Creator check in recordPlay:', { 
+                songWallet: songData.wallet_address.toLowerCase(), 
+                userWallet: fullAddress.toLowerCase(), 
+                isCreator 
+              });
+            }
+          } catch (err) {
+            console.error('Error checking song creator in recordPlay:', err);
+          }
+        }
+        
+        const isOwner = hasTokens || isCreator || (status.is_owner ?? false);
+        console.log('🔍 Ownership check in recordPlay:', { hasTokens, isCreator, dbIsOwner: status.is_owner, finalIsOwner: isOwner });
         const playCount = status.play_count ?? 0;
         const remainingPlays = Math.max(0, 3 - playCount);
         const canPlay = isOwner || playCount < 3;

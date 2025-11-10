@@ -450,23 +450,41 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
       
       // Initialize comment counts for all songs
       // Fetch comment counts in batch to prevent glitching
+      // Use count() to get accurate counts per song
       const songIds = songsWithProfiles.map(s => s.id);
       if (songIds.length > 0) {
-        const { data: commentCountsData } = await supabase
-          .from('comments')
-          .select('song_id')
-          .in('song_id', songIds);
-        
-        // Count comments per song
+        // Use a more accurate count query - count distinct comments per song
         const counts: Record<string, number> = {};
-        commentCountsData?.forEach(comment => {
-          if (comment.song_id) {
-            counts[comment.song_id] = (counts[comment.song_id] || 0) + 1;
-          }
-        });
+        
+        // Fetch counts for each song individually to ensure accuracy
+        await Promise.all(
+          songIds.map(async (songId) => {
+            const { count, error } = await supabase
+              .from('comments')
+              .select('*', { count: 'exact', head: true })
+              .eq('song_id', songId);
+            
+            if (!error && count !== null) {
+              counts[songId] = count;
+            } else {
+              counts[songId] = 0;
+            }
+          })
+        );
         
         // Update comment counts state
         setSongCommentCounts(prev => ({ ...prev, ...counts }));
+        
+        // Auto-expand comments for songs that have comments
+        setExpandedSongComments(prev => {
+          const next = new Set(prev);
+          Object.entries(counts).forEach(([songId, count]) => {
+            if (count > 0) {
+              next.add(songId);
+            }
+          });
+          return next;
+        });
       }
     } catch (error) {
       console.error('Error loading songs:', error);
@@ -970,7 +988,20 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
                 setSongCommentCounts(prev => {
                   // Only update if count actually changed to prevent unnecessary re-renders
                   if (prev[song.id] === count) return prev;
-                  return { ...prev, [song.id]: count };
+                  const updated = { ...prev, [song.id]: count };
+                  
+                  // Auto-expand if comments exist, auto-collapse if no comments
+                  setExpandedSongComments(prevExpanded => {
+                    const next = new Set(prevExpanded);
+                    if (count > 0) {
+                      next.add(song.id);
+                    } else {
+                      next.delete(song.id);
+                    }
+                    return next;
+                  });
+                  
+                  return updated;
                 });
               }, [song.id])}
             />

@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { debounce } from "@/lib/throttle";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import NetworkInfo from "@/components/NetworkInfo";
 import { Loader2, TrendingUp, TrendingDown, Flame, Music, Play, Pause, ChevronDown, ChevronUp, Clock, Zap, BarChart3, Sparkles } from "lucide-react";
@@ -79,7 +80,17 @@ interface Song {
   // Skeleton loader for featured song
   const FeaturedSongSkeleton = memo(() => {
     return (
-      <div className="mb-6 relative overflow-hidden rounded-2xl border border-white/20 bg-white/5 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,255,159,0.15)] p-6 pb-8">
+      <div className="mb-6 relative overflow-hidden rounded-2xl bg-white/5 backdrop-blur-2xl p-6 pb-8 h-full flex flex-col"
+           style={{
+             border: '1px solid rgba(255, 255, 255, 0.2)',
+             boxShadow: `
+               0 0 0 1px rgba(0, 255, 159, 0.1),
+               0 4px 16px rgba(0, 255, 159, 0.1),
+               0 8px 32px rgba(0, 255, 159, 0.15),
+               inset 0 1px 0 rgba(255, 255, 255, 0.1),
+               inset 0 -1px 0 rgba(0, 0, 0, 0.2)
+             `
+           }}>
         {/* Faded background */}
         <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-white/0 opacity-50" />
         
@@ -128,7 +139,16 @@ interface Song {
 
   // Skeleton for stats cards
   const StatsCardSkeleton = memo(() => (
-    <div className="group relative bg-gradient-to-br from-white/5 to-white/0 backdrop-blur-xl border border-white/10 rounded-xl p-5">
+    <div className="group relative bg-gradient-to-br from-white/5 to-white/0 backdrop-blur-xl rounded-xl p-5"
+         style={{
+           border: '1px solid rgba(255, 255, 255, 0.1)',
+           boxShadow: `
+             0 0 0 1px rgba(0, 0, 0, 0.2),
+             0 2px 8px rgba(0, 255, 159, 0.05),
+             inset 0 1px 0 rgba(255, 255, 255, 0.08),
+             inset 0 -1px 0 rgba(0, 0, 0, 0.3)
+           `
+         }}>
       <div className="absolute top-0 right-0 w-20 h-20 bg-white/5 rounded-full blur-2xl" />
       <div className="h-5 w-5 bg-white/10 rounded mb-2 animate-pulse" />
       <div className="h-4 bg-white/10 rounded w-20 mb-2 animate-pulse" />
@@ -313,7 +333,37 @@ interface Song {
   const marketCap = marketCapUSD;
   
   return (
-      <div className="mb-6 relative overflow-hidden rounded-2xl border border-white/20 bg-white/5 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,255,159,0.15)] p-6 pb-8 hover:bg-white/8 hover:border-white/30 hover:shadow-[0_8px_32px_0_rgba(0,255,159,0.25)] transition-all duration-300">
+      <div className="mb-6 relative overflow-hidden rounded-2xl bg-white/5 backdrop-blur-2xl p-6 pb-8 hover:bg-white/8 transition-all duration-300 h-full flex flex-col" 
+           style={{
+             border: '1px solid rgba(255, 255, 255, 0.2)',
+             boxShadow: `
+               0 0 0 1px rgba(0, 255, 159, 0.1),
+               0 4px 16px rgba(0, 255, 159, 0.1),
+               0 8px 32px rgba(0, 255, 159, 0.15),
+               inset 0 1px 0 rgba(255, 255, 255, 0.1),
+               inset 0 -1px 0 rgba(0, 0, 0, 0.2)
+             `
+           }}
+           onMouseEnter={(e) => {
+             e.currentTarget.style.boxShadow = `
+               0 0 0 1px rgba(0, 255, 159, 0.3),
+               0 8px 32px rgba(0, 255, 159, 0.2),
+               0 16px 64px rgba(0, 255, 159, 0.25),
+               inset 0 1px 0 rgba(255, 255, 255, 0.2),
+               inset 0 -1px 0 rgba(0, 0, 0, 0.3)
+             `;
+             e.currentTarget.style.border = '1px solid rgba(255, 255, 255, 0.3)';
+           }}
+           onMouseLeave={(e) => {
+             e.currentTarget.style.boxShadow = `
+               0 0 0 1px rgba(0, 255, 159, 0.1),
+               0 4px 16px rgba(0, 255, 159, 0.1),
+               0 8px 32px rgba(0, 255, 159, 0.15),
+               inset 0 1px 0 rgba(255, 255, 255, 0.1),
+               inset 0 -1px 0 rgba(0, 0, 0, 0.2)
+             `;
+             e.currentTarget.style.border = '1px solid rgba(255, 255, 255, 0.2)';
+           }}>
       {/* Faded background album cover */}
       {song.cover_cid && (
         <div 
@@ -369,7 +419,32 @@ interface Song {
             By {song.artist || 'Unknown'} • {song.ticker && `$${song.ticker}`}
           </p>
           <div className="flex flex-wrap gap-3 mb-4">
-            <div className="bg-black/40 rounded-lg px-3 py-2 border border-white/5 hover:border-neon-green/20 transition-colors">
+            <div className="bg-black/40 rounded-lg px-3 py-2 transition-all duration-300"
+                 style={{
+                   border: '1px solid rgba(255, 255, 255, 0.05)',
+                   boxShadow: `
+                     0 0 0 1px rgba(0, 0, 0, 0.3),
+                     inset 0 1px 0 rgba(255, 255, 255, 0.05),
+                     inset 0 -1px 0 rgba(0, 0, 0, 0.5)
+                   `
+                 }}
+                 onMouseEnter={(e) => {
+                   e.currentTarget.style.border = '1px solid rgba(0, 255, 159, 0.2)';
+                   e.currentTarget.style.boxShadow = `
+                     0 0 0 1px rgba(0, 255, 159, 0.1),
+                     0 2px 8px rgba(0, 255, 159, 0.15),
+                     inset 0 1px 0 rgba(0, 255, 159, 0.1),
+                     inset 0 -1px 0 rgba(0, 0, 0, 0.5)
+                   `;
+                 }}
+                 onMouseLeave={(e) => {
+                   e.currentTarget.style.border = '1px solid rgba(255, 255, 255, 0.05)';
+                   e.currentTarget.style.boxShadow = `
+                     0 0 0 1px rgba(0, 0, 0, 0.3),
+                     inset 0 1px 0 rgba(255, 255, 255, 0.05),
+                     inset 0 -1px 0 rgba(0, 0, 0, 0.5)
+                   `;
+                 }}>
               <div className="text-xs text-muted-foreground font-mono">PRICE (USD)</div>
               <div className="text-sm font-bold font-mono neon-text">
                 ${currentPrice ? (currentPrice < 0.000001 ? currentPrice.toFixed(10) : currentPrice < 0.01 ? currentPrice.toFixed(8) : currentPrice.toFixed(6)) : '$0.000000'}
@@ -380,13 +455,63 @@ interface Song {
                 </div>
               )}
             </div>
-            <div className="bg-black/40 rounded-lg px-3 py-2 border border-white/5 hover:border-green-400/20 transition-colors">
+            <div className="bg-black/40 rounded-lg px-3 py-2 transition-all duration-300"
+                 style={{
+                   border: '1px solid rgba(255, 255, 255, 0.05)',
+                   boxShadow: `
+                     0 0 0 1px rgba(0, 0, 0, 0.3),
+                     inset 0 1px 0 rgba(255, 255, 255, 0.05),
+                     inset 0 -1px 0 rgba(0, 0, 0, 0.5)
+                   `
+                 }}
+                 onMouseEnter={(e) => {
+                   e.currentTarget.style.border = '1px solid rgba(34, 197, 94, 0.2)';
+                   e.currentTarget.style.boxShadow = `
+                     0 0 0 1px rgba(34, 197, 94, 0.1),
+                     0 2px 8px rgba(34, 197, 94, 0.15),
+                     inset 0 1px 0 rgba(34, 197, 94, 0.1),
+                     inset 0 -1px 0 rgba(0, 0, 0, 0.5)
+                   `;
+                 }}
+                 onMouseLeave={(e) => {
+                   e.currentTarget.style.border = '1px solid rgba(255, 255, 255, 0.05)';
+                   e.currentTarget.style.boxShadow = `
+                     0 0 0 1px rgba(0, 0, 0, 0.3),
+                     inset 0 1px 0 rgba(255, 255, 255, 0.05),
+                     inset 0 -1px 0 rgba(0, 0, 0, 0.5)
+                   `;
+                 }}>
               <div className="text-xs text-muted-foreground font-mono">MKT CAP</div>
               <div className="text-sm font-bold font-mono text-green-400">
                 ${marketCap < 1 ? marketCap.toFixed(2) : marketCap.toLocaleString(undefined, {maximumFractionDigits: 2})}
               </div>
             </div>
-            <div className="bg-black/40 rounded-lg px-3 py-2 border border-white/5 hover:border-blue-400/20 transition-colors">
+            <div className="bg-black/40 rounded-lg px-3 py-2 transition-all duration-300"
+                 style={{
+                   border: '1px solid rgba(255, 255, 255, 0.05)',
+                   boxShadow: `
+                     0 0 0 1px rgba(0, 0, 0, 0.3),
+                     inset 0 1px 0 rgba(255, 255, 255, 0.05),
+                     inset 0 -1px 0 rgba(0, 0, 0, 0.5)
+                   `
+                 }}
+                 onMouseEnter={(e) => {
+                   e.currentTarget.style.border = '1px solid rgba(96, 165, 250, 0.2)';
+                   e.currentTarget.style.boxShadow = `
+                     0 0 0 1px rgba(96, 165, 250, 0.1),
+                     0 2px 8px rgba(96, 165, 250, 0.15),
+                     inset 0 1px 0 rgba(96, 165, 250, 0.1),
+                     inset 0 -1px 0 rgba(0, 0, 0, 0.5)
+                   `;
+                 }}
+                 onMouseLeave={(e) => {
+                   e.currentTarget.style.border = '1px solid rgba(255, 255, 255, 0.05)';
+                   e.currentTarget.style.boxShadow = `
+                     0 0 0 1px rgba(0, 0, 0, 0.3),
+                     inset 0 1px 0 rgba(255, 255, 255, 0.05),
+                     inset 0 -1px 0 rgba(0, 0, 0, 0.5)
+                   `;
+                 }}>
               <div className="text-xs text-muted-foreground font-mono">VOLUME</div>
               <div className="text-sm font-bold font-mono text-blue-400">
                 ${volumeUSD < 1 ? volumeUSD.toFixed(4) : volumeUSD.toLocaleString(undefined, {maximumFractionDigits: 2})}
@@ -395,7 +520,32 @@ interface Song {
                 {volumeXRGE.toLocaleString(undefined, {maximumFractionDigits: 2})} XRGE
               </div>
             </div>
-            <div className="bg-black/40 rounded-lg px-3 py-2 border border-white/5 hover:border-orange-400/20 transition-colors">
+            <div className="bg-black/40 rounded-lg px-3 py-2 transition-all duration-300"
+                 style={{
+                   border: '1px solid rgba(255, 255, 255, 0.05)',
+                   boxShadow: `
+                     0 0 0 1px rgba(0, 0, 0, 0.3),
+                     inset 0 1px 0 rgba(255, 255, 255, 0.05),
+                     inset 0 -1px 0 rgba(0, 0, 0, 0.5)
+                   `
+                 }}
+                 onMouseEnter={(e) => {
+                   e.currentTarget.style.border = '1px solid rgba(251, 146, 60, 0.2)';
+                   e.currentTarget.style.boxShadow = `
+                     0 0 0 1px rgba(251, 146, 60, 0.1),
+                     0 2px 8px rgba(251, 146, 60, 0.15),
+                     inset 0 1px 0 rgba(251, 146, 60, 0.1),
+                     inset 0 -1px 0 rgba(0, 0, 0, 0.5)
+                   `;
+                 }}
+                 onMouseLeave={(e) => {
+                   e.currentTarget.style.border = '1px solid rgba(255, 255, 255, 0.05)';
+                   e.currentTarget.style.boxShadow = `
+                     0 0 0 1px rgba(0, 0, 0, 0.3),
+                     inset 0 1px 0 rgba(255, 255, 255, 0.05),
+                     inset 0 -1px 0 rgba(0, 0, 0, 0.5)
+                   `;
+                 }}>
               <div className="text-xs text-muted-foreground font-mono">PLAYS</div>
               <div className="text-sm font-bold font-mono text-orange-400">
                 <Flame className="w-3 h-3 inline mr-1" />
@@ -404,8 +554,37 @@ interface Song {
             </div>
           </div>
           
-          {/* Price Chart - Collapsible */}
-          <div className="bg-black/40 rounded-lg px-4 py-3 border border-neon-green/20 hover:border-neon-green/40 transition-colors" data-tour="featured-chart">
+          {/* Price Chart - Collapsible with fixed height to prevent layout shift */}
+          <div className="bg-black/40 rounded-lg px-4 py-3 transition-all duration-300 relative" 
+               data-tour="featured-chart" 
+               style={{ 
+                 minHeight: isChartExpanded ? '300px' : 'auto',
+                 border: '1px solid rgba(0, 255, 159, 0.2)',
+                 boxShadow: `
+                   0 0 0 1px rgba(0, 255, 159, 0.1),
+                   0 2px 8px rgba(0, 255, 159, 0.1),
+                   inset 0 1px 0 rgba(0, 255, 159, 0.1),
+                   inset 0 -1px 0 rgba(0, 0, 0, 0.5)
+                 `
+               }}
+               onMouseEnter={(e) => {
+                 e.currentTarget.style.border = '1px solid rgba(0, 255, 159, 0.4)';
+                 e.currentTarget.style.boxShadow = `
+                   0 0 0 1px rgba(0, 255, 159, 0.2),
+                   0 4px 16px rgba(0, 255, 159, 0.2),
+                   inset 0 1px 0 rgba(0, 255, 159, 0.2),
+                   inset 0 -1px 0 rgba(0, 0, 0, 0.5)
+                 `;
+               }}
+               onMouseLeave={(e) => {
+                 e.currentTarget.style.border = '1px solid rgba(0, 255, 159, 0.2)';
+                 e.currentTarget.style.boxShadow = `
+                   0 0 0 1px rgba(0, 255, 159, 0.1),
+                   0 2px 8px rgba(0, 255, 159, 0.1),
+                   inset 0 1px 0 rgba(0, 255, 159, 0.1),
+                   inset 0 -1px 0 rgba(0, 0, 0, 0.5)
+                 `;
+               }}>
             <div className="flex items-center justify-between mb-2">
               <div className="text-xs text-muted-foreground font-mono flex items-center gap-2">
                 <TrendingUp className="w-3 h-3 text-neon-green" />
@@ -423,33 +602,35 @@ interface Song {
                 )}
               </button>
             </div>
-            {isChartExpanded && song.token_address && (
-              <>
-                {/* Hidden - Trading History Data Loader (EXACTLY like SongTrade page) */}
-                <div className="hidden">
-                  <SongTradingHistory 
-                    tokenAddress={song.token_address as Address}
-                    xrgeUsdPrice={xrgeUsdPrice}
-                    songTicker={song.ticker || undefined}
-                    coverCid={song.cover_cid || undefined}
-                    currentPriceInXRGE={priceInXRGE}
-                    onVolumeCalculated={setVolume24h}
-                    showRecentTrades={false}
-                    onTradesLoaded={(trades) => {
-                      setRecentTrades(trades);
-                    }}
+            <div className="relative" style={{ height: isChartExpanded ? '280px' : '0', overflow: 'hidden', transition: 'height 0.3s ease-in-out' }}>
+              {isChartExpanded && song.token_address && (
+                <div className="absolute inset-0">
+                  {/* Hidden - Trading History Data Loader (EXACTLY like SongTrade page) */}
+                  <div className="hidden">
+                    <SongTradingHistory 
+                      tokenAddress={song.token_address as Address}
+                      xrgeUsdPrice={xrgeUsdPrice}
+                      songTicker={song.ticker || undefined}
+                      coverCid={song.cover_cid || undefined}
+                      currentPriceInXRGE={priceInXRGE}
+                      onVolumeCalculated={setVolume24h}
+                      showRecentTrades={false}
+                      onTradesLoaded={(trades) => {
+                        setRecentTrades(trades);
+                      }}
+                    />
+                  </div>
+                  
+                  {/* Trading Chart with Real Trade Data */}
+                  <SongTradingChart 
+                    songTokenAddress={song.token_address as Address}
+                    priceInXRGE={priceInXRGE}
+                    bondingSupply={bondingSupply}
+                    trades={recentTrades}
                   />
                 </div>
-                
-                {/* Trading Chart with Real Trade Data */}
-                <SongTradingChart 
-                  songTokenAddress={song.token_address as Address}
-                  priceInXRGE={priceInXRGE}
-                  bondingSupply={bondingSupply}
-                  trades={recentTrades}
-                />
-              </>
-            )}
+              )}
+            </div>
           </div>
           
           {/* Audio Waveform */}
@@ -818,7 +999,15 @@ const SongRow = memo(({ song, index, onStatsUpdate, playSong, currentSong, isPla
 
           {/* Sparkline Chart - Only render when we have price data */}
           {song.token_address && priceInXRGE !== undefined && bondingSupplyStr && (
-            <div className="mt-1 bg-black/30 rounded-lg p-1.5 border border-neon-green/10">
+            <div className="mt-1 bg-black/30 rounded-lg p-1.5 transition-all duration-300"
+                 style={{
+                   border: '1px solid rgba(0, 255, 159, 0.1)',
+                   boxShadow: `
+                     0 0 0 1px rgba(0, 0, 0, 0.3),
+                     inset 0 1px 0 rgba(0, 255, 159, 0.05),
+                     inset 0 -1px 0 rgba(0, 0, 0, 0.4)
+                   `
+                 }}>
               <SongPriceSparkline 
                 tokenAddress={song.token_address || undefined}
                 bondingSupply={bondingSupplyStr || undefined}
@@ -1078,78 +1267,104 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
     }
   };
 
-  useEffect(() => {
-    const fetchTrendingData = async () => {
-      try {
-        setLoading(true);
+  // Memoize fetch function to avoid recreating on every render
+  const fetchTrendingData = useCallback(async () => {
+    try {
+      setLoading(true);
+      
+      if (searchQuery) {
+        // Perform search when search query is provided
+        const searchTerm = `%${searchQuery}%`;
         
-        if (searchQuery) {
-          // Perform search when search query is provided
-          const searchTerm = `%${searchQuery}%`;
-          
-          const [artistsResponse, songsResponse] = await Promise.all([
-            supabase
-              .from("public_profiles")
-              .select("wallet_address, artist_name, artist_ticker, avatar_cid, total_songs, total_plays, verified")
-              .not("artist_name", "is", null)
-              .ilike("artist_name", searchTerm)
-              .order("total_plays", { ascending: false })
-              .limit(100),
-            supabase
-              .from("songs")
-              .select("id, title, artist, wallet_address, audio_cid, cover_cid, play_count, ticker, genre, created_at, token_address, ai_usage")
-              .not("token_address", "is", null) // Only show deployed songs
-              .or(`title.ilike.%${searchQuery}%,artist.ilike.%${searchQuery}%,genre.ilike.%${searchQuery}%,ticker.ilike.%${searchQuery}%`)
-              .order("play_count", { ascending: false })
-              .limit(100) // Fetch more than displayLimit to allow user to view all
-          ]);
+        const [artistsResponse, songsResponse] = await Promise.all([
+          supabase
+            .from("public_profiles")
+            .select("wallet_address, artist_name, artist_ticker, avatar_cid, total_songs, total_plays, verified")
+            .not("artist_name", "is", null)
+            .ilike("artist_name", searchTerm)
+            .order("total_plays", { ascending: false })
+            .limit(100),
+          supabase
+            .from("songs")
+            .select("id, title, artist, wallet_address, audio_cid, cover_cid, play_count, ticker, genre, created_at, token_address, ai_usage")
+            .not("token_address", "is", null) // Only show deployed songs
+            .or(`title.ilike.%${searchQuery}%,artist.ilike.%${searchQuery}%,genre.ilike.%${searchQuery}%,ticker.ilike.%${searchQuery}%`)
+            .order("play_count", { ascending: false })
+            .limit(100) // Fetch more than displayLimit to allow user to view all
+        ]);
 
-          if (artistsResponse.error) throw artistsResponse.error;
-          if (songsResponse.error) throw songsResponse.error;
-          
-          setArtists(artistsResponse.data || []);
-          setSongs(songsResponse.data || []);
-        } else {
-          // Show trending data when no search query
-          const [artistsResponse, songsResponse] = await Promise.all([
-            supabase
-              .from("public_profiles")
-              .select("wallet_address, artist_name, artist_ticker, avatar_cid, total_songs, total_plays, verified")
-              .not("artist_name", "is", null)
-              .gt("total_songs", 0)
-              .order("total_plays", { ascending: false })
-              .limit(100),
-            supabase
-              .from("songs")
-              .select("id, title, artist, wallet_address, audio_cid, cover_cid, play_count, ticker, genre, created_at, token_address, ai_usage")
-              .not("token_address", "is", null) // Only show deployed songs
-              .order("created_at", { ascending: false }) // Order by newest first to include new songs
-              .limit(200) // Fetch more songs to ensure we get all trending ones
-          ]);
+        if (artistsResponse.error) throw artistsResponse.error;
+        if (songsResponse.error) throw songsResponse.error;
+        
+        setArtists(artistsResponse.data || []);
+        setSongs(songsResponse.data || []);
+      } else {
+        // Show trending data when no search query
+        const [artistsResponse, songsResponse] = await Promise.all([
+          supabase
+            .from("public_profiles")
+            .select("wallet_address, artist_name, artist_ticker, avatar_cid, total_songs, total_plays, verified")
+            .not("artist_name", "is", null)
+            .gt("total_songs", 0)
+            .order("total_plays", { ascending: false })
+            .limit(100),
+          supabase
+            .from("songs")
+            .select("id, title, artist, wallet_address, audio_cid, cover_cid, play_count, ticker, genre, created_at, token_address, ai_usage")
+            .not("token_address", "is", null) // Only show deployed songs
+            .order("created_at", { ascending: false }) // Order by newest first to include new songs
+            .limit(200) // Fetch more songs to ensure we get all trending ones
+        ]);
 
-          if (artistsResponse.error) throw artistsResponse.error;
-          if (songsResponse.error) throw songsResponse.error;
-          
-          setArtists(artistsResponse.data || []);
-          setSongs(songsResponse.data || []);
-        }
-      } catch (error) {
-        console.error("Error fetching trending data:", error);
-      } finally {
-        setLoading(false);
+        if (artistsResponse.error) throw artistsResponse.error;
+        if (songsResponse.error) throw songsResponse.error;
+        
+        setArtists(artistsResponse.data || []);
+        setSongs(songsResponse.data || []);
       }
-    };
+    } catch (error) {
+      console.error("Error fetching trending data:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [searchQuery]);
 
-    fetchTrendingData();
+  // Debounce search queries to avoid excessive API calls
+  const debouncedFetch = useMemo(
+    () => debounce(() => {
+      fetchTrendingData();
+    }, 500), // 500ms debounce for search
+    [fetchTrendingData]
+  );
+
+  useEffect(() => {
+    if (searchQuery) {
+      // For search queries, use debounced fetch
+      debouncedFetch();
+    } else {
+      // For initial load, fetch immediately
+      fetchTrendingData();
+    }
     
-    // Refresh data every 30 seconds to catch new songs
+    // Cleanup debounced function on unmount
+    return () => {
+      // Clear any pending debounced calls
+    };
+  }, [searchQuery, debouncedFetch, fetchTrendingData]);
+
+  // Periodic refresh (rate limited to avoid spam)
+  useEffect(() => {
+    // Only refresh if not searching (search has its own debounced refresh)
+    if (searchQuery) return;
+    
+    // Refresh data every 60 seconds to catch new songs
     const refreshInterval = setInterval(() => {
       console.log('🔄 Refreshing trending data to catch new songs...');
       fetchTrendingData();
-    }, 30 * 1000); // 30 seconds
+    }, 60 * 1000); // 60 seconds (increased from 30s to reduce load)
     
     return () => clearInterval(refreshInterval);
-  }, [searchQuery]);
+  }, [searchQuery, fetchTrendingData]);
 
   // Calculate true total volume across ALL songs (not just visible ones)
   useEffect(() => {
@@ -1500,8 +1715,14 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
       const scrollPosition = window.innerHeight + window.scrollY;
       const pageHeight = document.documentElement.scrollHeight;
       
-      // When user scrolls to 80% of the page, load 5 more items
-      if (scrollPosition >= pageHeight * 0.8) {
+      // Use different thresholds for mobile vs desktop
+      // Mobile: trigger at 50% (earlier) for better UX
+      // Desktop: trigger at 70% (still earlier than before)
+      const isMobile = window.innerWidth < 768;
+      const threshold = isMobile ? 0.5 : 0.7;
+      
+      // When user scrolls to threshold, load 5 more items
+      if (scrollPosition >= pageHeight * threshold) {
         const totalAvailable = displayLimit ? Math.min(sortedSongs.length, displayLimit) : sortedSongs.length;
         if (visibleCount < totalAvailable) {
           setVisibleCount(prev => Math.min(prev + 5, totalAvailable));
@@ -1608,13 +1829,73 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
             </>
           ) : (
             <>
-              <div className="group relative bg-gradient-to-br from-white/5 to-white/0 backdrop-blur-xl border border-white/10 rounded-xl p-5 shadow-[0_4px_16px_0_rgba(0,255,159,0.1)] hover:bg-white/10 hover:border-neon-green/30 hover:shadow-[0_8px_32px_0_rgba(0,255,159,0.25)] transition-all duration-300 overflow-hidden">
+              <div className="group relative bg-gradient-to-br from-white/5 to-white/0 backdrop-blur-xl rounded-xl p-5 transition-all duration-300 overflow-hidden"
+                   style={{
+                     border: '1px solid rgba(255, 255, 255, 0.1)',
+                     boxShadow: `
+                       0 0 0 1px rgba(0, 255, 159, 0.05),
+                       0 4px 16px rgba(0, 255, 159, 0.1),
+                       0 8px 32px rgba(0, 255, 159, 0.05),
+                       inset 0 1px 0 rgba(255, 255, 255, 0.1),
+                       inset 0 -1px 0 rgba(0, 0, 0, 0.3)
+                     `
+                   }}
+                   onMouseEnter={(e) => {
+                     e.currentTarget.style.border = '1px solid rgba(0, 255, 159, 0.3)';
+                     e.currentTarget.style.boxShadow = `
+                       0 0 0 1px rgba(0, 255, 159, 0.2),
+                       0 8px 32px rgba(0, 255, 159, 0.2),
+                       0 16px 64px rgba(0, 255, 159, 0.25),
+                       inset 0 1px 0 rgba(0, 255, 159, 0.2),
+                       inset 0 -1px 0 rgba(0, 0, 0, 0.4)
+                     `;
+                   }}
+                   onMouseLeave={(e) => {
+                     e.currentTarget.style.border = '1px solid rgba(255, 255, 255, 0.1)';
+                     e.currentTarget.style.boxShadow = `
+                       0 0 0 1px rgba(0, 255, 159, 0.05),
+                       0 4px 16px rgba(0, 255, 159, 0.1),
+                       0 8px 32px rgba(0, 255, 159, 0.05),
+                       inset 0 1px 0 rgba(255, 255, 255, 0.1),
+                       inset 0 -1px 0 rgba(0, 0, 0, 0.3)
+                     `;
+                   }}>
                 <div className="absolute top-0 right-0 w-20 h-20 bg-neon-green/10 rounded-full blur-2xl group-hover:bg-neon-green/20 transition-all" />
                 <Music className="w-5 h-5 text-neon-green/70 mb-2" />
                 <div className="text-xs text-muted-foreground font-mono mb-1">TOTAL SONGS</div>
                 <div className="text-3xl font-bold font-mono neon-text drop-shadow-[0_0_8px_rgba(0,255,159,0.6)]">{songs.length}</div>
               </div>
-              <div className="group relative bg-gradient-to-br from-white/5 to-white/0 backdrop-blur-xl border border-white/10 rounded-xl p-5 shadow-[0_4px_16px_0_rgba(168,85,247,0.1)] hover:bg-white/10 hover:border-purple-400/30 hover:shadow-[0_8px_32px_0_rgba(168,85,247,0.25)] transition-all duration-300 overflow-hidden">
+              <div className="group relative bg-gradient-to-br from-white/5 to-white/0 backdrop-blur-xl rounded-xl p-5 transition-all duration-300 overflow-hidden"
+                   style={{
+                     border: '1px solid rgba(255, 255, 255, 0.1)',
+                     boxShadow: `
+                       0 0 0 1px rgba(168, 85, 247, 0.05),
+                       0 4px 16px rgba(168, 85, 247, 0.1),
+                       0 8px 32px rgba(168, 85, 247, 0.05),
+                       inset 0 1px 0 rgba(255, 255, 255, 0.1),
+                       inset 0 -1px 0 rgba(0, 0, 0, 0.3)
+                     `
+                   }}
+                   onMouseEnter={(e) => {
+                     e.currentTarget.style.border = '1px solid rgba(168, 85, 247, 0.3)';
+                     e.currentTarget.style.boxShadow = `
+                       0 0 0 1px rgba(168, 85, 247, 0.2),
+                       0 8px 32px rgba(168, 85, 247, 0.2),
+                       0 16px 64px rgba(168, 85, 247, 0.25),
+                       inset 0 1px 0 rgba(168, 85, 247, 0.2),
+                       inset 0 -1px 0 rgba(0, 0, 0, 0.4)
+                     `;
+                   }}
+                   onMouseLeave={(e) => {
+                     e.currentTarget.style.border = '1px solid rgba(255, 255, 255, 0.1)';
+                     e.currentTarget.style.boxShadow = `
+                       0 0 0 1px rgba(168, 85, 247, 0.05),
+                       0 4px 16px rgba(168, 85, 247, 0.1),
+                       0 8px 32px rgba(168, 85, 247, 0.05),
+                       inset 0 1px 0 rgba(255, 255, 255, 0.1),
+                       inset 0 -1px 0 rgba(0, 0, 0, 0.3)
+                     `;
+                   }}>
                 <div className="absolute top-0 right-0 w-20 h-20 bg-purple-500/10 rounded-full blur-2xl group-hover:bg-purple-500/20 transition-all" />
                 <BarChart3 className="w-5 h-5 text-purple-400/70 mb-2" />
                 <div className="text-xs text-muted-foreground font-mono mb-1">TOTAL VOLUME (24H)</div>
@@ -1626,7 +1907,37 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
                   )}
                 </div>
               </div>
-              <div className="group relative bg-gradient-to-br from-white/5 to-white/0 backdrop-blur-xl border border-white/10 rounded-xl p-5 shadow-[0_4px_16px_0_rgba(249,115,22,0.1)] hover:bg-white/10 hover:border-orange-400/30 hover:shadow-[0_8px_32px_0_rgba(249,115,22,0.25)] transition-all duration-300 overflow-hidden">
+              <div className="group relative bg-gradient-to-br from-white/5 to-white/0 backdrop-blur-xl rounded-xl p-5 transition-all duration-300 overflow-hidden"
+                   style={{
+                     border: '1px solid rgba(255, 255, 255, 0.1)',
+                     boxShadow: `
+                       0 0 0 1px rgba(249, 115, 22, 0.05),
+                       0 4px 16px rgba(249, 115, 22, 0.1),
+                       0 8px 32px rgba(249, 115, 22, 0.05),
+                       inset 0 1px 0 rgba(255, 255, 255, 0.1),
+                       inset 0 -1px 0 rgba(0, 0, 0, 0.3)
+                     `
+                   }}
+                   onMouseEnter={(e) => {
+                     e.currentTarget.style.border = '1px solid rgba(249, 115, 22, 0.3)';
+                     e.currentTarget.style.boxShadow = `
+                       0 0 0 1px rgba(249, 115, 22, 0.2),
+                       0 8px 32px rgba(249, 115, 22, 0.2),
+                       0 16px 64px rgba(249, 115, 22, 0.25),
+                       inset 0 1px 0 rgba(249, 115, 22, 0.2),
+                       inset 0 -1px 0 rgba(0, 0, 0, 0.4)
+                     `;
+                   }}
+                   onMouseLeave={(e) => {
+                     e.currentTarget.style.border = '1px solid rgba(255, 255, 255, 0.1)';
+                     e.currentTarget.style.boxShadow = `
+                       0 0 0 1px rgba(249, 115, 22, 0.05),
+                       0 4px 16px rgba(249, 115, 22, 0.1),
+                       0 8px 32px rgba(249, 115, 22, 0.05),
+                       inset 0 1px 0 rgba(255, 255, 255, 0.1),
+                       inset 0 -1px 0 rgba(0, 0, 0, 0.3)
+                     `;
+                   }}>
                 <div className="absolute top-0 right-0 w-20 h-20 bg-orange-500/10 rounded-full blur-2xl group-hover:bg-orange-500/20 transition-all" />
                 <Zap className="w-5 h-5 text-orange-400/70 mb-2" />
                 <div className="text-xs text-muted-foreground font-mono mb-1">TOP GAINER</div>
@@ -1634,7 +1945,37 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
                   {topGainerPercent > 0 ? `+${topGainerPercent.toFixed(1)}%` : '0%'}
                 </div>
               </div>
-              <div className="group relative bg-gradient-to-br from-white/5 to-white/0 backdrop-blur-xl border border-white/10 rounded-xl p-5 shadow-[0_4px_16px_0_rgba(59,130,246,0.1)] hover:bg-white/10 hover:border-blue-400/30 hover:shadow-[0_8px_32px_0_rgba(59,130,246,0.25)] transition-all duration-300 overflow-hidden">
+              <div className="group relative bg-gradient-to-br from-white/5 to-white/0 backdrop-blur-xl rounded-xl p-5 transition-all duration-300 overflow-hidden"
+                   style={{
+                     border: '1px solid rgba(255, 255, 255, 0.1)',
+                     boxShadow: `
+                       0 0 0 1px rgba(59, 130, 246, 0.05),
+                       0 4px 16px rgba(59, 130, 246, 0.1),
+                       0 8px 32px rgba(59, 130, 246, 0.05),
+                       inset 0 1px 0 rgba(255, 255, 255, 0.1),
+                       inset 0 -1px 0 rgba(0, 0, 0, 0.3)
+                     `
+                   }}
+                   onMouseEnter={(e) => {
+                     e.currentTarget.style.border = '1px solid rgba(59, 130, 246, 0.3)';
+                     e.currentTarget.style.boxShadow = `
+                       0 0 0 1px rgba(59, 130, 246, 0.2),
+                       0 8px 32px rgba(59, 130, 246, 0.2),
+                       0 16px 64px rgba(59, 130, 246, 0.25),
+                       inset 0 1px 0 rgba(59, 130, 246, 0.2),
+                       inset 0 -1px 0 rgba(0, 0, 0, 0.4)
+                     `;
+                   }}
+                   onMouseLeave={(e) => {
+                     e.currentTarget.style.border = '1px solid rgba(255, 255, 255, 0.1)';
+                     e.currentTarget.style.boxShadow = `
+                       0 0 0 1px rgba(59, 130, 246, 0.05),
+                       0 4px 16px rgba(59, 130, 246, 0.1),
+                       0 8px 32px rgba(59, 130, 246, 0.05),
+                       inset 0 1px 0 rgba(255, 255, 255, 0.1),
+                       inset 0 -1px 0 rgba(0, 0, 0, 0.3)
+                     `;
+                   }}>
                 <div className="absolute top-0 right-0 w-20 h-20 bg-blue-500/10 rounded-full blur-2xl group-hover:bg-blue-500/20 transition-all" />
                 <Sparkles className="w-5 h-5 text-blue-400/70 mb-2" />
                 <div className="text-xs text-muted-foreground font-mono mb-1">ARTISTS</div>
@@ -1651,15 +1992,16 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
           </div>
         ) : featuredSong && top5Songs.length > 0 ? (
           <div className="relative mb-20 px-4 md:px-0" style={{ zIndex: 1 }}>
-            {/* Container for both cards during transition - ensures proper height */}
-            <div className="relative w-full" style={{ minHeight: '450px' }}>
+            {/* Container for both cards during transition - fixed height prevents layout shift */}
+            <div className="relative w-full overflow-hidden" style={{ height: '520px' }}>
               {/* Skeleton loader - shows during transition */}
               {isTransitioning && (
                 <div
                   className="absolute top-0 left-0 right-0 w-full transition-opacity duration-300 ease-in-out"
                   style={{
                     zIndex: 4,
-                    opacity: 1
+                    opacity: 1,
+                    height: '100%'
                   }}
                 >
                   <FeaturedSongSkeleton />
@@ -1676,7 +2018,8 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
                     opacity: nextSong ? 0 : 1,
                     transform: nextSong ? 'translateX(-32px) scale(0.98)' : 'translateX(0) scale(1)',
                     filter: nextSong ? 'blur(4px)' : 'blur(0)',
-                    pointerEvents: nextSong ? 'none' : 'auto'
+                    pointerEvents: nextSong ? 'none' : 'auto',
+                    height: nextSong ? '100%' : 'auto'
                   }}
                 >
                   <FeaturedSong 
@@ -1700,7 +2043,8 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
                     opacity: nextSong?.id === nextSongForPreload.id ? (isTransitioning ? 0 : 1) : 0,
                     transform: nextSong?.id === nextSongForPreload.id ? 'translateX(0) scale(1)' : 'translateX(30px) scale(0.98)',
                     filter: nextSong?.id === nextSongForPreload.id ? 'blur(0)' : 'blur(4px)',
-                    pointerEvents: nextSong?.id === nextSongForPreload.id ? 'auto' : 'none'
+                    pointerEvents: nextSong?.id === nextSongForPreload.id ? 'auto' : 'none',
+                    height: '100%'
                   }}
                 >
                   <FeaturedSong 

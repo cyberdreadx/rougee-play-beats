@@ -1,11 +1,16 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.58.0';
 import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 import { requireWalletAddress } from '../_shared/privy.ts';
+import { rateLimitCombined, getClientIP } from '../_shared/rateLimit.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-wallet-address, x-privy-token',
 };
+
+// Rate limits: 10 comments per minute per wallet/IP
+const COMMENT_RATE_LIMIT = 10;
+const COMMENT_RATE_WINDOW = 60 * 1000; // 1 minute
 
 const commentSchema = z.object({
   songId: z.string().uuid(),
@@ -39,6 +44,24 @@ Deno.serve(async (req) => {
 
     if (!walletAddress) {
       throw new Error('No wallet address provided');
+    }
+
+    // Rate limiting: 10 comments per minute per wallet/IP
+    const clientIP = getClientIP(req);
+    const rateLimitCheck = rateLimitCombined(walletAddress, clientIP, COMMENT_RATE_LIMIT, COMMENT_RATE_WINDOW);
+    
+    if (!rateLimitCheck.allowed) {
+      console.warn(`⚠️ Rate limit exceeded for ${walletAddress} (${clientIP}): ${rateLimitCheck.reason}`);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Rate limit exceeded. Please wait before posting another comment.',
+          reason: rateLimitCheck.reason
+        }),
+        { 
+          status: 429,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Retry-After': '60' }
+        }
+      );
     }
 
     const supabase = createClient(

@@ -1,11 +1,16 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
 import { requireWalletAddress } from '../_shared/privy.ts';
+import { rateLimitCombined, getClientIP } from '../_shared/rateLimit.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-wallet-address, x-privy-token',
 };
+
+// Rate limits: 30 play tracks per minute per wallet/IP
+const PLAY_TRACK_RATE_LIMIT = 30;
+const PLAY_TRACK_RATE_WINDOW = 60 * 1000; // 1 minute
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -15,6 +20,24 @@ serve(async (req) => {
   try {
     // Validate wallet address from JWT
     const walletAddress = await requireWalletAddress(req);
+    
+    // Rate limiting: 30 play tracks per minute per wallet/IP
+    const clientIP = getClientIP(req);
+    const rateLimitCheck = rateLimitCombined(walletAddress, clientIP, PLAY_TRACK_RATE_LIMIT, PLAY_TRACK_RATE_WINDOW);
+    
+    if (!rateLimitCheck.allowed) {
+      console.warn(`⚠️ Rate limit exceeded for ${walletAddress} (${clientIP}): ${rateLimitCheck.reason}`);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Rate limit exceeded. Please wait before tracking another play.',
+          reason: rateLimitCheck.reason
+        }),
+        { 
+          status: 429,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Retry-After': '60' }
+        }
+      );
+    }
     
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;

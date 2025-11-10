@@ -45,14 +45,17 @@ export const usePlayTracking = (songId?: string, songTokenAddress?: Address): Us
 
     try {
       // First check database play status
+      const normalizedWallet = fullAddress.toLowerCase();
+      console.log('🔍 Checking play status:', { wallet: normalizedWallet, songId: targetSongId });
+      
       const { data, error: rpcError } = await supabase.rpc('can_user_play_song', {
-        p_user_wallet: fullAddress.toLowerCase(),
+        p_user_wallet: normalizedWallet,
         p_song_id: targetSongId,
         p_max_free_plays: 3
       });
 
       if (rpcError) {
-        console.error('RPC Error:', rpcError);
+        console.error('❌ RPC Error:', rpcError);
         // If the function doesn't exist yet, allow unlimited plays
         if (rpcError.message.includes('function') && rpcError.message.includes('does not exist')) {
           setPlayStatus({
@@ -67,6 +70,21 @@ export const usePlayTracking = (songId?: string, songTokenAddress?: Address): Us
         throw new Error(`Failed to check play status: ${rpcError.message}`);
       }
 
+      console.log('📊 Play status response:', data);
+
+      // Also directly query user_plays table to verify
+      const { data: directPlays, error: directError } = await supabase
+        .from('user_plays')
+        .select('id')
+        .eq('song_id', targetSongId)
+        .ilike('user_wallet_address', normalizedWallet);
+      
+      console.log('🎵 Direct query result:', { 
+        count: directPlays?.length || 0, 
+        error: directError,
+        wallet: normalizedWallet 
+      });
+
       // Verify ownership by checking token balance
       // If user has tokens (> 0), they are an owner regardless of database status
       const hasTokens = tokenBalance && parseFloat(tokenBalance) > 0;
@@ -74,6 +92,8 @@ export const usePlayTracking = (songId?: string, songTokenAddress?: Address): Us
       const playCount = data?.play_count ?? 0;
       const remainingPlays = Math.max(0, 3 - playCount);
       const canPlay = isOwner || playCount < 3;
+      
+      console.log('✅ Final play status:', { playCount, isOwner, canPlay, remainingPlays });
       
       // Map database response to interface (snake_case to camelCase)
       const updatedPlayStatus: PlayStatus = {

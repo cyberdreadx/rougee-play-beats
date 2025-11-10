@@ -18,6 +18,7 @@ import { Card } from "@/components/ui/card";
 import { Play, Pause, TrendingUp, Sparkles, Clock, Flame, Radio, Music, Zap } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import LiveStreams from "@/components/LiveStreams";
+import TwinklingStars from "@/components/TwinklingStars";
 
 interface Song {
   id: string;
@@ -231,8 +232,11 @@ const Index = ({ playSong, currentSong, isPlaying, isRadioMode, onToggleRadio }:
   }
 
   return (
-    <div className="min-h-screen bg-background pb-24 md:pb-20 flex flex-col overflow-x-hidden">
-      <div className="flex items-center justify-between px-4 md:px-6 py-4 gap-3">
+    <div className="min-h-screen bg-background pb-24 md:pb-20 flex flex-col overflow-x-hidden relative">
+      {/* Twinkling Stars Background */}
+      <TwinklingStars className="fixed inset-0 pointer-events-none" count={50} minSize={1} maxSize={2} />
+      
+      <div className="relative z-10 flex items-center justify-between px-4 md:px-6 py-4 gap-3">
         {onToggleRadio && (
           <RadioToggle 
             isRadioMode={isRadioMode || false} 
@@ -240,7 +244,7 @@ const Index = ({ playSong, currentSong, isPlaying, isRadioMode, onToggleRadio }:
           />
         )}
       </div>
-      <div className="flex-1 w-full overflow-x-hidden">
+      <div className="relative z-10 flex-1 w-full overflow-x-hidden">
         {/* Enhanced Hero Section with Featured Content */}
         <div className="relative px-4 md:px-6 pt-4 md:pt-6 pb-8">
           {/* Animated gradient background */}
@@ -267,8 +271,11 @@ const Index = ({ playSong, currentSong, isPlaying, isRadioMode, onToggleRadio }:
             {loadingFeatured ? (
               <FeaturedCardSkeleton />
             ) : featuredSong ? (
-              <Card className="mb-6 overflow-hidden border-neon-green/20 bg-gradient-to-br from-white/5 via-white/3 to-transparent backdrop-blur-xl shadow-[0_8px_32px_0_rgba(0,255,159,0.2)] hover:shadow-[0_12px_48px_0_rgba(0,255,159,0.3)] transition-all duration-300 group">
-                <div className="relative h-48 md:h-64 overflow-hidden">
+              <Card className="mb-6 relative overflow-hidden border-neon-green/20 bg-gradient-to-br from-white/5 via-white/3 to-transparent backdrop-blur-xl shadow-[0_8px_32px_0_rgba(0,255,159,0.2)] hover:shadow-[0_12px_48px_0_rgba(0,255,159,0.3)] transition-all duration-300 group">
+                {/* Twinkling Stars Background */}
+                <TwinklingStars className="rounded-lg" count={20} />
+                
+                <div className="relative z-10 h-48 md:h-64 overflow-hidden">
                   {featuredSong.cover_cid && (
                     <img 
                       src={getIPFSGatewayUrl(featuredSong.cover_cid)} 

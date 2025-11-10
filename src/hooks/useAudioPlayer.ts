@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useWallet } from "./useWallet";
 
 interface Song {
   id: string;
@@ -14,6 +15,7 @@ interface Song {
 }
 
 export const useAudioPlayer = () => {
+  const { fullAddress } = useWallet();
   const [currentSong, setCurrentSong] = useState<Song | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [playlist, setPlaylist] = useState<Song[]>([]);
@@ -24,17 +26,39 @@ export const useAudioPlayer = () => {
 
   const incrementPlayCount = useCallback(async (songId: string) => {
     try {
-      const { error } = await supabase.rpc('increment_play_count', {
-        song_id: songId
-      });
+      // If user is connected, track individual play with wallet address
+      if (fullAddress) {
+        const normalizedWallet = fullAddress.toLowerCase();
+        console.log('🎵 Recording play via increment_play_count:', { 
+          songId, 
+          wallet: normalizedWallet 
+        });
+        
+        const { error } = await supabase.rpc('increment_play_count', {
+          song_id: songId,
+          user_wallet_address: normalizedWallet
+        });
 
-      if (error) {
-        console.error('Error incrementing play count:', error);
+        if (error) {
+          console.error('❌ Error incrementing play count:', error);
+        } else {
+          console.log('✅ Play recorded successfully via increment_play_count');
+        }
+      } else {
+        // If user is not connected, just increment total play count
+        console.log('🎵 Recording play (no wallet):', { songId });
+        const { error } = await supabase.rpc('increment_play_count', {
+          song_id: songId
+        });
+
+        if (error) {
+          console.error('❌ Error incrementing play count:', error);
+        }
       }
     } catch (error) {
-      console.error('Error incrementing play count:', error);
+      console.error('❌ Error incrementing play count:', error);
     }
-  }, []);
+  }, [fullAddress]);
 
   const playSong = useCallback((song: Song, newPlaylist?: Song[]) => {
     if (currentSong?.id === song.id) {

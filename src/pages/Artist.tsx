@@ -29,6 +29,7 @@ import { AudioWaveform } from "@/components/AudioWaveform";
 import { useAudioStateForSong } from "@/hooks/useAudioState";
 import { TipButton } from "@/components/TipButton";
 import TaggedText from "@/components/TaggedText";
+import TwinklingStars from "@/components/TwinklingStars";
 
 interface Song {
   id: string;
@@ -42,6 +43,7 @@ interface Song {
   created_at: string;
   ticker?: string | null;
   ai_usage?: 'none' | 'partial' | 'full' | null;
+  description?: string | null;
 }
 
 interface FeedPost {
@@ -215,6 +217,37 @@ const ArtistSongCardSkeleton = memo(() => (
 ));
 ArtistSongCardSkeleton.displayName = 'ArtistSongCardSkeleton';
 
+const formatCyberpunkDate = (dateString: string) => {
+  const date = new Date(dateString);
+  const now = new Date();
+  const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+  
+  // Format as cyberpunk timestamp: YYYY.MM.DD HH:MM:SS
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const secs = String(date.getSeconds()).padStart(2, '0');
+  
+  // If less than 24 hours, show relative time with cyberpunk format
+  if (seconds < 86400) {
+    if (seconds < 60) return `[${seconds}s]`;
+    if (seconds < 3600) return `[${Math.floor(seconds / 60)}m]`;
+    return `[${Math.floor(seconds / 3600)}h]`;
+  }
+  
+  // If less than a week, show day name
+  if (seconds < 604800) {
+    const days = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+    const dayName = days[date.getDay()];
+    return `${dayName} ${hours}:${minutes}`;
+  }
+  
+  // Otherwise show full date in cyberpunk format: YYYY.MM.DD
+  return `${year}.${month}.${day}`;
+};
+
 const ArtistSongCard = ({ song, coverUrl, isThisSongPlaying, navigate, playSong, toggleSongComments, expandedSongComments }: {
   song: Song;
   coverUrl: string | null;
@@ -231,10 +264,14 @@ const ArtistSongCard = ({ song, coverUrl, isThisSongPlaying, navigate, playSong,
 
   return (
     <Card
-      className="bg-white/5 backdrop-blur-xl border border-white/10 shadow-[0_4px_16px_0_rgba(0,255,159,0.1)] p-4 md:p-6 hover:bg-white/8 active:bg-white/10 active:scale-[0.99] transition-all duration-300 group rounded-2xl cursor-pointer"
+      className="relative bg-white/5 backdrop-blur-xl border border-white/10 shadow-[0_4px_16px_0_rgba(0,255,159,0.1)] p-4 md:p-6 hover:bg-white/8 active:bg-white/10 active:scale-[0.99] transition-all duration-300 group rounded-2xl cursor-pointer overflow-hidden"
       onClick={() => navigate(`/song/${song.id}`)}
     >
-      <div className="flex flex-col md:flex-row md:items-center gap-4">
+      {/* Twinkling Stars Background */}
+      <TwinklingStars className="rounded-2xl" count={20} />
+      
+      {/* Content with relative positioning to appear above stars */}
+      <div className="relative z-10 flex flex-col md:flex-row md:items-center gap-4">
         {/* Album Artwork with Play Button */}
         <div className="relative flex-shrink-0 mx-auto md:mx-0">
           <div className="w-20 h-20 md:w-24 md:h-24 rounded-xl overflow-hidden bg-black/30">
@@ -280,10 +317,28 @@ const ArtistSongCard = ({ song, coverUrl, isThisSongPlaying, navigate, playSong,
               <AiBadge aiUsage={song.ai_usage} size="sm" />
             </div>
           </div>
+          {song.description && (
+            <div className="mb-2 px-2 py-1.5 rounded-md bg-white/5 border border-white/10 backdrop-blur-sm">
+              <p className="text-[10px] md:text-xs font-mono text-muted-foreground/90 line-clamp-2 leading-relaxed">
+                {song.description}
+              </p>
+            </div>
+          )}
           <div className="flex flex-col gap-1">
-            <p className="text-xs md:text-sm font-mono text-muted-foreground">
-              {song.play_count} plays • uploaded {new Date(song.created_at).toLocaleDateString()}
-            </p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="text-xs md:text-sm font-mono text-muted-foreground">
+                {song.play_count} plays
+              </p>
+              <span className="text-muted-foreground/50">•</span>
+              <div className="relative inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-neon-green/10 border border-neon-green/20 group/timestamp">
+                <Calendar className="w-3 h-3 text-neon-green/70" />
+                <span className="text-[10px] md:text-xs font-mono text-neon-green/90 font-semibold">
+                  {formatCyberpunkDate(song.created_at)}
+                </span>
+                {/* Glitch effect on hover */}
+                <div className="absolute inset-0 rounded-md bg-neon-green/5 opacity-0 group-hover/timestamp:opacity-100 transition-opacity duration-300 blur-sm" />
+              </div>
+            </div>
             {song.token_address && priceUSD > 0 && (
               <p className="text-xs md:text-sm font-mono text-neon-green font-bold">
                 ${priceUSD < 0.000001 ? priceUSD.toFixed(10) : priceUSD < 0.01 ? priceUSD.toFixed(8) : priceUSD.toFixed(6)}
@@ -319,7 +374,7 @@ const ArtistSongCard = ({ song, coverUrl, isThisSongPlaying, navigate, playSong,
 
       {/* Comments Section */}
       {expandedSongComments.has(song.id) && (
-        <div className="mt-4 pt-4 border-t border-white/10">
+        <div className="relative z-10 mt-4 pt-4 border-t border-white/10">
           <SongComments songId={song.id} />
         </div>
       )}
@@ -392,20 +447,29 @@ const Artist = ({ playSong, currentSong, isPlaying }: ArtistProps) => {
         const to = from + SONGS_PER_PAGE - 1;
         const { data, error, count } = await supabase
           .from("songs")
-          .select("id, title, artist, wallet_address, audio_cid, cover_cid, play_count, ticker, created_at, ai_usage", { count: 'exact' })
+          .select("id, title, artist, wallet_address, audio_cid, cover_cid, play_count, ticker, created_at, ai_usage, description", { count: 'exact' })
           .ilike("wallet_address", walletAddress)
           .order("created_at", { ascending: false })
           .range(from, to);
         if (error) throw error;
-        setTotalSongsCount(count || 0);
+        const totalCount = count || 0;
+        setTotalSongsCount(totalCount);
+        
         if (loadMore) {
-          setSongs(prev => [...prev, ...(data || [])]);
+          setSongs(prev => {
+            const newSongs = [...prev, ...(data || [])];
+            // Check if there are more songs to load
+            setHasMoreSongs(newSongs.length < totalCount);
+            return newSongs;
+          });
           setSongsPage(page);
         } else {
-          setSongs(data || []);
+          const newSongs = data || [];
+          setSongs(newSongs);
           setSongsPage(1);
+          // Check if there are more songs to load
+          setHasMoreSongs(newSongs.length < totalCount);
         }
-        setHasMoreSongs((data?.length || 0) === SONGS_PER_PAGE && (songs.length + (data?.length || 0)) < (count || 0));
       } catch (err) {
         console.error("Error fetching artist songs:", err);
         toast({ title: "Error loading songs", description: "Failed to load artist's music", variant: "destructive" });
@@ -807,6 +871,7 @@ const Artist = ({ playSong, currentSong, isPlaying }: ArtistProps) => {
     if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
     return `${Math.floor(seconds / 86400)}d ago`;
   };
+
 
   // Don't show full page loading - show skeleton instead
 
@@ -1471,25 +1536,48 @@ const Artist = ({ playSong, currentSong, isPlaying }: ArtistProps) => {
                   <p className="font-medium text-white/60">No songs uploaded yet</p>
                 </Card>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {songs.map((song) => {
-                    const coverUrl = song.cover_cid ? getIPFSGatewayUrl(song.cover_cid) : null;
-                    const isThisSongPlaying = currentSong?.id === song.id && isPlaying;
-                    
-                    return (
-                      <ArtistSongCard 
-                        key={song.id}
-                        song={song}
-                        coverUrl={coverUrl}
-                        isThisSongPlaying={isThisSongPlaying}
-                        navigate={navigate}
-                        playSong={playSong}
-                        toggleSongComments={toggleSongComments}
-                        expandedSongComments={expandedSongComments}
-                      />
-                    );
-                  })}
-                </div>
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {songs.map((song) => {
+                      const coverUrl = song.cover_cid ? getIPFSGatewayUrl(song.cover_cid) : null;
+                      const isThisSongPlaying = currentSong?.id === song.id && isPlaying;
+                      
+                      return (
+                        <ArtistSongCard 
+                          key={song.id}
+                          song={song}
+                          coverUrl={coverUrl}
+                          isThisSongPlaying={isThisSongPlaying}
+                          navigate={navigate}
+                          playSong={playSong}
+                          toggleSongComments={toggleSongComments}
+                          expandedSongComments={expandedSongComments}
+                        />
+                      );
+                    })}
+                  </div>
+                  {hasMoreSongs && (
+                    <div className="flex justify-center mt-6">
+                      <Button
+                        onClick={() => fetchArtistSongs(true)}
+                        disabled={loadingSongs}
+                        variant="outline"
+                        className="bg-white/5 backdrop-blur-xl border border-white/10 hover:bg-white/10 hover:border-neon-green/50 text-white"
+                      >
+                        {loadingSongs ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Loading...
+                          </>
+                        ) : (
+                          <>
+                            Load More Songs ({totalSongsCount - songs.length} remaining)
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  )}
+                </>
               )}
             </TabsContent>
             <TabsContent value="albums" className="mt-0">

@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useWallet } from "./useWallet";
 
 interface Song {
   id: string;
@@ -21,6 +22,7 @@ interface Ad {
 }
 
 export const useRadioPlayer = () => {
+  const { fullAddress } = useWallet();
   const [currentSong, setCurrentSong] = useState<Song | null>(null);
   const [currentAd, setCurrentAd] = useState<Ad | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -76,11 +78,30 @@ export const useRadioPlayer = () => {
 
   const incrementPlayCount = useCallback(async (songId: string) => {
     try {
-      await supabase.rpc('increment_play_count', { song_id: songId });
+      // If user is connected, track individual play with wallet address
+      if (fullAddress) {
+        const { error } = await supabase.rpc('increment_play_count', {
+          song_id: songId,
+          user_wallet_address: fullAddress.toLowerCase()
+        });
+
+        if (error) {
+          console.error('Error incrementing play count:', error);
+        }
+      } else {
+        // If user is not connected, just increment total play count
+        const { error } = await supabase.rpc('increment_play_count', {
+          song_id: songId
+        });
+
+        if (error) {
+          console.error('Error incrementing play count:', error);
+        }
+      }
     } catch (error) {
       console.error('Error incrementing play count:', error);
     }
-  }, []);
+  }, [fullAddress]);
 
   const playNextInQueue = useCallback(async () => {
     // Check if we need to play an ad (every 3 songs)

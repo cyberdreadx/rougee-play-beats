@@ -1,4 +1,4 @@
-import React, { useState, useEffect, memo } from 'react';
+import React, { useState, useEffect, useRef, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useWallet } from '@/hooks/useWallet';
 import { supabase } from '@/integrations/supabase/client';
@@ -92,6 +92,8 @@ interface SongPost {
   token_address: string | null;
   created_at: string;
   ai_usage?: 'none' | 'partial' | 'full' | null;
+  like_count?: number;
+  comment_count?: number;
   profiles?: {
     artist_name: string | null;
     display_name: string | null;
@@ -238,8 +240,8 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
   const isMobileNavVisible = useMobileNavVisibility();
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [songs, setSongs] = useState<SongPost[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadingSongs, setLoadingSongs] = useState(true);
+  const [loading, setLoading] = useState(false); // Start as false, will be set to true when loading starts
+  const [loadingSongs, setLoadingSongs] = useState(false); // Start as false, will be set to true when loading starts
   const [loadingMorePosts, setLoadingMorePosts] = useState(false);
   const [loadingMoreSongs, setLoadingMoreSongs] = useState(false);
   const [postsPage, setPostsPage] = useState(1);
@@ -265,6 +267,8 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
   const [allSongs, setAllSongs] = useState<SongPost[]>([]);
   const [loadingAllSongs, setLoadingAllSongs] = useState(false);
   const [showCreatePostModal, setShowCreatePostModal] = useState(false);
+  const loadingCommentsRef = useRef<Set<string>>(new Set()); // Track which comments are currently loading
+  const [activeTab, setActiveTab] = useState<'songs' | 'posts'>('songs'); // Track active tab
   
   // Dismissible tip for feed page
   const [showFeedTip, setShowFeedTip] = useState(() => {
@@ -285,6 +289,8 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
 
   const hasXRGE = xrgeBalance ? Number(xrgeBalance) > 0 : false;
   useEffect(() => {
+    console.log('🔄 Feed component mounted, loading posts and songs...');
+    // Load posts and songs - loadPosts will set loading state internally
     loadPosts();
     loadSongs();
     if (isConnected && fullAddress) {
@@ -292,12 +298,14 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
     }
   }, [isConnected, fullAddress]);
 
-  // Simplified infinite scroll - only for posts (songs use button)
+  // Infinite scroll for both posts and songs
   useEffect(() => {
     let scrollTimeout: NodeJS.Timeout;
     let lastScrollTime = 0;
-    let lastLoadTime = 0;
-    let isLoading = false;
+    let lastLoadPostsTime = 0;
+    let lastLoadSongsTime = 0;
+    let isLoadingPosts = false;
+    let isLoadingSongs = false;
     const SCROLL_THROTTLE_MS = 1000; // Check every 1 second max
     const MIN_LOAD_INTERVAL = 2000; // Minimum 2 seconds between loads
     const SCROLL_DEBOUNCE_MS = 500; // Wait 500ms after scroll stops
@@ -309,27 +317,43 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
       if (now - lastScrollTime < SCROLL_THROTTLE_MS) return;
       lastScrollTime = now;
       
-      // Don't trigger if already loading or recently loaded
-      if (isLoading || loadingMorePosts || loading) return;
-      if (now - lastLoadTime < MIN_LOAD_INTERVAL) return;
-      
       clearTimeout(scrollTimeout);
       scrollTimeout = setTimeout(() => {
-        // Double check we're not loading
-        if (isLoading || loadingMorePosts || loading) return;
-        if (!hasMorePosts) return;
-        
         const scrollPosition = window.innerHeight + window.scrollY;
         const pageHeight = document.documentElement.scrollHeight;
         const scrollPercentage = scrollPosition / pageHeight;
         
-        // Only load when 85% down (higher threshold to prevent frequent loads)
-        if (scrollPercentage >= 0.85) {
-          isLoading = true;
-          lastLoadTime = Date.now();
-          loadPosts(true).finally(() => {
-            isLoading = false;
-          });
+        // Only load when 75% down (lower threshold for earlier loading)
+        if (scrollPercentage >= 0.75) {
+          // Use state to determine which tab is active
+          const isPostsTab = activeTab === 'posts';
+          const isSongsTab = activeTab === 'songs';
+          
+          console.log('🔍 Scroll check:', { scrollPercentage, activeTab, isPostsTab, isSongsTab, hasMorePosts, hasMoreSongs });
+          
+          // Load more posts if posts tab is active, available, and not loading
+          if (isPostsTab && hasMorePosts && !isLoadingPosts && !loadingMorePosts && !loading) {
+            if (now - lastLoadPostsTime >= MIN_LOAD_INTERVAL) {
+              isLoadingPosts = true;
+              lastLoadPostsTime = Date.now();
+              console.log('📜 Loading more posts via scroll...');
+              loadPosts(true).finally(() => {
+                isLoadingPosts = false;
+              });
+            }
+          }
+          
+          // Load more songs if songs tab is active, available, and not loading
+          if (isSongsTab && hasMoreSongs && !isLoadingSongs && !loadingMoreSongs && !loadingSongs) {
+            if (now - lastLoadSongsTime >= MIN_LOAD_INTERVAL) {
+              isLoadingSongs = true;
+              lastLoadSongsTime = Date.now();
+              console.log('🎵 Loading more songs via scroll...', { hasMoreSongs, loadingMoreSongs, loadingSongs });
+              loadSongs(true).finally(() => {
+                isLoadingSongs = false;
+              });
+            }
+          }
         }
       }, SCROLL_DEBOUNCE_MS);
     };
@@ -339,11 +363,19 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
       window.removeEventListener('scroll', handleScroll);
       clearTimeout(scrollTimeout);
     };
-  }, [hasMorePosts, loadingMorePosts, loading]);
+  }, [hasMorePosts, hasMoreSongs, loadingMorePosts, loadingMoreSongs, loading, loadingSongs, activeTab]);
   const loadPosts = async (loadMore = false) => {
     // Prevent concurrent loads
-    if (loadMore && loadingMorePosts) return;
-    if (!loadMore && loading) return;
+    if (loadMore && loadingMorePosts) {
+      console.log('⏸️ Skipping loadPosts - already loading more');
+      return;
+    }
+    if (!loadMore && loading) {
+      console.log('⏸️ Skipping loadPosts - already loading');
+      return;
+    }
+    
+    console.log('🔄 loadPosts called, loadMore:', loadMore);
     
     try {
       if (loadMore) {
@@ -374,7 +406,12 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
         .order('created_at', { ascending: false })
         .range(from, to);
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Error fetching posts:', error);
+        throw error;
+      }
+
+      console.log('📝 Posts fetched:', postsData?.length || 0, 'posts');
 
       // Check if there are more posts
       const hasMore = postsData && postsData.length === ITEMS_PER_PAGE;
@@ -438,11 +475,13 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
         setPosts(postsWithProfiles as FeedPost[]);
         setPostsPage(1);
       }
+      
+      console.log('✅ Posts loaded successfully:', postsWithProfiles.length, 'posts');
     } catch (error) {
-      console.error('Error loading posts:', error);
+      console.error('❌ Error loading posts:', error);
       toast({
         title: 'Error loading feed',
-        description: 'Failed to load posts',
+        description: error instanceof Error ? error.message : 'Failed to load posts',
         variant: 'destructive'
       });
     } finally {
@@ -454,7 +493,12 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
   // Simplified songs loader - clean and efficient
   const loadSongs = async (loadMore = false) => {
     // Prevent concurrent loads
-    if (songsLoadingRef) return;
+    if (songsLoadingRef) {
+      console.log('⏸️ Skipping loadSongs - already loading');
+      return;
+    }
+    
+    console.log('🔄 loadSongs called, loadMore:', loadMore);
     
     try {
       setSongsLoadingRef(true);
@@ -504,23 +548,76 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
         profilesData = data || [];
       }
 
-      // Merge songs with profiles
+      // Fetch like counts and comment counts for all songs
+      const songIds = songsData.map(s => s.id);
+      
+      // Fetch all likes and comments for these songs in parallel
+      const [likeCountsResult, commentCountsResult] = await Promise.all([
+        supabase
+          .from('song_likes')
+          .select('song_id')
+          .in('song_id', songIds),
+        supabase
+          .from('comments')
+          .select('song_id')
+          .in('song_id', songIds)
+      ]);
+      
+      // Count likes per song
+      const likeCountsMap = new Map<string, number>();
+      likeCountsResult.data?.forEach(like => {
+        likeCountsMap.set(like.song_id, (likeCountsMap.get(like.song_id) || 0) + 1);
+      });
+      
+      // Count comments per song
+      const commentCountsMap = new Map<string, number>();
+      commentCountsResult.data?.forEach(comment => {
+        commentCountsMap.set(comment.song_id, (commentCountsMap.get(comment.song_id) || 0) + 1);
+      });
+
+      // Merge songs with profiles and counts
       const songsWithProfiles = songsData.map(song => ({
         ...song,
-        profiles: profilesData.find(p => p.wallet_address?.toLowerCase() === song.wallet_address?.toLowerCase()) || null
+        profiles: profilesData.find(p => p.wallet_address?.toLowerCase() === song.wallet_address?.toLowerCase()) || null,
+        like_count: likeCountsMap.get(song.id) || 0,
+        comment_count: commentCountsMap.get(song.id) || 0
       })) as SongPost[];
 
       // Update state
       if (loadMore) {
+        // Preserve scroll position relative to bottom when loading more songs (same as posts)
+        const scrollTop = window.scrollY;
+        const scrollHeight = document.documentElement.scrollHeight;
+        const clientHeight = window.innerHeight;
+        const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+        
         setSongs(prev => [...prev, ...songsWithProfiles]);
         setSongsPage(page);
+        
+        // Restore scroll position after state update, maintaining distance from bottom
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            const newScrollHeight = document.documentElement.scrollHeight;
+            const newScrollTop = newScrollHeight - clientHeight - distanceFromBottom;
+            window.scrollTo({
+              top: Math.max(0, newScrollTop),
+              behavior: 'instant'
+            });
+          });
+        });
       } else {
         setSongs(songsWithProfiles);
         setSongsPage(1);
       }
-
-      // Load comment counts lazily - only when needed (when comments are expanded)
-      // Don't fetch all comment counts upfront
+      
+      // Also update songCommentCounts state for immediate display
+      const newCommentCounts: Record<string, number> = {};
+      songsWithProfiles.forEach(song => {
+        if (song.comment_count !== undefined) {
+          newCommentCounts[song.id] = song.comment_count;
+        }
+      });
+      setSongCommentCounts(prev => ({ ...prev, ...newCommentCounts }));
       
     } catch (error) {
       console.error('Error loading songs:', error);
@@ -660,6 +757,7 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
     } else {
       setExpandedComments(prev => new Set(prev).add(postId));
       // Only load comments if they haven't been loaded yet
+      // Double-check to prevent race conditions
       if (!comments[postId] || comments[postId].length === 0) {
         await loadComments(postId);
       }
@@ -678,6 +776,17 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
     });
   }, []);
   const loadComments = async (postId: string) => {
+    // Prevent reloading if comments are already loaded or currently loading
+    if (loadingCommentsRef.current.has(postId)) {
+      return; // Already loading
+    }
+    if (comments[postId] && comments[postId].length > 0) {
+      return; // Already loaded
+    }
+    
+    // Mark as loading
+    loadingCommentsRef.current.add(postId);
+    
     try {
       const {
         data: commentsData,
@@ -720,6 +829,9 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
       );
     } catch (error) {
       console.error('Error loading comments:', error);
+    } finally {
+      // Remove from loading set
+      loadingCommentsRef.current.delete(postId);
     }
   };
   const handleAddComment = async (postId: string) => {
@@ -825,26 +937,32 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
     return `${Math.floor(seconds / 86400)}d ago`;
   };
 
-  // Waveform component for feed page
-  const FeedWaveform = ({ songId, audioCid }: { songId: string; audioCid: string }) => {
+  // Waveform component for feed page - Memoized to prevent re-renders on scroll
+  const FeedWaveform = React.memo(({ songId, audioCid }: { songId: string; audioCid: string }) => {
     const audioState = useAudioStateForSong(songId);
     
     return (
-      <AudioWaveform
-        audioCid={audioCid}
-        height={25}
-        color="#00ff9f"
-        backgroundColor="rgba(0, 0, 0, 0.1)"
-        className="rounded border border-neon-green/10"
-        showProgress={audioState.isCurrentSong && audioState.isPlaying}
-        currentTime={audioState.currentTime}
-        duration={audioState.duration}
-        onSeek={(time) => {
-          console.log('Seek to:', time);
-        }}
-      />
+      <div style={{ willChange: 'auto' }}>
+        <AudioWaveform
+          audioCid={audioCid}
+          height={25}
+          color="#00ff9f"
+          backgroundColor="rgba(0, 0, 0, 0.1)"
+          className="rounded border border-neon-green/10"
+          showProgress={audioState.isCurrentSong && audioState.isPlaying}
+          currentTime={audioState.currentTime}
+          duration={audioState.duration}
+          onSeek={(time) => {
+            console.log('Seek to:', time);
+          }}
+        />
+      </div>
     );
-  };
+  }, (prevProps, nextProps) => {
+    // Only re-render if audioCid changes or if playing state changes significantly
+    return prevProps.audioCid === nextProps.audioCid && 
+           prevProps.songId === nextProps.songId;
+  });
 
   // Song Card Component with Price - Memoized to prevent re-renders on scroll
   const SongCard = React.memo(({ song }: { song: SongPost }) => {
@@ -866,9 +984,10 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
                 <img
                   src={getIPFSGatewayUrl(song.profiles.avatar_cid)}
                   alt="Avatar"
-                  loading="lazy"
+                  loading="eager"
                   decoding="async"
                   className="w-12 h-12 md:w-14 md:h-14 rounded-full object-cover border-2 border-neon-green/20 group-hover/avatar:border-neon-green/60 transition-all duration-300"
+                  style={{ willChange: 'auto' }}
                 />
                 <div className="absolute inset-0 rounded-full bg-neon-green/0 group-hover/avatar:bg-neon-green/10 transition-colors duration-300" />
               </div>
@@ -917,10 +1036,13 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
                 <img
                   src={getIPFSGatewayUrl(song.cover_cid)}
                   alt={song.title}
-                  loading="lazy"
+                  loading="eager"
                   decoding="async"
                   className="w-24 h-24 md:w-28 md:h-28 rounded-xl object-cover cursor-pointer border-2 border-neon-green/20 group-hover/cover:border-neon-green/60 transition-all duration-300 shadow-lg group-hover/cover:scale-105"
                   onClick={() => song.token_address ? navigate(`/song/${song.id}`) : null}
+                  style={{ 
+                    imageRendering: 'auto'
+                  }}
                 />
                 <div className="absolute inset-0 rounded-xl bg-neon-green/0 group-hover/cover:bg-neon-green/10 transition-colors duration-300" />
               </div>
@@ -990,6 +1112,7 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
         <div className="flex items-center gap-4 pt-4 border-t border-border/50">
           <LikeButton 
             songId={song.id} 
+            initialLikeCount={song.like_count || 0}
             size="sm" 
             showCount={true} 
           />
@@ -999,23 +1122,11 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
               e.stopPropagation();
               e.preventDefault();
               toggleSongComments(song.id);
-              // Load comment count when expanding comments
-              if (!expandedSongComments.has(song.id) && !songCommentCounts[song.id]) {
-                supabase
-                  .from('comments')
-                  .select('*', { count: 'exact', head: true })
-                  .eq('song_id', song.id)
-                  .then(({ count }) => {
-                    if (count !== null) {
-                      setSongCommentCounts(prev => ({ ...prev, [song.id]: count }));
-                    }
-                  });
-              }
             }} 
             className="flex items-center gap-1.5 text-sm hover:text-neon-green transition-colors duration-200"
           >
             <MessageCircle className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" />
-            <span className="font-mono min-w-[20px] text-right">{songCommentCounts[song.id] ?? 0}</span>
+            <span className="font-mono min-w-[20px] text-right">{songCommentCounts[song.id] ?? song.comment_count ?? 0}</span>
           </button>
 
           {song.token_address && (
@@ -1053,7 +1164,9 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
            prevProps.song.like_count === nextProps.song.like_count &&
            prevProps.song.comment_count === nextProps.song.comment_count &&
            prevProps.song.title === nextProps.song.title &&
-           prevProps.song.artist === nextProps.song.artist;
+           prevProps.song.artist === nextProps.song.artist &&
+           prevProps.song.cover_cid === nextProps.song.cover_cid &&
+           prevProps.song.profiles?.avatar_cid === nextProps.song.profiles?.avatar_cid;
   });
   return <>
       <StoriesBar hasXRGE={hasXRGE} />
@@ -1326,7 +1439,7 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
           )}
 
           {/* Feed with Tabs */}
-          <Tabs defaultValue="songs" className="w-full md:max-w-2xl md:mx-auto">
+          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'songs' | 'posts')} className="w-full md:max-w-2xl md:mx-auto">
             <TabsList className="grid w-full grid-cols-2 mb-4 md:mb-6 mx-auto max-w-xs md:max-w-full md:mx-0 bg-black/60 backdrop-blur-xl border border-neon-green/20 shadow-[0_0_20px_rgba(0,255,159,0.15)] p-1 rounded-lg">
               <TabsTrigger 
                 value="songs"
@@ -1842,35 +1955,22 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
                 );
               })()}
 
-              {/* Load More Songs Button */}
-              {!loadingSongs && songs.length > 0 && hasMoreSongs && (
-                <div className="flex justify-center py-6 px-4 md:px-0">
-                  <Button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      if (!loadingMoreSongs && !songsLoadingRef) {
-                        loadSongs(true);
-                      }
-                    }}
-                    type="button"
-                    disabled={loadingMoreSongs || songsLoadingRef}
-                    variant="outline"
-                    size="lg"
-                    className="w-full md:max-w-md border-neon-green/30 hover:border-neon-green/60 hover:bg-neon-green/10"
-                  >
-                    {loadingMoreSongs ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Loading more songs...
-                      </>
-                    ) : (
-                      <>
-                        <Plus className="w-4 h-4 mr-2" />
-                        Load More Songs
-                      </>
-                    )}
-                  </Button>
+              {/* Loading indicator for infinite scroll */}
+              {loadingMoreSongs && (
+                <div className="flex justify-center py-8 px-4 md:px-0">
+                  <div className="flex items-center gap-3 text-muted-foreground bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl px-6 py-4">
+                    <Loader2 className="w-5 h-5 animate-spin text-neon-green" />
+                    <span className="text-sm font-mono text-neon-green">Loading more songs...</span>
+                  </div>
+                </div>
+              )}
+              
+              {/* Show indicator when there are more songs but not loading yet */}
+              {!loadingMoreSongs && !loadingSongs && songs.length > 0 && hasMoreSongs && (
+                <div className="flex justify-center py-4 px-4 md:px-0">
+                  <div className="flex items-center gap-2 text-muted-foreground/70">
+                    <span className="text-xs font-mono">Scroll down for more songs</span>
+                  </div>
                 </div>
               )}
             </TabsContent>

@@ -114,6 +114,7 @@ const AudioPlayer = ({
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showOwnershipPrompt, setShowOwnershipPrompt] = useState(false);
   const [previewTimeRemaining, setPreviewTimeRemaining] = useState(20);
+  const loginPromptDismissedRef = useRef<{ songId: string | null; dismissed: boolean }>({ songId: null, dismissed: false });
   const { toast } = useToast();
   const { isPWA, audioSupported, handlePWAAudioPlay, isAudioUnlocked } = usePWAAudio();
   const { isConnected } = useWallet();
@@ -331,51 +332,112 @@ const AudioPlayer = ({
       setCurrentAudioUrlIndex(0); // Reset to first URL
       setPreviewTimeRemaining(20); // Reset preview timer
       setShowLoginPrompt(false); // Hide login prompt
+      // Reset dismissed state when song changes
+      loginPromptDismissedRef.current = { songId: currentSong?.id || null, dismissed: false };
       updateAudioState({ 
         currentTime: 0,
         duration: 0,
         currentSongId: currentSong.id,
         isPlaying 
       });
+      
+      // Refresh play status when song changes (to get updated play count)
+      if (authenticated && currentSong.id) {
+        // Small delay to ensure database has been updated by increment_play_count
+        const timer = setTimeout(() => {
+          checkPlayStatus(currentSong.id);
+        }, 500);
+        return () => clearTimeout(timer);
+      }
     }
-  }, [currentSong?.id]); // Only reset when song ID changes, not when isPlaying changes
+  }, [currentSong?.id, authenticated, checkPlayStatus]); // Only reset when song ID changes, not when isPlaying changes
 
-  // Preview timer for non-logged-in users
+  // Preview timer for non-logged-in users and authenticated users who exceeded free plays
   useEffect(() => {
-    if (!authenticated && isPlaying && currentSong) {
-      const timer = setInterval(() => {
-        setPreviewTimeRemaining(prev => {
-          if (prev <= 1) {
-            // Preview time is up, pause and show login prompt
-            const audio = audioRef.current;
-            if (audio) {
-              audio.pause();
-            }
-            setShowLoginPrompt(true);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-
-      return () => clearInterval(timer);
-    }
-  }, [authenticated, isPlaying, currentSong]);
-
-  // Check play limits for authenticated users
-  useEffect(() => {
-    if (authenticated && isPlaying && currentSong && playStatus) {
-      // Only enforce limits if the database functions are working properly
-      if (playStatus.playCount > 0 && !playStatus.canPlay && playStatus.playCount >= playStatus.maxFreePlays) {
-        // User has exceeded play limit and doesn't own the song
-        const audio = audioRef.current;
-        if (audio) {
-          audio.pause();
+    if (isPlaying && currentSong) {
+      // Check if user should get preview (non-authenticated OR authenticated but exceeded free plays)
+      const shouldPreview = !authenticated || 
+        (authenticated && playStatus && !playStatus.isOwner && playStatus.playCount >= playStatus.maxFreePlays);
+      
+      if (shouldPreview) {
+        // Reset preview timer when song changes or when starting preview
+        if (loginPromptDismissedRef.current.songId !== currentSong.id) {
+          setPreviewTimeRemaining(20);
+          loginPromptDismissedRef.current = { songId: currentSong.id, dismissed: false };
         }
-        setShowOwnershipPrompt(true);
+        
+        // Only show preview timer if not dismissed
+        if (!loginPromptDismissedRef.current.dismissed || loginPromptDismissedRef.current.songId !== currentSong.id) {
+          const timer = setInterval(() => {
+            setPreviewTimeRemaining(prev => {
+              if (prev <= 1) {
+                // Preview time is up, pause and show prompt
+                const audio = audioRef.current;
+                if (audio) {
+                  audio.pause();
+                }
+                // Only show prompt if not dismissed
+                if (!loginPromptDismissedRef.current.dismissed || loginPromptDismissedRef.current.songId !== currentSong.id) {
+                  if (!authenticated) {
+                    setShowLoginPrompt(true);
+                  } else {
+                    setShowOwnershipPrompt(true);
+                  }
+                }
+                return 0;
+              }
+              return prev - 1;
+            });
+          }, 1000);
+
+          return () => clearInterval(timer);
+        }
       }
     }
   }, [authenticated, isPlaying, currentSong, playStatus]);
+
+  // Check play limits for authenticated users - Check frequently during playback
+  // Note: If user exceeded free plays, they get 20-second preview (handled in preview timer above)
+  useEffect(() => {
+    if (authenticated && isPlaying && currentSong && playStatus) {
+      // Check if user has exceeded play limit
+      const currentPlayCount = playStatus.playCount || 0;
+      const isOwner = playStatus.isOwner || false;
+      const maxFreePlays = playStatus.maxFreePlays || 3;
+      
+      // If user exceeded free plays and doesn't own, they get preview (handled by preview timer)
+      // Only stop full playback if they somehow got past the preview
+      if (!isOwner && currentPlayCount >= maxFreePlays) {
+        // Check if we're in preview mode (20 seconds)
+        const audio = audioRef.current;
+        if (audio && audio.currentTime > 20) {
+          // Past preview time, stop playback
+          console.log('🚫 Play limit exceeded, stopping after preview:', {
+            playCount: currentPlayCount,
+            maxFreePlays: maxFreePlays,
+            isOwner: isOwner,
+            currentTime: audio.currentTime
+          });
+          audio.pause();
+          // Call onPlayPause to update the parent's isPlaying state
+          if (isPlaying) {
+            onPlayPause();
+          }
+          setShowOwnershipPrompt(true);
+          return;
+        }
+      }
+      
+      // Also check periodically during playback to catch updates
+      const checkInterval = setInterval(async () => {
+        if (currentSong?.id) {
+          await checkPlayStatus(currentSong.id);
+        }
+      }, 1000); // Check every 1 second during playback for faster detection
+      
+      return () => clearInterval(checkInterval);
+    }
+  }, [authenticated, isPlaying, currentSong, playStatus, checkPlayStatus]);
 
   // Record play when song starts playing (for authenticated users)
   // Use a ref to track if we've already recorded this continuous play session
@@ -395,19 +457,81 @@ const AudioPlayer = ({
         playRecordedRef.current.songId = currentSong.id;
         
         // Record the play after a short delay to ensure it's a real play
-        const timer = setTimeout(() => {
-          recordPlay(currentSong.id, 0).then(() => {
+        const timer = setTimeout(async () => {
+          try {
+            await recordPlay(currentSong.id, 0);
             // Always check play status again after recording to update UI with latest count
-            checkPlayStatus(currentSong.id);
+            await checkPlayStatus(currentSong.id);
+            
+            // Wait for status to update, then check if we should stop playback
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            // Check if play limit was exceeded after recording this play
+            // We need to check the updated playStatus
+            if (playStatus) {
+              const updatedPlayCount = playStatus.playCount || 0;
+              const isOwner = playStatus.isOwner || false;
+              const maxFreePlays = playStatus.maxFreePlays || 3;
+              
+              if (!isOwner && updatedPlayCount >= maxFreePlays) {
+                // Play limit exceeded - stop playback immediately
+                console.log('🚫 Play limit exceeded after recording play, stopping:', {
+                  playCount: updatedPlayCount,
+                  maxFreePlays: maxFreePlays
+                });
+                const audio = audioRef.current;
+                if (audio && isPlaying) {
+                  audio.pause();
+                  // Call onPlayPause to update the parent's isPlaying state
+                  onPlayPause();
+                  setShowOwnershipPrompt(true);
+                }
+              }
+            }
+            
             playRecordedRef.current.timestamp = Date.now();
-          }).catch((error) => {
+          } catch (error) {
             console.error('Failed to record play:', error);
             // Reset on error so we can retry
             playRecordedRef.current.isRecording = false;
-          });
+          }
         }, 2000); // Record after 2 seconds of playing
-
-        return () => clearTimeout(timer);
+        
+        // Also refresh play status immediately when song starts playing
+        // This ensures the play count updates right away (from increment_play_count in useAudioPlayer)
+        const refreshTimer = setTimeout(async () => {
+          if (authenticated && currentSong.id) {
+            await checkPlayStatus(currentSong.id);
+            
+            // After refresh, check if we should stop playback
+            await new Promise(resolve => setTimeout(resolve, 300));
+            
+            if (playStatus) {
+              const currentPlayCount = playStatus.playCount || 0;
+              const isOwner = playStatus.isOwner || false;
+              const maxFreePlays = playStatus.maxFreePlays || 3;
+              
+              if (!isOwner && currentPlayCount >= maxFreePlays) {
+                console.log('🚫 Play limit exceeded after refresh, stopping:', {
+                  playCount: currentPlayCount,
+                  maxFreePlays: maxFreePlays
+                });
+                const audio = audioRef.current;
+                if (audio && isPlaying) {
+                  audio.pause();
+                  // Call onPlayPause to update the parent's isPlaying state
+                  onPlayPause();
+                  setShowOwnershipPrompt(true);
+                }
+              }
+            }
+          }
+        }, 1000); // Check after 1 second to catch the increment_play_count update
+        
+        return () => {
+          clearTimeout(timer);
+          clearTimeout(refreshTimer);
+        };
       }
     } else if (!isPlaying) {
       // Reset recording flag when playback stops so we can record again on next play
@@ -497,6 +621,37 @@ const AudioPlayer = ({
       try { audio.pause(); } catch {}
       onPlayPause();
     } else {
+      // Check play limits BEFORE starting playback
+      if (authenticated && currentSong) {
+        // Refresh play status immediately before playing
+        await checkPlayStatus(currentSong.id);
+        
+        // Wait a moment for the status to update
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        // Check play status again - we need to check the current playStatus state
+        // If playCount is at or above maxFreePlays and user is not owner, block playback
+        if (playStatus) {
+          const currentPlayCount = playStatus.playCount || 0;
+          const isOwner = playStatus.isOwner || false;
+          const maxFreePlays = playStatus.maxFreePlays || 3;
+          
+          if (!isOwner && currentPlayCount >= maxFreePlays) {
+            // User has exceeded play limit - allow 20-second preview
+            console.log('🚫 Play limit reached, allowing 20-second preview only:', { 
+              playCount: currentPlayCount, 
+              maxFreePlays: maxFreePlays,
+              isOwner: isOwner 
+            });
+            // Reset preview timer and dismissed state
+            setPreviewTimeRemaining(20);
+            loginPromptDismissedRef.current = { songId: currentSong.id, dismissed: false };
+            // Allow playback to start (will be limited to 20 seconds by preview timer)
+            // Don't block playback - let it start and the preview timer will handle it
+          }
+        }
+      }
+      
       // Use PWA-specific handler if in PWA mode, otherwise regular play
       try {
         if (isPWA) {
@@ -706,6 +861,12 @@ const AudioPlayer = ({
             {!isAd && currentSong?.ticker && (
               <span className="ml-2 text-neon-green">${currentSong.ticker}</span>
             )}
+            {authenticated && currentSong && playStatus && (
+              <span className="ml-2 text-blue-400">
+                <Music className="w-3 h-3 inline mr-1" />
+                {playStatus.playCount} plays
+              </span>
+            )}
           </div>
         </div>
         <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
@@ -901,11 +1062,16 @@ const AudioPlayer = ({
           </div>
           
           {/* Preview indicator for mobile */}
-          {!authenticated && isPlaying && currentSong && (
-            <div className="flex items-center justify-center gap-2 text-xs text-yellow-500 mt-2">
-              <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" />
-              <span>Preview: {previewTimeRemaining}s remaining</span>
-            </div>
+          {isPlaying && currentSong && (
+            (!authenticated || (authenticated && playStatus && !playStatus.isOwner && playStatus.playCount >= playStatus.maxFreePlays)) && (
+              <div className="flex items-center justify-center gap-2 text-xs text-yellow-500 mt-2">
+                <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" />
+                <span>Preview: {previewTimeRemaining}s remaining</span>
+                {authenticated && playStatus && !playStatus.isOwner && playStatus.playCount >= playStatus.maxFreePlays && (
+                  <span className="text-xs text-muted-foreground ml-2">(Free plays used)</span>
+                )}
+              </div>
+            )
           )}
 
           {/* Play limit indicator for mobile */}
@@ -922,6 +1088,14 @@ const AudioPlayer = ({
                   <span>Free plays: {playStatus.remainingPlays}/{playStatus.maxFreePlays}</span>
                 </div>
               )}
+            </div>
+          )}
+          
+          {/* User play count display for mobile */}
+          {authenticated && currentSong && playStatus && (
+            <div className="flex items-center justify-center gap-1 text-[10px] text-muted-foreground mt-1">
+              <Music className="w-3 h-3" />
+              <span className="font-mono">Your plays: {playStatus.playCount}</span>
             </div>
           )}
         </div>
@@ -1088,6 +1262,12 @@ const AudioPlayer = ({
                 {!isAd && currentSong?.ticker && (
                   <span className="ml-2 text-neon-green">${currentSong.ticker}</span>
                 )}
+                {authenticated && currentSong && playStatus && (
+                  <span className="ml-2 text-blue-400">
+                    <Music className="w-2.5 h-2.5 inline mr-1" />
+                    {playStatus.playCount} plays
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -1238,6 +1418,40 @@ const AudioPlayer = ({
             // Ensure volume is set correctly when audio loads
             audio.volume = isMuted ? 0 : volume;
             
+            // Check play limits before auto-playing
+            if (authenticated && currentSong && isPlaying) {
+              // Refresh play status before auto-play
+              await checkPlayStatus(currentSong.id);
+              
+              // Wait a moment for the status to update
+              await new Promise(resolve => setTimeout(resolve, 300));
+              
+              // Check if user can still play
+              if (playStatus) {
+                const currentPlayCount = playStatus.playCount || 0;
+                const isOwner = playStatus.isOwner || false;
+                const maxFreePlays = playStatus.maxFreePlays || 3;
+                
+                if (!isOwner && currentPlayCount >= maxFreePlays) {
+                  // User has exceeded play limit - don't auto-play
+                  console.log('🚫 Play limit reached, blocking auto-play:', { 
+                    playCount: currentPlayCount, 
+                    maxFreePlays: maxFreePlays,
+                    isOwner: isOwner 
+                  });
+                  if (audio) {
+                    audio.pause();
+                  }
+                  // Call onPlayPause to update the parent's isPlaying state
+                  if (isPlaying) {
+                    onPlayPause();
+                  }
+                  setShowOwnershipPrompt(true);
+                  return;
+                }
+              }
+            }
+            
             if (isPlaying && audio.paused) {
               // Use PWA-specific handler if in PWA mode
               try {
@@ -1303,10 +1517,18 @@ const AudioPlayer = ({
                   variant="outline" 
                   onClick={() => {
                     setShowLoginPrompt(false);
+                    // Mark as dismissed so it doesn't show again for this song
+                    if (currentSong) {
+                      loginPromptDismissedRef.current = { songId: currentSong.id, dismissed: true };
+                    }
                     // Stop the audio
                     const audio = audioRef.current;
                     if (audio) {
                       audio.pause();
+                    }
+                    // Update parent state
+                    if (isPlaying) {
+                      onPlayPause();
                     }
                   }}
                   className="w-full"
@@ -1362,10 +1584,18 @@ const AudioPlayer = ({
                   variant="outline" 
                   onClick={() => {
                     setShowOwnershipPrompt(false);
+                    // Mark as dismissed so it doesn't show again for this song
+                    if (currentSong) {
+                      loginPromptDismissedRef.current = { songId: currentSong.id, dismissed: true };
+                    }
                     // Stop the audio
                     const audio = audioRef.current;
                     if (audio) {
                       audio.pause();
+                    }
+                    // Update parent state
+                    if (isPlaying) {
+                      onPlayPause();
                     }
                   }}
                   className="w-full"

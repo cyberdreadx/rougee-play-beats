@@ -230,51 +230,65 @@ export const AudioWaveform = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const rect = canvas.getBoundingClientRect();
-    canvas.width = rect.width * window.devicePixelRatio;
-    canvas.height = rect.height * window.devicePixelRatio;
-    ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+    // Use requestAnimationFrame to prevent flickering during scroll
+    const drawFrame = () => {
+      const rect = canvas.getBoundingClientRect();
+      
+      // Skip if element is not visible (scrolled out of view)
+      if (rect.width === 0 || rect.height === 0) return;
+      
+      canvas.width = rect.width * window.devicePixelRatio;
+      canvas.height = rect.height * window.devicePixelRatio;
+      ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
 
-    const width = rect.width;
-    const height = rect.height;
-    const centerY = height / 2;
+      const width = rect.width;
+      const height = rect.height;
+      const centerY = height / 2;
 
-    // Clear canvas
-    ctx.fillStyle = backgroundColor;
-    ctx.fillRect(0, 0, width, height);
+      // Clear canvas
+      ctx.fillStyle = backgroundColor;
+      ctx.fillRect(0, 0, width, height);
 
-    // Draw waveform
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-
-    const barWidth = width / waveformData.length;
-    const progress = duration > 0 ? currentTime / duration : 0;
-
-    waveformData.forEach((amplitude, index) => {
-      const x = index * barWidth;
-      const barHeight = amplitude * height * 0.8;
-      const y = centerY - barHeight / 2;
-
-      // Different colors for played vs unplayed
-      if (showProgress && index / waveformData.length < progress) {
-        ctx.fillStyle = color;
-      } else {
-        ctx.fillStyle = `${color}60`; // More transparent for unplayed
-      }
-
-      ctx.fillRect(x, y, Math.max(1, barWidth - 1), barHeight);
-    });
-
-    // Draw progress line
-    if (showProgress && progress > 0) {
+      // Draw waveform
       ctx.strokeStyle = color;
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(progress * width, 0);
-      ctx.lineTo(progress * width, height);
-      ctx.stroke();
-    }
+
+      const barWidth = width / waveformData.length;
+      const progress = duration > 0 ? currentTime / duration : 0;
+
+      waveformData.forEach((amplitude, index) => {
+        const x = index * barWidth;
+        const barHeight = amplitude * height * 0.8;
+        const y = centerY - barHeight / 2;
+
+        // Different colors for played vs unplayed
+        if (showProgress && index / waveformData.length < progress) {
+          ctx.fillStyle = color;
+        } else {
+          ctx.fillStyle = `${color}60`; // More transparent for unplayed
+        }
+
+        ctx.fillRect(x, y, Math.max(1, barWidth - 1), barHeight);
+      });
+
+      // Draw progress line
+      if (showProgress && progress > 0) {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(progress * width, 0);
+        ctx.lineTo(progress * width, height);
+        ctx.stroke();
+      }
+    };
+
+    // Use requestAnimationFrame to batch canvas updates and prevent flickering
+    const rafId = requestAnimationFrame(drawFrame);
+    
+    return () => {
+      cancelAnimationFrame(rafId);
+    };
   }, [waveformData, currentTime, duration, showProgress, color, backgroundColor]);
 
   // Handle click to seek

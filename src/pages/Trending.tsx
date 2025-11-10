@@ -787,11 +787,11 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
   // Don't show full page loading - show skeleton instead
 
   return (
-    <div className="min-h-screen bg-background pb-24 md:pb-20 pt-16 md:pt-20">
-      <AppTutorial />
-      
-      {/* Stunning Hero Section */}
-      <div className="relative overflow-hidden">
+    <div className="min-h-screen bg-background pb-24 md:pb-20 pt-0">
+        <AppTutorial />
+        
+        {/* Stunning Hero Section */}
+        <div className="relative overflow-hidden">
         {/* Animated gradient background */}
         <div className="absolute inset-0 bg-gradient-to-br from-neon-green/20 via-purple-500/10 to-pink-500/10 blur-3xl opacity-50 animate-pulse" />
         <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent z-10" />

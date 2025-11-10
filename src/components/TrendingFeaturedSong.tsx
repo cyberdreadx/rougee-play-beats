@@ -11,6 +11,7 @@ import { SongTradingChart } from "@/components/SongTradingChart";
 import SongTradingHistory, { TradeData } from "@/components/SongTradingHistory";
 import { AudioWaveform } from "@/components/AudioWaveform";
 import { useAudioStateForSong } from "@/hooks/useAudioState";
+import TwinklingStars from "@/components/TwinklingStars";
 
 interface Song {
   id: string;
@@ -168,6 +169,9 @@ const TrendingFeaturedSong = memo(({ song, playSong, currentSong, isPlaying, ran
           style={{ backgroundImage: `url(${getIPFSGatewayUrl(song.cover_cid)})` }}
         />
       )}
+      
+      {/* Twinkling Stars Background */}
+      <TwinklingStars className="rounded-2xl" count={25} />
       
       {/* Content overlay */}
       <div className="relative z-10">

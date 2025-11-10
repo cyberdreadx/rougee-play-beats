@@ -31,6 +31,8 @@ import { AudioWaveform } from '@/components/AudioWaveform';
 import { useAudioStateForSong } from '@/hooks/useAudioState';
 import CreatePostModal from '@/components/CreatePostModal';
 import { useMobileNavVisibility } from '@/hooks/useMobileNavVisibility';
+import FeedSwipeView from '@/components/FeedSwipeView';
+import { Grid3x3, List } from 'lucide-react';
 
 const XRGE_TOKEN_ADDRESS = "0x147120faEC9277ec02d957584CFCD92B56A24317" as const;
 
@@ -269,6 +271,15 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
   const [showCreatePostModal, setShowCreatePostModal] = useState(false);
   const loadingCommentsRef = useRef<Set<string>>(new Set()); // Track which comments are currently loading
   const [activeTab, setActiveTab] = useState<'songs' | 'posts'>('songs'); // Track active tab
+  const [swipeViewEnabled, setSwipeViewEnabled] = useState(() => {
+    // Only enable swipe view on mobile by default
+    if (typeof window !== 'undefined') {
+      const isMobile = window.innerWidth < 768;
+      const saved = localStorage.getItem('feed_swipe_view');
+      return saved ? saved === 'true' : isMobile;
+    }
+    return false;
+  });
   
   // Dismissible tip for feed page
   const [showFeedTip, setShowFeedTip] = useState(() => {
@@ -1438,22 +1449,64 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
             </Card>
           )}
 
+          {/* Swipe View Toggle - Mobile Only */}
+          <div className="md:hidden flex items-center justify-end mb-4 px-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const newValue = !swipeViewEnabled;
+                setSwipeViewEnabled(newValue);
+                localStorage.setItem('feed_swipe_view', newValue.toString());
+              }}
+              className="gap-2 bg-black/60 backdrop-blur-xl border border-neon-green/20"
+            >
+              {swipeViewEnabled ? (
+                <>
+                  <List className="h-4 w-4" />
+                  <span className="text-xs font-mono">List View</span>
+                </>
+              ) : (
+                <>
+                  <Grid3x3 className="h-4 w-4" />
+                  <span className="text-xs font-mono">Swipe View</span>
+                </>
+              )}
+            </Button>
+          </div>
+
+          {/* Swipe View - Mobile Only */}
+          {swipeViewEnabled && typeof window !== 'undefined' && window.innerWidth < 768 && (
+            <FeedSwipeView
+              items={activeTab === 'songs' ? songs : posts}
+              currentSong={currentSong}
+              isPlaying={isPlaying}
+              playSong={playSong || (() => {})}
+              onClose={() => {
+                setSwipeViewEnabled(false);
+                localStorage.setItem('feed_swipe_view', 'false');
+              }}
+              type={activeTab}
+            />
+          )}
+
           {/* Feed with Tabs */}
-          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'songs' | 'posts')} className="w-full md:max-w-2xl md:mx-auto">
-            <TabsList className="grid w-full grid-cols-2 mb-4 md:mb-6 mx-auto max-w-xs md:max-w-full md:mx-0 bg-black/60 backdrop-blur-xl border border-neon-green/20 shadow-[0_0_20px_rgba(0,255,159,0.15)] p-1 rounded-lg">
-              <TabsTrigger 
-                value="songs"
-                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-neon-green/20 data-[state=active]:to-emerald-500/20 data-[state=active]:text-neon-green data-[state=active]:shadow-[0_0_15px_rgba(0,255,159,0.5)] data-[state=active]:border data-[state=active]:border-neon-green/50 data-[state=inactive]:text-white/50 data-[state=inactive]:hover:text-white/80 transition-all duration-300 font-mono font-bold uppercase"
-              >
-                Songs
-              </TabsTrigger>
-              <TabsTrigger 
-                value="posts" 
-                className="flex items-center justify-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-neon-green/20 data-[state=active]:to-emerald-500/20 data-[state=active]:shadow-[0_0_15px_rgba(0,255,159,0.5)] data-[state=active]:border data-[state=active]:border-neon-green/50 data-[state=inactive]:opacity-50 data-[state=inactive]:hover:opacity-80 transition-all duration-300"
-              >
-                <img src={gltchTabLogo} alt="GLTCH" className="h-6 w-auto" />
-              </TabsTrigger>
-            </TabsList>
+          {!swipeViewEnabled && (
+            <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'songs' | 'posts')} className="w-full md:max-w-2xl md:mx-auto">
+              <TabsList className="grid w-full grid-cols-2 mb-4 md:mb-6 mx-auto max-w-xs md:max-w-full md:mx-0 bg-black/60 backdrop-blur-xl border border-neon-green/20 shadow-[0_0_20px_rgba(0,255,159,0.15)] p-1 rounded-lg">
+                <TabsTrigger 
+                  value="songs"
+                  className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-neon-green/20 data-[state=active]:to-emerald-500/20 data-[state=active]:text-neon-green data-[state=active]:shadow-[0_0_15px_rgba(0,255,159,0.5)] data-[state=active]:border data-[state=active]:border-neon-green/50 data-[state=inactive]:text-white/50 data-[state=inactive]:hover:text-white/80 transition-all duration-300 font-mono font-bold uppercase"
+                >
+                  Songs
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="posts" 
+                  className="flex items-center justify-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-neon-green/20 data-[state=active]:to-emerald-500/20 data-[state=active]:shadow-[0_0_15px_rgba(0,255,159,0.5)] data-[state=active]:border data-[state=active]:border-neon-green/50 data-[state=inactive]:opacity-50 data-[state=inactive]:hover:opacity-80 transition-all duration-300"
+                >
+                  <img src={gltchTabLogo} alt="GLTCH" className="h-6 w-auto" />
+                </TabsTrigger>
+              </TabsList>
 
             {/* Posts Tab */}
             <TabsContent value="posts" className="space-y-0 md:space-y-4">
@@ -1975,6 +2028,7 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
               )}
             </TabsContent>
           </Tabs>
+          )}
         </div>
       </div>
     </>;

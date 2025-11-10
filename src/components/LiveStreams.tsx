@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -29,48 +29,7 @@ export default function LiveStreams({ className = '', limit = 6 }: LiveStreamsPr
   const [artists, setArtists] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    // Clean up old streams that are still marked as live
-    const cleanupOldStreams = async () => {
-      try {
-        const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-        
-        // Mark streams older than 24 hours as not live
-        await supabase
-          .from('live_streams')
-          .update({ 
-            is_live: false,
-            ended_at: new Date().toISOString()
-          })
-          .eq('is_live', true)
-          .lt('started_at', twentyFourHoursAgo);
-      } catch (error) {
-        console.error('❌ Failed to cleanup old streams:', error);
-        // Don't block if cleanup fails
-      }
-    };
-
-    cleanupOldStreams();
-    fetchLiveStreams();
-
-    // Subscribe to live stream changes
-    const channel = supabase
-      .channel('live-streams-updates')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'live_streams'
-      }, () => {
-        fetchLiveStreams();
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [limit]);
-
-  const fetchLiveStreams = async () => {
+  const fetchLiveStreams = useCallback(async () => {
     try {
       // Get all streams marked as live
       const { data: streamsData, error } = await supabase
@@ -144,7 +103,84 @@ export default function LiveStreams({ className = '', limit = 6 }: LiveStreamsPr
     } finally {
       setLoading(false);
     }
-  };
+  }, [limit]);
+
+  useEffect(() => {
+    // Clean up old streams that are still marked as live
+    const cleanupOldStreams = async () => {
+      try {
+        const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        
+        // Mark streams older than 24 hours as not live
+        await supabase
+          .from('live_streams')
+          .update({ 
+            is_live: false,
+            ended_at: new Date().toISOString()
+          })
+          .eq('is_live', true)
+          .lt('started_at', twentyFourHoursAgo);
+      } catch (error) {
+        console.error('❌ Failed to cleanup old streams:', error);
+        // Don't block if cleanup fails
+      }
+    };
+
+    cleanupOldStreams();
+    fetchLiveStreams();
+
+    // Subscribe to live stream changes for real-time updates
+    const channel = supabase
+      .channel('live-streams-updates')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'live_streams'
+      }, (payload) => {
+        console.log('📡 Live stream update:', payload);
+        // Update viewer count in real-time
+        if (payload.eventType === 'UPDATE' && payload.new) {
+          setStreams(prev => prev.map(stream => 
+            stream.id === payload.new.id 
+              ? { 
+                  ...stream, 
+                  viewer_count: payload.new.viewer_count !== undefined ? payload.new.viewer_count : stream.viewer_count, 
+                  is_live: payload.new.is_live !== undefined ? payload.new.is_live : stream.is_live,
+                  updated_at: payload.new.updated_at || stream.updated_at
+                }
+              : stream
+          ));
+        } else if (payload.eventType === 'INSERT' && payload.new) {
+          // New stream added - refetch to get full data
+          fetchLiveStreams();
+        } else if (payload.eventType === 'DELETE' || (payload.eventType === 'UPDATE' && payload.new?.is_live === false)) {
+          // Stream ended - remove from list
+          setStreams(prev => prev.filter(stream => stream.id !== (payload.old?.id || payload.new?.id)));
+        } else {
+          // Other changes - refetch
+          fetchLiveStreams();
+        }
+      })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'live_stream_viewers'
+      }, (payload) => {
+        console.log('👁️ Viewer update:', payload);
+        // Viewer count changes trigger updates to live_streams via database trigger
+        // The trigger will update viewer_count, which will trigger the live_streams subscription above
+        // But we can also directly update if we know the stream_id
+        if (payload.new?.stream_id) {
+          // The database trigger will update the live_streams table, which will trigger the subscription above
+          // So we just need to wait for that update
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchLiveStreams]);
 
   if (loading) {
     return (
@@ -217,9 +253,18 @@ function LiveStreamPreview({ stream, artist, onClick }: { stream: LiveStream; ar
         try {
           setIsConnecting(true);
           await join(stream.channel_name, `preview-${stream.id}-${Date.now()}`);
-        } catch (error) {
-          console.warn('⚠️ Failed to join preview channel:', error);
-          // Silently fail - just show thumbnail instead
+        } catch (error: any) {
+          // Silently fail for preview connections - don't show errors to users
+          // Common errors: invalid App ID, connection issues, etc.
+          // Just show thumbnail instead of video preview
+          if (error?.message?.includes('invalid vendor key') || 
+              error?.message?.includes('CAN_NOT_GET_GATEWAY_SERVER') ||
+              error?.message?.includes('can not find appid')) {
+            // App ID not configured - this is expected if not set up yet
+            console.debug('🔇 Preview connection skipped (App ID not configured)');
+          } else {
+            console.debug('🔇 Preview connection failed:', error?.message || error);
+          }
         } finally {
           setIsConnecting(false);
         }
@@ -229,7 +274,8 @@ function LiveStreamPreview({ stream, artist, onClick }: { stream: LiveStream; ar
       try {
         leave();
       } catch (error) {
-        console.warn('⚠️ Failed to leave preview channel:', error);
+        // Silently fail on leave - not critical
+        console.debug('🔇 Failed to leave preview channel:', error);
       }
     }
     
@@ -255,7 +301,8 @@ function LiveStreamPreview({ stream, artist, onClick }: { stream: LiveStream; ar
         try {
           remoteUser.videoTrack.play(videoRef.current);
         } catch (error) {
-          console.warn('⚠️ Failed to play preview video:', error);
+          // Silently fail - just show thumbnail instead
+          console.debug('🔇 Failed to play preview video:', error);
         }
       }
     }

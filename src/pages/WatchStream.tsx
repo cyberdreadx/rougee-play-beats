@@ -17,6 +17,7 @@ import {
   VolumeX
 } from 'lucide-react';
 import { getIPFSGatewayUrl } from '@/lib/ipfs';
+import { TipButton } from '@/components/TipButton';
 
 export default function WatchStream() {
   const { streamId } = useParams<{ streamId: string }>();
@@ -82,13 +83,25 @@ export default function WatchStream() {
       setViewerCount(streamData.viewer_count || 0);
 
       // Fetch artist profile
-      const { data: profileData } = await supabase
+      const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('*')
         .eq('wallet_address', streamData.artist_id)
         .single();
 
-      setArtist(profileData);
+      if (profileError) {
+        console.warn('⚠️ Failed to fetch artist profile:', profileError);
+        // Try public_profiles as fallback
+        const { data: publicProfileData } = await supabase
+          .from('public_profiles')
+          .select('*')
+          .eq('wallet_address', streamData.artist_id)
+          .single();
+        
+        setArtist(publicProfileData || null);
+      } else {
+        setArtist(profileData);
+      }
     };
 
     fetchStream();
@@ -207,7 +220,13 @@ export default function WatchStream() {
         table: 'live_stream_chat',
         filter: `stream_id=eq.${streamId}`
       }, (payload) => {
-        setChatMessages(prev => [...prev, payload.new]);
+        console.log('💬 New chat message received:', payload);
+        // Only add if message doesn't already exist (avoid duplicates)
+        setChatMessages(prev => {
+          const exists = prev.some(msg => msg.id === payload.new.id);
+          if (exists) return prev;
+          return [...prev, payload.new];
+        });
       })
       .subscribe();
 
@@ -225,16 +244,50 @@ export default function WatchStream() {
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !streamId) return;
 
+    const messageText = newMessage.trim();
+    const senderId = fullAddress || 'Anonymous';
+    
+    // Optimistic update - show message immediately
+    const tempMessage = {
+      id: `temp-${Date.now()}`,
+      stream_id: streamId,
+      sender_id: senderId,
+      message: messageText,
+      created_at: new Date().toISOString()
+    };
+    
+    setChatMessages(prev => [...prev, tempMessage]);
+    setNewMessage('');
+
     try {
-      await supabase.from('live_stream_chat').insert({
-        stream_id: streamId,
-        sender_id: fullAddress || 'Anonymous',
-        message: newMessage
-      });
-      
-      setNewMessage('');
+      const { data, error } = await supabase
+        .from('live_stream_chat')
+        .insert({
+          stream_id: streamId,
+          sender_id: senderId,
+          message: messageText
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Replace temp message with real one
+      if (data) {
+        setChatMessages(prev => 
+          prev.map(msg => msg.id === tempMessage.id ? data : msg)
+        );
+      }
     } catch (error) {
       console.error('❌ Failed to send message:', error);
+      // Remove temp message on error
+      setChatMessages(prev => prev.filter(msg => msg.id !== tempMessage.id));
+      setNewMessage(messageText); // Restore message text
+      toast({
+        title: 'Failed to send message',
+        description: 'Please try again',
+        variant: 'destructive'
+      });
     }
   };
 
@@ -336,7 +389,7 @@ export default function WatchStream() {
                   <div>
                     <h2 className="text-xl font-mono font-bold">{stream.title}</h2>
                     <p className="text-sm text-muted-foreground font-mono">
-                      {artist?.artist_name || 'Unknown Artist'}
+                      {artist?.artist_name || artist?.display_name || (stream?.artist_id ? `${stream.artist_id.slice(0, 6)}...${stream.artist_id.slice(-4)}` : 'Unknown Artist')}
                     </p>
                   </div>
                 </div>
@@ -357,6 +410,16 @@ export default function WatchStream() {
                   >
                     <Share2 className="h-5 w-5" />
                   </Button>
+                  {stream?.artist_id && artist && (
+                    <TipButton
+                      artistId={stream.artist_id}
+                      artistWalletAddress={stream.artist_id}
+                      artistName={artist?.artist_name || artist?.display_name || 'this artist'}
+                      variant="default"
+                      size="default"
+                      className="shadow-[0_4px_16px_rgba(0,255,159,0.3)] hover:shadow-[0_6px_24px_rgba(0,255,159,0.4)]"
+                    />
+                  )}
                 </div>
               </div>
 

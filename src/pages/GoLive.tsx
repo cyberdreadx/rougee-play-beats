@@ -22,6 +22,7 @@ import {
   Users,
   Settings
 } from 'lucide-react';
+import { TipButton } from '@/components/TipButton';
 
 export default function GoLive() {
   const navigate = useNavigate();
@@ -41,6 +42,7 @@ export default function GoLive() {
   const [retryKey, setRetryKey] = useState(0);
   
   const localVideoRef = useRef<HTMLDivElement>(null);
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
   const {
     localVideoTrack,
@@ -229,14 +231,29 @@ export default function GoLive() {
   useEffect(() => {
     if (!streamId) return;
 
+    // Fetch initial viewer count
+    const fetchViewerCount = async () => {
+      const { data } = await supabase
+        .from('live_streams')
+        .select('viewer_count')
+        .eq('id', streamId)
+        .single();
+      
+      if (data?.viewer_count !== undefined) {
+        setViewerCount(data.viewer_count);
+      }
+    };
+    fetchViewerCount();
+
     const channel = supabase
-      .channel(`stream-${streamId}`)
+      .channel(`stream-${streamId}-viewers`)
       .on('postgres_changes', {
         event: 'UPDATE',
         schema: 'public',
         table: 'live_streams',
         filter: `id=eq.${streamId}`
       }, (payload) => {
+        console.log('👁️ Viewer count update:', payload);
         if (payload.new.viewer_count !== undefined) {
           setViewerCount(payload.new.viewer_count);
         }
@@ -272,15 +289,34 @@ export default function GoLive() {
   useEffect(() => {
     if (!streamId) return;
 
+    // Fetch existing messages
+    const fetchMessages = async () => {
+      const { data } = await supabase
+        .from('live_stream_chat')
+        .select('*')
+        .eq('stream_id', streamId)
+        .order('created_at', { ascending: true });
+
+      if (data) setChatMessages(data);
+    };
+    fetchMessages();
+
+    // Subscribe to new messages
     const channel = supabase
-      .channel(`chat-${streamId}`)
+      .channel(`chat-${streamId}-go-live`)
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
         table: 'live_stream_chat',
         filter: `stream_id=eq.${streamId}`
       }, (payload) => {
-        setChatMessages(prev => [...prev, payload.new]);
+        console.log('💬 New chat message received:', payload);
+        // Only add if message doesn't already exist (avoid duplicates)
+        setChatMessages(prev => {
+          const exists = prev.some(msg => msg.id === payload.new.id);
+          if (exists) return prev;
+          return [...prev, payload.new];
+        });
       })
       .subscribe();
 
@@ -288,6 +324,11 @@ export default function GoLive() {
       supabase.removeChannel(channel);
     };
   }, [streamId]);
+
+  // Auto scroll chat to bottom when new messages arrive
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatMessages]);
 
   // Start live stream
   const handleGoLive = async () => {
@@ -402,18 +443,51 @@ export default function GoLive() {
 
   // Send chat message
   const handleSendMessage = async () => {
-    if (!newMessage.trim() || !streamId) return;
+    if (!newMessage.trim() || !streamId || !fullAddress) return;
+
+    const messageText = newMessage.trim();
+    
+    // Optimistic update - show message immediately
+    const tempMessage = {
+      id: `temp-${Date.now()}`,
+      stream_id: streamId,
+      sender_id: fullAddress,
+      message: messageText,
+      created_at: new Date().toISOString()
+    };
+    
+    setChatMessages(prev => [...prev, tempMessage]);
+    setNewMessage('');
 
     try {
-      await supabase.from('live_stream_chat').insert({
-        stream_id: streamId,
-        sender_id: fullAddress,
-        message: newMessage
-      });
-      
-      setNewMessage('');
+      const { data, error } = await supabase
+        .from('live_stream_chat')
+        .insert({
+          stream_id: streamId,
+          sender_id: fullAddress,
+          message: messageText
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Replace temp message with real one
+      if (data) {
+        setChatMessages(prev => 
+          prev.map(msg => msg.id === tempMessage.id ? data : msg)
+        );
+      }
     } catch (error) {
       console.error('❌ Failed to send message:', error);
+      // Remove temp message on error
+      setChatMessages(prev => prev.filter(msg => msg.id !== tempMessage.id));
+      setNewMessage(messageText); // Restore message text
+      toast({
+        title: 'Failed to send message',
+        description: 'Please try again',
+        variant: 'destructive'
+      });
     }
   };
 
@@ -618,6 +692,20 @@ export default function GoLive() {
                 <div className="text-xs text-muted-foreground font-mono uppercase">Tips</div>
               </Card>
             </div>
+
+            {/* Tip Button */}
+            {fullAddress && profile && (
+              <div className="flex justify-center">
+                <TipButton
+                  artistId={fullAddress}
+                  artistWalletAddress={fullAddress}
+                  artistName={profile.artist_name || profile.display_name || 'this artist'}
+                  variant="default"
+                  size="default"
+                  className="shadow-[0_4px_16px_rgba(0,255,159,0.3)] hover:shadow-[0_6px_24px_rgba(0,255,159,0.4)]"
+                />
+              </div>
+            )}
           </div>
 
           {/* Chat Sidebar */}
@@ -646,6 +734,7 @@ export default function GoLive() {
                     </div>
                   ))
                 )}
+                <div ref={chatEndRef} />
               </div>
 
               {/* Input */}

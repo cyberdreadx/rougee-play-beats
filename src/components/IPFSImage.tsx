@@ -40,7 +40,8 @@ export const IPFSImage = ({
     }
 
     // Get all gateway URLs for this CID
-    gatewayUrls.current = getIPFSGatewayUrls(cid, maxRetries, false);
+    // Use proxy for images to avoid CORS issues
+    gatewayUrls.current = getIPFSGatewayUrls(cid, maxRetries, true); // Use proxy = true
     attemptedUrls.current.clear();
     currentAttempt.current = 0;
     setHasError(false);

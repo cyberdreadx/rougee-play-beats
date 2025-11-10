@@ -12,9 +12,9 @@ interface Song24hData {
   loading: boolean;
 }
 
-// In-memory cache with shorter expiration for more real-time updates
+// In-memory cache with longer expiration to reduce RPC calls
 const dataCache = new Map<string, { data: Song24hData; timestamp: number }>();
-const CACHE_DURATION = 5 * 1000; // 5 seconds (reduced for faster updates after purchases)
+const CACHE_DURATION = 30 * 1000; // 30 seconds (increased to reduce RPC calls)
 
 // Function to invalidate cache for a specific token (can be called after purchases)
 export const invalidate24hDataCache = (tokenAddress: Address) => {
@@ -91,35 +91,48 @@ export const useSong24hData = (tokenAddress: Address | null, _bondingSupplyStr?:
             } as any);
             
             // Get historical price from 24h ago
-            const historicalPrice = await publicClient.readContract({
-              address: BONDING_CURVE_ADDRESS as Address,
-              abi: [{
-                type: 'function',
-                name: 'getCurrentPrice',
-                inputs: [{ name: 'songToken', type: 'address' }],
-                outputs: [{ name: '', type: 'uint256' }],
-                stateMutability: 'view'
-              }],
-              functionName: 'getCurrentPrice',
-              args: [tokenAddress],
-              blockNumber: block24hAgo
-            } as any);
-            
-            if (currentPrice && historicalPrice) {
-              const changePercent = ((Number(currentPrice) - Number(historicalPrice)) / Number(historicalPrice)) * 100;
+            // Note: This might not work if the contract doesn't support historical queries
+            try {
+              const historicalPrice = await publicClient.readContract({
+                address: BONDING_CURVE_ADDRESS as Address,
+                abi: [{
+                  type: 'function',
+                  name: 'getCurrentPrice',
+                  inputs: [{ name: 'songToken', type: 'address' }],
+                  outputs: [{ name: '', type: 'uint256' }],
+                  stateMutability: 'view'
+                }],
+                functionName: 'getCurrentPrice',
+                args: [tokenAddress],
+                blockNumber: block24hAgo
+              } as any);
               
-          const resultData = {
-            priceChange24h: changePercent,
-            volume24h: 0, // Historical price method doesn't give us volume
-            loading: false
-          };
-          
-          // Only cache if bypassCache is false (trending needs real-time data)
-          if (!bypassCache) {
-            dataCache.set(cacheKey, { data: resultData, timestamp: now });
-          }
-          setData(resultData);
-          return;
+              if (currentPrice && historicalPrice) {
+                const currentPriceNum = Number(currentPrice) / 1e18;
+                const historicalPriceNum = Number(historicalPrice) / 1e18;
+                
+                if (historicalPriceNum > 0) {
+                  const changePercent = ((currentPriceNum - historicalPriceNum) / historicalPriceNum) * 100;
+                  
+                  console.log(`📊 useSong24hData (historical): ${tokenAddress.slice(0, 8)}... price change: ${historicalPriceNum.toFixed(6)} → ${currentPriceNum.toFixed(6)} = ${changePercent.toFixed(2)}%`);
+                  
+                  const resultData = {
+                    priceChange24h: changePercent,
+                    volume24h: 0, // Historical price method doesn't give us volume
+                    loading: false
+                  };
+                  
+                  // Only cache if bypassCache is false (trending needs real-time data)
+                  if (!bypassCache) {
+                    dataCache.set(cacheKey, { data: resultData, timestamp: now });
+                  }
+                  setData(resultData);
+                  return;
+                }
+              }
+            } catch (histError) {
+              // Historical queries not supported, fall through to trade-based calculation
+              console.log(`⚠️ useSong24hData: Historical price query failed for ${tokenAddress.slice(0, 8)}..., using trade-based method`);
             }
           } catch (histError) {
             // Historical queries not supported, fall through to trade-based calculation
@@ -220,10 +233,19 @@ export const useSong24hData = (tokenAddress: Address | null, _bondingSupplyStr?:
             trades.sort((a, b) => a.timestamp - b.timestamp);
             const firstPrice = trades[0].priceXRGE;
             const lastPrice = trades[trades.length - 1].priceXRGE;
-            changePercent = ((lastPrice - firstPrice) / firstPrice) * 100;
+            
+            if (firstPrice > 0) {
+              changePercent = ((lastPrice - firstPrice) / firstPrice) * 100;
+              console.log(`📊 useSong24hData: ${tokenAddress.slice(0, 8)}... price change: ${firstPrice.toFixed(6)} → ${lastPrice.toFixed(6)} = ${changePercent.toFixed(2)}%`);
+            } else {
+              changePercent = 0;
+            }
           } else if (trades.length === 1) {
             // Only 1 trade in 24h, show 0% change
             changePercent = 0;
+          } else {
+            // No trades - try historical price method as fallback
+            console.log(`⚠️ useSong24hData: No trades found for ${tokenAddress.slice(0, 8)}..., trying historical price method`);
           }
           
           // Calculate total volume (sum of all XRGE traded)

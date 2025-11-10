@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/table";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTokenPrices } from "@/hooks/useTokenPrices";
-import { useSongPrice, useSongMetadata, useBondingCurveSupply } from "@/hooks/useSongBondingCurve";
+import { useSongPrice, useSongMetadata, useBondingCurveSupply, BONDING_CURVE_ADDRESS, XRGE_TOKEN_ADDRESS } from "@/hooks/useSongBondingCurve";
 import { useSong24hData } from "@/hooks/useSong24hData";
 import { usePublicClient } from "wagmi";
 import { Address } from "viem";
@@ -482,7 +482,7 @@ const SongRow = memo(({ song, index, onStatsUpdate, playSong, currentSong, isPla
   const isThisSongPlaying = isCurrentSong && isPlaying;
   
   // Get current price from bonding curve (no auto-refresh to reduce RPC calls)
-  const { price: priceData } = useSongPrice(song.token_address as Address, false);
+  const { price: priceData, isLoading: priceLoading } = useSongPrice(song.token_address as Address, false);
   const priceInXRGE = priceData ? parseFloat(priceData) : undefined;
   
   // Get metadata and supply using proper hooks (no auto-refresh to reduce RPC calls)
@@ -495,7 +495,7 @@ const SongRow = memo(({ song, index, onStatsUpdate, playSong, currentSong, isPla
   
   // Use shared 24h data hook for consistent data between mobile and desktop
   // Enable caching (5s cache) to improve performance and reduce RPC calls
-  const { priceChange24h, volume24h } = useSong24hData(song.token_address as Address, bondingSupplyStr, false);
+  const { priceChange24h, volume24h, loading: change24hLoading } = useSong24hData(song.token_address as Address, bondingSupplyStr, false);
   
   // EXACTLY match SongTrade page calculations
   const currentPrice = priceInXRGE && prices.xrge ? priceInXRGE * prices.xrge : undefined;
@@ -623,8 +623,13 @@ const SongRow = memo(({ song, index, onStatsUpdate, playSong, currentSong, isPla
             />
           </div>
         ) : (
-          <div className="w-24 h-7 flex items-center justify-center">
-            <div className="text-[8px] text-muted-foreground animate-pulse">...</div>
+          <div className="w-24 h-7 flex items-center justify-center bg-muted/10 rounded">
+            <div className="w-full h-3/4 bg-gradient-to-r from-muted/20 via-muted/40 to-muted/20 rounded" 
+                 style={{ 
+                   background: 'linear-gradient(90deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.05) 100%)',
+                   backgroundSize: '200% 100%',
+                   animation: 'shimmer 1.5s ease-in-out infinite'
+                 }} />
           </div>
         )}
       </TableCell>
@@ -656,37 +661,56 @@ const SongRow = memo(({ song, index, onStatsUpdate, playSong, currentSong, isPla
       
       <TableCell className={`font-mono text-right font-semibold text-xs py-2 ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
         {song.token_address ? (
-          <div className="flex items-center justify-end gap-0.5">
-            {isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-            <span className="whitespace-nowrap">{isPositive ? '+' : ''}{Math.abs(change24h) < 0.01 ? change24h.toFixed(2) : change24h.toFixed(1)}%</span>
-          </div>
+          change24hLoading || priceChange24h === null ? (
+            <div className="h-4 bg-muted/20 rounded w-12 ml-auto animate-pulse" />
+          ) : (
+            <div className="flex items-center justify-end gap-0.5">
+              {isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+              <span className="whitespace-nowrap">{isPositive ? '+' : ''}{Math.abs(change24h) < 0.01 ? change24h.toFixed(2) : change24h.toFixed(1)}%</span>
+            </div>
+          )
         ) : (
           <span className="text-muted-foreground">—</span>
         )}
       </TableCell>
       
       <TableCell className="font-mono text-right py-2">
-        {song.token_address && volumeUSD > 0 ? (
-          <div>
-            <div className="font-semibold text-xs">
-              ${volumeUSD < 1 ? volumeUSD.toFixed(4) : volumeUSD.toLocaleString(undefined, {maximumFractionDigits: 2})}
+        {song.token_address ? (
+          change24hLoading || (volumeUSD === 0 && volumeXRGE === 0) ? (
+            <div className="space-y-1">
+              <div className="h-3 bg-muted/20 rounded w-16 ml-auto animate-pulse" />
+              <div className="h-2 bg-muted/10 rounded w-20 ml-auto animate-pulse" />
             </div>
-            <div className="text-[10px] text-muted-foreground font-mono">
-              {volumeXRGE < 1000 ? volumeXRGE.toFixed(2) : volumeXRGE.toLocaleString(undefined, {maximumFractionDigits: 2})} XRGE
+          ) : volumeUSD > 0 ? (
+            <div>
+              <div className="font-semibold text-xs">
+                ${volumeUSD < 1 ? volumeUSD.toFixed(4) : volumeUSD.toLocaleString(undefined, {maximumFractionDigits: 2})}
+              </div>
+              <div className="text-[10px] text-muted-foreground font-mono">
+                {volumeXRGE < 1000 ? volumeXRGE.toFixed(2) : volumeXRGE.toLocaleString(undefined, {maximumFractionDigits: 2})} XRGE
+              </div>
             </div>
-          </div>
+          ) : (
+            <span className="text-muted-foreground text-[10px]">$0</span>
+          )
         ) : (
-          <span className="text-muted-foreground text-[10px]">$0</span>
+          <span className="text-muted-foreground text-[10px]">Not deployed</span>
         )}
       </TableCell>
       
       <TableCell className="font-mono text-right py-2">
-        {song.token_address && marketCap > 0 ? (
-          <div className="font-semibold text-xs">
-            ${marketCap < 1 ? marketCap.toFixed(6) : marketCap.toLocaleString(undefined, {maximumFractionDigits: 2})}
-          </div>
+        {song.token_address ? (
+          (priceLoading || metadataLoading || supplyLoading) && marketCap === 0 ? (
+            <div className="h-4 bg-muted/20 rounded w-16 ml-auto animate-pulse" />
+          ) : marketCap > 0 ? (
+            <div className="font-semibold text-xs">
+              ${marketCap < 1 ? marketCap.toFixed(6) : marketCap.toLocaleString(undefined, {maximumFractionDigits: 2})}
+            </div>
+          ) : (
+            <span className="text-muted-foreground text-[10px]">$0</span>
+          )
         ) : (
-          <span className="text-muted-foreground text-[10px]">$0</span>
+          <span className="text-muted-foreground text-[10px]">Not deployed</span>
         )}
       </TableCell>
       
@@ -985,8 +1009,25 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
   const { prices } = useTokenPrices();
   const publicClient = usePublicClient();
   
-  // Calculate aggregated stats from individual song stats (for Top Gainer only)
-  const topGainerPercent = Array.from(songStats.values()).reduce((max, stat) => Math.max(max, stat.change), 0);
+  // Calculate top gainer from visible songs' stats
+  // This updates as songs load and report their stats
+  const topGainerPercent = useMemo(() => {
+    if (songStats.size === 0) return 0;
+    
+    const maxChange = Array.from(songStats.values()).reduce((max, stat) => {
+      // Only count positive changes (gains)
+      const change = stat.change || 0;
+      return change > max ? change : max;
+    }, 0);
+    
+    console.log('📈 Top gainer calculation:', {
+      totalSongs: songStats.size,
+      maxChange,
+      allChanges: Array.from(songStats.values()).map(s => s.change)
+    });
+    
+    return maxChange;
+  }, [songStats]);
   
   const handleStatsUpdate = (songId: string, volume: number, change: number, marketCap: number, price: number) => {
     setSongStats(prev => {
@@ -999,20 +1040,30 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
   // Calculate trending score for a song (memoized to prevent recalculation)
   const calculateTrendingScore = useCallback((song: Song): number => {
     const stats = songStats.get(song.id);
-    if (!stats) return song.play_count; // Fallback to play count if no stats yet
+    
+    // Boost new songs (created in last 24h) to ensure they appear in trending
+    const songAge = song.created_at ? Date.now() - new Date(song.created_at).getTime() : Infinity;
+    const isNewSong = songAge < 24 * 60 * 60 * 1000; // 24 hours
+    const newSongBoost = isNewSong ? 1000 : 0; // Boost new songs by 1000 points
+    
+    if (!stats) {
+      // If no stats yet, use play count + new song boost
+      return song.play_count + newSongBoost;
+    }
     
     // Weighted scoring algorithm (all values normalized to USD for fair comparison):
     // - Volume (40%): Recent trading activity
     // - Price Change (25%): Momentum (scaled by market cap)
     // - Market Cap (20%): Overall value
     // - Plays (15%): Popularity (scaled to USD equivalent: $0.01 per play)
+    // - New Song Boost: Extra points for songs created in last 24h
     
     const volumeScore = stats.volume * 0.4;
     const changeScore = Math.max(0, stats.change / 100) * stats.marketCap * 0.25; // % change scaled by market cap
     const marketCapScore = stats.marketCap * 0.2;
     const playsScore = (song.play_count * 0.01) * 0.15; // $0.01 per play
     
-    return volumeScore + changeScore + marketCapScore + playsScore;
+    return volumeScore + changeScore + marketCapScore + playsScore + newSongBoost;
   }, [songStats]);
   
   // Handle column header click for sorting
@@ -1072,8 +1123,8 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
               .from("songs")
               .select("id, title, artist, wallet_address, audio_cid, cover_cid, play_count, ticker, genre, created_at, token_address, ai_usage")
               .not("token_address", "is", null) // Only show deployed songs
-              .order("play_count", { ascending: false })
-              .limit(100) // Fetch more than displayLimit to allow user to view all
+              .order("created_at", { ascending: false }) // Order by newest first to include new songs
+              .limit(200) // Fetch more songs to ensure we get all trending ones
           ]);
 
           if (artistsResponse.error) throw artistsResponse.error;
@@ -1090,6 +1141,14 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
     };
 
     fetchTrendingData();
+    
+    // Refresh data every 30 seconds to catch new songs
+    const refreshInterval = setInterval(() => {
+      console.log('🔄 Refreshing trending data to catch new songs...');
+      fetchTrendingData();
+    }, 30 * 1000); // 30 seconds
+    
+    return () => clearInterval(refreshInterval);
   }, [searchQuery]);
 
   // Calculate true total volume across ALL songs (not just visible ones)
@@ -1185,23 +1244,144 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
           allTrades = tradesData || [];
         }
         
-        console.log(`💰 Found ${allTrades.length} trades in last 24h`);
+        console.log(`💰 Found ${allTrades.length} trades in last 24h from database`);
         
-        if (allTrades.length === 0) {
-          console.warn('⚠️ No trades found in last 24h - total volume will be 0');
+        let totalVolumeXRGE = 0;
+        
+        if (allTrades.length > 0) {
+          // Sum up 24h volume per song from database
+          const volumeBySong: Record<string, number> = {};
+          allTrades.forEach(trade => {
+            if (trade.song_id && trade.xrge_amount) {
+              const amount = typeof trade.xrge_amount === 'string' ? parseFloat(trade.xrge_amount) : trade.xrge_amount;
+              volumeBySong[trade.song_id] = (volumeBySong[trade.song_id] || 0) + amount;
+            }
+          });
+          
+          totalVolumeXRGE = Object.values(volumeBySong).reduce((sum, vol) => sum + vol, 0);
+        } else {
+          // Fallback: Query XRGE Transfer events to/from bonding curve contract
+          console.warn('⚠️ No trades in database - querying XRGE Transfer events directly...');
+          
+          if (publicClient && allSongs.length > 0) {
+            try {
+              const XRGE_TOKEN_ADDRESS = '0x147120faec9277ec02d957584cfcd92b56a24317' as Address;
+              const FEE_ADDRESS = '0xb787433e138893a0ed84d99e82c7da260a940b1e'.toLowerCase();
+              
+              // Query XRGE Transfer events for last 24h
+              const twentyFourHoursAgo = Date.now() - (24 * 60 * 60 * 1000);
+              const blockTime = 2000; // Base block time ~2 seconds
+              const blocksAgo = Math.floor((Date.now() - twentyFourHoursAgo) / blockTime);
+              
+              const currentBlock = await publicClient.getBlockNumber();
+              const fromBlock = currentBlock - BigInt(Math.min(blocksAgo, 500000)); // Max 500k blocks (~11.5 days)
+              
+              console.log(`📡 Querying XRGE Transfer events from block ${fromBlock.toString()} to ${currentBlock.toString()}`);
+              
+              // Get all XRGE Transfer events
+              const ERC20_TRANSFER_ABI = [{
+                anonymous: false,
+                inputs: [
+                  { indexed: true, name: 'from', type: 'address' },
+                  { indexed: true, name: 'to', type: 'address' },
+                  { indexed: false, name: 'value', type: 'uint256' }
+                ],
+                name: 'Transfer',
+                type: 'event'
+              }] as const;
+              
+              const xrgeLogs = await publicClient.getLogs({
+                address: XRGE_TOKEN_ADDRESS,
+                event: ERC20_TRANSFER_ABI[0],
+                fromBlock,
+                toBlock: 'latest'
+              });
+              
+              console.log(`📊 Found ${xrgeLogs.length} XRGE Transfer events in last 24h`);
+              
+              // Group by transaction hash and filter for bonding curve trades
+              const bondingCurveLower = BONDING_CURVE_ADDRESS.toLowerCase();
+              const volumeByTx = new Map<string, number>();
+              
+              for (const log of xrgeLogs) {
+                try {
+                  const { args } = log as any;
+                  const from = (args.from as string).toLowerCase();
+                  const to = (args.to as string).toLowerCase();
+                  const amount = Number(args.value as bigint) / 1e18;
+                  
+                  // Skip fee transfers
+                  if (from === FEE_ADDRESS || to === FEE_ADDRESS) continue;
+                  
+                  // BUY: User sends XRGE TO bonding curve (to === bonding curve) - count this as volume
+                  // SELL: User receives XRGE FROM bonding curve (from === bonding curve) - count this as volume
+                  // For volume calculation, we count the XRGE that flows through the bonding curve
+                  const txHash = log.transactionHash;
+                  
+                  if (to === bondingCurveLower) {
+                    // BUY: User pays XRGE to bonding curve
+                    const existing = volumeByTx.get(txHash) || 0;
+                    volumeByTx.set(txHash, existing + amount);
+                  } else if (from === bondingCurveLower) {
+                    // SELL: User receives XRGE from bonding curve
+                    const existing = volumeByTx.get(txHash) || 0;
+                    volumeByTx.set(txHash, existing + amount);
+                  }
+                } catch (err) {
+                  // Skip this log if there's an error
+                  continue;
+                }
+              }
+              
+              // Filter to only transactions within 24h by checking block timestamps
+              let volumeXRGE = 0;
+              let validTxs = 0;
+              
+              // Get unique block numbers to batch timestamp queries
+              const uniqueBlocks = new Set(Array.from(xrgeLogs).map(log => log.blockNumber));
+              const blockTimestamps = new Map<bigint, number>();
+              
+              // Batch fetch block timestamps (limit to 50 to avoid timeout)
+              const blockArray = Array.from(uniqueBlocks).slice(0, 50);
+              for (const blockNum of blockArray) {
+                try {
+                  const block = await publicClient.getBlock({ blockNumber: blockNum });
+                  blockTimestamps.set(blockNum, Number(block.timestamp) * 1000);
+                } catch (err) {
+                  // Skip if error
+                }
+              }
+              
+              // Sum volume from transactions within 24h
+              for (const [txHash, amount] of volumeByTx.entries()) {
+                const log = xrgeLogs.find(l => l.transactionHash === txHash);
+                if (!log) continue;
+                
+                const timestamp = blockTimestamps.get(log.blockNumber);
+                if (timestamp && timestamp >= twentyFourHoursAgo) {
+                  volumeXRGE += amount;
+                  validTxs++;
+                } else if (!timestamp) {
+                  // If we don't have timestamp, include it anyway (within our block range)
+                  volumeXRGE += amount;
+                  validTxs++;
+                }
+              }
+              
+              console.log(`💰 Calculated ${volumeXRGE.toFixed(2)} XRGE from ${validTxs} valid transactions in last 24h`);
+              
+              totalVolumeXRGE = volumeXRGE;
+            } catch (blockchainErr) {
+              console.error('❌ Error calculating volume from blockchain:', blockchainErr);
+              totalVolumeXRGE = 0;
+            }
+          } else {
+            console.warn('⚠️ No blockchain client available - cannot calculate volume');
+            totalVolumeXRGE = 0;
+          }
         }
         
-        // Sum up 24h volume per song
-        const volumeBySong: Record<string, number> = {};
-        allTrades.forEach(trade => {
-          if (trade.song_id && trade.xrge_amount) {
-            const amount = typeof trade.xrge_amount === 'string' ? parseFloat(trade.xrge_amount) : trade.xrge_amount;
-            volumeBySong[trade.song_id] = (volumeBySong[trade.song_id] || 0) + amount;
-          }
-        });
-        
         // Calculate total volume in USD
-        const totalVolumeXRGE = Object.values(volumeBySong).reduce((sum, vol) => sum + vol, 0);
         const totalVolumeInUSD = totalVolumeXRGE * prices.xrge;
         
         console.log(`💰 Total 24h Volume: ${totalVolumeXRGE.toFixed(2)} XRGE = $${totalVolumeInUSD.toLocaleString()}`);
@@ -1226,6 +1406,7 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
       mounted = false;
     };
   }, [prices.xrge]); // Removed calculatingVolume from dependencies to prevent infinite loop
+
 
   // Sort songs based on selected field (reactive to songStats changes)
   const sortedSongs = useMemo(() => {

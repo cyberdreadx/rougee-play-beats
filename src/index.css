@@ -82,6 +82,15 @@
   }
 }
 
+@keyframes shimmer {
+  0% { 
+    background-position: -200% 0; 
+  }
+  100% { 
+    background-position: 200% 0; 
+  }
+}
+
 /* ROUGEE - Blockchain Music DApp Design System */
 
 @layer base {

@@ -221,8 +221,15 @@ export const SongPriceSparkline = ({
   // Don't render if no meaningful data - wait for data to load first
   if (loading || !tokenAddress || !priceInXRGE || !bondingSupply) {
     return (
-      <div className={`flex items-center justify-center ${className}`} style={{ height }}>
-        <div className="text-[8px] text-muted-foreground animate-pulse">...</div>
+      <div className={`flex items-center justify-center ${className} bg-muted/10 rounded`} style={{ height }}>
+        <div className="w-full h-full flex items-center justify-center">
+          <div className="w-full h-3/4 bg-gradient-to-r from-muted/20 via-muted/40 to-muted/20 rounded" 
+               style={{ 
+                 background: 'linear-gradient(90deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.05) 100%)',
+                 backgroundSize: '200% 100%',
+                 animation: 'shimmer 1.5s ease-in-out infinite'
+               }} />
+        </div>
       </div>
     );
   }

@@ -13,6 +13,7 @@ import { getIPFSGatewayUrl } from '@/lib/ipfs';
 import { IPFSImage } from '@/components/IPFSImage';
 import StoriesBar from '@/components/StoriesBar';
 import LikeButton from '@/components/LikeButton';
+import RepostButton from '@/components/RepostButton';
 import { usePrivy } from '@privy-io/react-auth';
 import TaggedText from '@/components/TaggedText';
 import TagAutocomplete from '@/components/TagAutocomplete';
@@ -64,6 +65,7 @@ interface FeedPost {
   created_at: string;
   like_count: number;
   comment_count: number;
+  repost_count?: number;
   profiles?: {
     artist_name: string | null;
     display_name: string | null;
@@ -244,6 +246,7 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
   const [songsPage, setSongsPage] = useState(1);
   const [hasMorePosts, setHasMorePosts] = useState(true);
   const [hasMoreSongs, setHasMoreSongs] = useState(true);
+  const [songsLoadingRef, setSongsLoadingRef] = useState(false); // Prevent concurrent loads
   const ITEMS_PER_PAGE = 5;
   const [posting, setPosting] = useState(false);
   const [contentText, setContentText] = useState('');
@@ -289,27 +292,59 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
     }
   }, [isConnected, fullAddress]);
 
-  // Prefetch next page in background when user scrolls near bottom
+  // Simplified infinite scroll - only for posts (songs use button)
   useEffect(() => {
+    let scrollTimeout: NodeJS.Timeout;
+    let lastScrollTime = 0;
+    let lastLoadTime = 0;
+    let isLoading = false;
+    const SCROLL_THROTTLE_MS = 1000; // Check every 1 second max
+    const MIN_LOAD_INTERVAL = 2000; // Minimum 2 seconds between loads
+    const SCROLL_DEBOUNCE_MS = 500; // Wait 500ms after scroll stops
+    
     const handleScroll = () => {
-      const scrollPosition = window.innerHeight + window.scrollY;
-      const pageHeight = document.documentElement.scrollHeight;
+      const now = Date.now();
       
-      // When user is 80% down the page, prefetch next batch
-      if (scrollPosition >= pageHeight * 0.8) {
-        if (hasMorePosts && !loadingMorePosts && !loading) {
-          loadPosts(true);
+      // Throttle scroll checks
+      if (now - lastScrollTime < SCROLL_THROTTLE_MS) return;
+      lastScrollTime = now;
+      
+      // Don't trigger if already loading or recently loaded
+      if (isLoading || loadingMorePosts || loading) return;
+      if (now - lastLoadTime < MIN_LOAD_INTERVAL) return;
+      
+      clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(() => {
+        // Double check we're not loading
+        if (isLoading || loadingMorePosts || loading) return;
+        if (!hasMorePosts) return;
+        
+        const scrollPosition = window.innerHeight + window.scrollY;
+        const pageHeight = document.documentElement.scrollHeight;
+        const scrollPercentage = scrollPosition / pageHeight;
+        
+        // Only load when 85% down (higher threshold to prevent frequent loads)
+        if (scrollPercentage >= 0.85) {
+          isLoading = true;
+          lastLoadTime = Date.now();
+          loadPosts(true).finally(() => {
+            isLoading = false;
+          });
         }
-        if (hasMoreSongs && !loadingMoreSongs && !loadingSongs) {
-          loadSongs(true);
-        }
-      }
+      }, SCROLL_DEBOUNCE_MS);
     };
 
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [hasMorePosts, hasMoreSongs, loadingMorePosts, loadingMoreSongs, loading, loadingSongs]);
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      clearTimeout(scrollTimeout);
+    };
+  }, [hasMorePosts, loadingMorePosts, loading]);
   const loadPosts = async (loadMore = false) => {
+    // Prevent concurrent loads
+    if (loadMore && loadingMorePosts) return;
+    if (!loadMore && loading) return;
+    
     try {
       if (loadMore) {
         setLoadingMorePosts(true);
@@ -379,8 +414,26 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
       }) || [];
 
       if (loadMore) {
+        // Preserve scroll position relative to bottom when loading more
+        const scrollTop = window.scrollY;
+        const scrollHeight = document.documentElement.scrollHeight;
+        const clientHeight = window.innerHeight;
+        const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+        
         setPosts(prev => [...prev, ...(postsWithProfiles as FeedPost[])]);
         setPostsPage(page);
+        
+        // Restore scroll position after state update, maintaining distance from bottom
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            const newScrollHeight = document.documentElement.scrollHeight;
+            const newScrollTop = newScrollHeight - clientHeight - distanceFromBottom;
+            window.scrollTo({
+              top: Math.max(0, newScrollTop),
+              behavior: 'instant'
+            });
+          });
+        });
       } else {
         setPosts(postsWithProfiles as FeedPost[]);
         setPostsPage(1);
@@ -398,18 +451,27 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
     }
   };
 
+  // Simplified songs loader - clean and efficient
   const loadSongs = async (loadMore = false) => {
+    // Prevent concurrent loads
+    if (songsLoadingRef) return;
+    
     try {
+      setSongsLoadingRef(true);
+      
       if (loadMore) {
         setLoadingMoreSongs(true);
       } else {
         setLoadingSongs(true);
+        setSongs([]);
+        setSongsPage(1);
       }
 
       const page = loadMore ? songsPage + 1 : 1;
       const from = (page - 1) * ITEMS_PER_PAGE;
       const to = from + ITEMS_PER_PAGE - 1;
 
+      // Fetch songs
       const { data: songsData, error } = await supabase
         .from('songs')
         .select('id, title, artist, wallet_address, audio_cid, cover_cid, ticker, token_address, created_at, ai_usage')
@@ -422,10 +484,18 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
       const hasMore = songsData && songsData.length === ITEMS_PER_PAGE;
       setHasMoreSongs(hasMore);
 
-      // Fetch profiles separately (case-insensitive matching)
-      const walletAddresses = [...new Set(songsData?.map(s => s.wallet_address) || [])];
+      if (!songsData || songsData.length === 0) {
+        setLoadingSongs(false);
+        setLoadingMoreSongs(false);
+        setSongsLoadingRef(false);
+        return;
+      }
+
+      // Fetch profiles in parallel
+      const walletAddresses = [...new Set(songsData.map(s => s.wallet_address))];
       let profilesData: { wallet_address: string; artist_name: string | null; avatar_cid: string | null; verified: boolean | null }[] = [];
-      if (walletAddresses.length) {
+      
+      if (walletAddresses.length > 0) {
         const orFilter = walletAddresses.map((a) => `wallet_address.ilike.${a}`).join(',');
         const { data } = await supabase
           .from('profiles')
@@ -434,58 +504,24 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
         profilesData = data || [];
       }
 
-      // Merge data (normalize addresses to lowercase)
-      const songsWithProfiles = songsData?.map(song => ({
+      // Merge songs with profiles
+      const songsWithProfiles = songsData.map(song => ({
         ...song,
-        profiles: profilesData?.find(p => p.wallet_address?.toLowerCase() === song.wallet_address?.toLowerCase()) || null
-      })) || [];
+        profiles: profilesData.find(p => p.wallet_address?.toLowerCase() === song.wallet_address?.toLowerCase()) || null
+      })) as SongPost[];
 
+      // Update state
       if (loadMore) {
-        setSongs(prev => [...prev, ...(songsWithProfiles as SongPost[])]);
+        setSongs(prev => [...prev, ...songsWithProfiles]);
         setSongsPage(page);
       } else {
-        setSongs(songsWithProfiles as SongPost[]);
+        setSongs(songsWithProfiles);
         setSongsPage(1);
       }
+
+      // Load comment counts lazily - only when needed (when comments are expanded)
+      // Don't fetch all comment counts upfront
       
-      // Initialize comment counts for all songs
-      // Fetch comment counts in batch to prevent glitching
-      // Use count() to get accurate counts per song
-      const songIds = songsWithProfiles.map(s => s.id);
-      if (songIds.length > 0) {
-        // Use a more accurate count query - count distinct comments per song
-        const counts: Record<string, number> = {};
-        
-        // Fetch counts for each song individually to ensure accuracy
-        await Promise.all(
-          songIds.map(async (songId) => {
-            const { count, error } = await supabase
-              .from('comments')
-              .select('*', { count: 'exact', head: true })
-              .eq('song_id', songId);
-            
-            if (!error && count !== null) {
-              counts[songId] = count;
-            } else {
-              counts[songId] = 0;
-            }
-          })
-        );
-        
-        // Update comment counts state
-        setSongCommentCounts(prev => ({ ...prev, ...counts }));
-        
-        // Auto-expand comments for songs that have comments
-        setExpandedSongComments(prev => {
-          const next = new Set(prev);
-          Object.entries(counts).forEach(([songId, count]) => {
-            if (count > 0) {
-              next.add(songId);
-            }
-          });
-          return next;
-        });
-      }
     } catch (error) {
       console.error('Error loading songs:', error);
       toast({
@@ -496,6 +532,7 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
     } finally {
       setLoadingSongs(false);
       setLoadingMoreSongs(false);
+      setSongsLoadingRef(false);
     }
   };
 
@@ -622,7 +659,10 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
       });
     } else {
       setExpandedComments(prev => new Set(prev).add(postId));
-      await loadComments(postId);
+      // Only load comments if they haven't been loaded yet
+      if (!comments[postId] || comments[postId].length === 0) {
+        await loadComments(postId);
+      }
     }
   };
 
@@ -806,8 +846,8 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
     );
   };
 
-  // Song Card Component with Price
-  const SongCard = ({ song }: { song: SongPost }) => {
+  // Song Card Component with Price - Memoized to prevent re-renders on scroll
+  const SongCard = React.memo(({ song }: { song: SongPost }) => {
     const { prices } = useTokenPrices();
     const { price: priceInXRGE } = useSongPrice(song.token_address as Address);
     const priceUSD = (parseFloat(priceInXRGE) || 0) * (prices.xrge || 0);
@@ -959,6 +999,18 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
               e.stopPropagation();
               e.preventDefault();
               toggleSongComments(song.id);
+              // Load comment count when expanding comments
+              if (!expandedSongComments.has(song.id) && !songCommentCounts[song.id]) {
+                supabase
+                  .from('comments')
+                  .select('*', { count: 'exact', head: true })
+                  .eq('song_id', song.id)
+                  .then(({ count }) => {
+                    if (count !== null) {
+                      setSongCommentCounts(prev => ({ ...prev, [song.id]: count }));
+                    }
+                  });
+              }
             }} 
             className="flex items-center gap-1.5 text-sm hover:text-neon-green transition-colors duration-200"
           >
@@ -984,32 +1036,25 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
             <SongComments 
               key={song.id} 
               songId={song.id} 
-              onCommentCountChange={React.useCallback((count: number) => {
+              onCommentCountChange={(count: number) => {
                 setSongCommentCounts(prev => {
-                  // Only update if count actually changed to prevent unnecessary re-renders
                   if (prev[song.id] === count) return prev;
-                  const updated = { ...prev, [song.id]: count };
-                  
-                  // Auto-expand if comments exist, auto-collapse if no comments
-                  setExpandedSongComments(prevExpanded => {
-                    const next = new Set(prevExpanded);
-                    if (count > 0) {
-                      next.add(song.id);
-                    } else {
-                      next.delete(song.id);
-                    }
-                    return next;
-                  });
-                  
-                  return updated;
+                  return { ...prev, [song.id]: count };
                 });
-              }, [song.id])}
+              }}
             />
           </div>
         )}
       </Card>
     );
-  };
+  }, (prevProps, nextProps) => {
+    // Return true if props are equal (skip re-render), false if different (re-render)
+    return prevProps.song.id === nextProps.song.id &&
+           prevProps.song.like_count === nextProps.song.like_count &&
+           prevProps.song.comment_count === nextProps.song.comment_count &&
+           prevProps.song.title === nextProps.song.title &&
+           prevProps.song.artist === nextProps.song.artist;
+  });
   return <>
       <StoriesBar hasXRGE={hasXRGE} />
       <div className="min-h-screen bg-background pt-0 pb-24 md:pb-32 px-0 md:px-4">
@@ -1569,6 +1614,17 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
                       <span>{comments[post.id]?.length || post.comment_count || 0}</span>
                     </button>
 
+                    <RepostButton 
+                      postId={post.id} 
+                      initialRepostCount={post.repost_count || 0} 
+                      size="sm" 
+                      showCount={true}
+                      onRepostChange={() => {
+                        // Refresh posts to update repost counts
+                        loadPosts();
+                      }}
+                    />
+
                     <div className="flex items-center gap-2">
                       <Button
                         variant="ghost"
@@ -1788,25 +1844,31 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
 
               {/* Load More Songs Button */}
               {!loadingSongs && songs.length > 0 && hasMoreSongs && (
-                <div className="flex justify-center py-4 px-4 md:px-0 md:pt-4">
+                <div className="flex justify-center py-6 px-4 md:px-0">
                   <Button
                     onClick={(e) => {
                       e.preventDefault();
-                      loadSongs(true);
+                      e.stopPropagation();
+                      if (!loadingMoreSongs && !songsLoadingRef) {
+                        loadSongs(true);
+                      }
                     }}
                     type="button"
-                    disabled={loadingMoreSongs}
+                    disabled={loadingMoreSongs || songsLoadingRef}
                     variant="outline"
                     size="lg"
-                    className="w-full md:max-w-md"
+                    className="w-full md:max-w-md border-neon-green/30 hover:border-neon-green/60 hover:bg-neon-green/10"
                   >
                     {loadingMoreSongs ? (
                       <>
                         <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Loading...
+                        Loading more songs...
                       </>
                     ) : (
-                      'Load More'
+                      <>
+                        <Plus className="w-4 h-4 mr-2" />
+                        Load More Songs
+                      </>
                     )}
                   </Button>
                 </div>

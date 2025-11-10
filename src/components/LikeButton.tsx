@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, memo } from "react";
 import { Heart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -14,7 +14,7 @@ interface LikeButtonProps {
   entityType?: 'song' | 'post';
 }
 
-export default function LikeButton({ 
+const LikeButtonComponent = function LikeButton({ 
   songId, 
   initialLikeCount = 0, 
   size = "md",
@@ -26,14 +26,43 @@ export default function LikeButton({
   const [isLiked, setIsLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(initialLikeCount);
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Track if we've already fetched to prevent duplicate calls
+  const hasFetchedRef = useRef(false);
+  const lastSongIdRef = useRef<string | null>(null);
 
-  // Always fetch the public like count; only check personal like state when connected
+  // Only fetch once per songId - prevent refetching on every render/scroll
   useEffect(() => {
+    // Reset if songId changed
+    if (lastSongIdRef.current !== songId) {
+      hasFetchedRef.current = false;
+      lastSongIdRef.current = songId;
+      setLikeCount(initialLikeCount);
+      setIsLiked(false);
+    }
+    
+    // Only fetch if we haven't fetched this songId yet
+    if (hasFetchedRef.current) return;
+    
     let mounted = true;
+    const currentSongId = songId;
+    const currentAddress = address;
+    const currentIsConnected = isConnected;
     
     const loadData = async () => {
-      await fetchLikeCount();
-      if (isConnected && address && mounted) {
+      if (!mounted) return;
+      
+      // Double check we haven't already fetched for this songId
+      if (lastSongIdRef.current !== currentSongId) return;
+      hasFetchedRef.current = true;
+      
+      // Only fetch count if we don't have initialLikeCount
+      if (!initialLikeCount || initialLikeCount === 0) {
+        await fetchLikeCount();
+      }
+      
+      // Only check if liked when connected
+      if (currentIsConnected && currentAddress && mounted && lastSongIdRef.current === currentSongId) {
         await checkIfLiked();
       }
     };
@@ -43,10 +72,17 @@ export default function LikeButton({
     return () => {
       mounted = false;
     };
-  }, [songId, isConnected, address]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [songId]); // Only depend on songId - don't refetch when address/connected changes
 
   const checkIfLiked = async () => {
     if (!address) return;
+    
+    // Prevent duplicate calls
+    if (hasFetchedRef.current && lastSongIdRef.current === songId) {
+      // Already checked for this song
+      return;
+    }
 
     try {
       const table = entityType === 'post' ? 'feed_likes' : 'song_likes';
@@ -67,6 +103,17 @@ export default function LikeButton({
   };
 
   const fetchLikeCount = async () => {
+    // Skip if we already have a count from initialLikeCount
+    if (initialLikeCount > 0) {
+      setLikeCount(initialLikeCount);
+      return;
+    }
+    
+    // Prevent duplicate calls
+    if (hasFetchedRef.current && lastSongIdRef.current === songId) {
+      return;
+    }
+    
     try {
       const table = entityType === 'post' ? 'feed_likes' : 'song_likes';
       const idColumn = entityType === 'post' ? 'post_id' : 'song_id';
@@ -188,4 +235,14 @@ export default function LikeButton({
       )}
     </div>
   );
-}
+};
+
+// Memoize to prevent re-renders on scroll
+export default memo(LikeButtonComponent, (prevProps, nextProps) => {
+  // Only re-render if props actually changed
+  return prevProps.songId === nextProps.songId &&
+         prevProps.initialLikeCount === nextProps.initialLikeCount &&
+         prevProps.size === nextProps.size &&
+         prevProps.showCount === nextProps.showCount &&
+         prevProps.entityType === nextProps.entityType;
+});

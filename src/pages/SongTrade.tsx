@@ -26,6 +26,11 @@ import { useArtistProfile } from "@/hooks/useArtistProfile";
 import { SongComments } from "@/components/SongComments";
 import { AudioWaveform } from "@/components/AudioWaveform";
 import { useAudioStateForSong } from "@/hooks/useAudioState";
+import SongTradeHeader from "@/components/SongTradeHeader";
+import SongTradeStats from "@/components/SongTradeStats";
+import SongTradeHolders from "@/components/SongTradeHolders";
+import SongTradeRecentTrades from "@/components/SongTradeRecentTrades";
+import SongTradeForm from "@/components/SongTradeForm";
 import { useBuySongTokens, useSellSongTokens, useSongPrice, useSongMetadata, useCreateSong, SONG_FACTORY_ADDRESS, useApproveToken, useBuyQuote, useSellQuote, useBondingCurveSupply, useSongTokenBalance, BONDING_CURVE_ADDRESS, useAutoIndexTrades } from "@/hooks/useSongBondingCurve";
 import { useBalance, useConnect, useWaitForTransactionReceipt, usePublicClient } from "wagmi";
 import { useXRGESwap, KTA_TOKEN_ADDRESS, USDC_TOKEN_ADDRESS, useXRGEQuote, useXRGEQuoteFromKTA, useXRGEQuoteFromUSDC, XRGE_TOKEN_ADDRESS as XRGE_TOKEN } from "@/hooks/useXRGESwap";
@@ -64,27 +69,6 @@ interface SongTradeProps {
   isPlaying: boolean;
 }
 
-// Component that connects waveform to audio state
-const AudioWaveformWithState = ({ songId, audioCid }: { songId: string; audioCid: string }) => {
-  const audioState = useAudioStateForSong(songId);
-  
-  return (
-    <AudioWaveform
-      audioCid={audioCid}
-      height={40}
-      color="#00ff9f"
-      backgroundColor="rgba(0, 0, 0, 0.2)"
-      className="rounded border border-neon-green/20"
-      showProgress={audioState.isCurrentSong && audioState.isPlaying}
-      currentTime={audioState.currentTime}
-      duration={audioState.duration}
-      onSeek={(time) => {
-        // Handle seeking - this would need to be connected to the audio player
-        console.log('Seek to:', time);
-      }}
-    />
-  );
-};
 
 const SongTrade = ({ playSong, currentSong, isPlaying }: SongTradeProps) => {
   const { songId } = useParams<{ songId: string }>();
@@ -1738,357 +1722,45 @@ const SongTrade = ({ playSong, currentSong, isPlaying }: SongTradeProps) => {
       <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 py-4 md:py-8">
         {/* Song Header */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 md:gap-6 mb-6 md:mb-8">
-          <Card className="console-bg tech-border p-4 md:p-6 lg:col-span-2 relative overflow-hidden">
-            {/* Background Cover Image with Fade - Use song album art */}
-            <div 
-              className="absolute inset-0 z-0"
-              style={song.cover_cid ? {
-                backgroundImage: `url(${getIPFSGatewayUrl(song.cover_cid)})`,
-                backgroundSize: 'cover',
-                backgroundPosition: 'center'
-              } : undefined}
-            >
-              {song.cover_cid && (
-                <div className="absolute inset-0 bg-gradient-to-b from-background/60 via-background/80 to-background/95" />
-              )}
-            </div>
-            <div className="flex flex-col sm:flex-row items-start gap-4 md:gap-6 relative z-10">
-              <Avatar className="h-20 w-20 sm:h-24 sm:w-24 md:h-32 md:w-32 border-2 border-neon-green shrink-0 shadow-2xl">
-                <AvatarImage
-                  src={song.cover_cid ? getIPFSGatewayUrl(song.cover_cid) : undefined}
-                  className="object-cover"
-                />
-                <AvatarFallback className="bg-primary/20 text-neon-green font-mono text-2xl md:text-3xl">
-                  {song.title.substring(0, 2).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-
-              {/* Play/Pause */}
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => playSong(song)}
-                className="h-12 w-12 rounded-full bg-neon-green/10 hover:bg-neon-green/20 border border-neon-green/40"
-                aria-label="Play or Pause"
-              >
-                {currentSong?.id === song.id && isPlaying ? (
-                  <Pause className="w-6 h-6 text-neon-green" />
-                ) : (
-                  <Play className="w-6 h-6 text-neon-green" />
-                )}
-              </Button>
-
-              <div className="flex-1 w-full min-w-0">
-                <h1 className="text-xl sm:text-2xl md:text-3xl font-mono font-bold neon-text mb-1 md:mb-2 truncate flex items-center gap-2">
-                  <span className="truncate">{song.title}</span>
-                  <AiBadge aiUsage={(song as any).ai_usage} size="md" />
-                </h1>
-                <button 
-                  onClick={() => navigate(`/artist/${song.wallet_address}`)}
-                  className="text-sm sm:text-base md:text-lg text-white font-mono mb-2 truncate hover:text-neon-green transition-colors duration-200 underline-offset-4 hover:underline"
-                >
-                  By {song.artist || "Unknown Artist"}
-                </button>
-                {song.description && (
-                  <p className="text-xs sm:text-sm text-white/90 font-mono mb-3 md:mb-4 line-clamp-2 bg-black/20 px-2 py-1 rounded backdrop-blur-sm">
-                    {song.description}
-                  </p>
-                )}
-                
-                {/* Audio Waveform */}
-                {song.audio_cid && (
-                  <div className="mb-3 md:mb-4">
-                    <AudioWaveformWithState songId={song.id} audioCid={song.audio_cid} />
-                  </div>
-                )}
-                
-                <div className="flex flex-wrap items-center gap-2">
-                  <LikeButton songId={song.id} size="sm" />
-                  <ReportButton songId={song.id} />
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleShare}
-                    className="font-mono"
-                    disabled={sharing}
-                  >
-                    {copied ? <Check className="h-4 w-4 mr-2" /> : <Share2 className="h-4 w-4 mr-2" />}
-                    {copied ? 'COPIED' : 'SHARE'}
-                  </Button>
-                  {song.download_enabled && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleDownload}
-                      className="font-mono"
-                      disabled={downloading || !song.audio_cid}
-                    >
-                      {downloading ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          DOWNLOADING...
-                        </>
-                      ) : (
-                        <>
-                          {song.download_type === 'holders_only' && (!userBalance || parseFloat(userBalance) === 0) ? (
-                            <Lock className="h-4 w-4 mr-2" />
-                          ) : (
-                            <Download className="h-4 w-4 mr-2" />
-                          )}
-                          {song.download_type === 'purchase_usdc' ? `DOWNLOAD ($${song.download_price_usdc || 0})` : 
-                           song.download_type === 'holders_only' && (!userBalance || parseFloat(userBalance) === 0) ? 'LOCKED' :
-                           'DOWNLOAD'}
-                        </>
-                      )}
-                    </Button>
-                  )}
-                  {song.wallet_address?.toLowerCase() === fullAddress?.toLowerCase() && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => navigate(`/song/${song.id}/edit`)}
-                      className="font-mono"
-                    >
-                      <Edit className="h-4 w-4 mr-2" />
-                      EDIT
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </div>
-          </Card>
+          <SongTradeHeader
+            song={song}
+            currentSong={currentSong}
+            isPlaying={isPlaying}
+            playSong={playSong}
+            fullAddress={fullAddress}
+            userBalance={userBalance}
+            sharing={sharing}
+            copied={copied}
+            downloading={downloading}
+            onShare={handleShare}
+            onDownload={handleDownload}
+          />
 
           {/* Quick Stats */}
-          <Card className="console-bg tech-border p-3 sm:p-4 md:p-6">
-            {songTokenAddress && currentPrice !== undefined ? (
-              <>
-                <h3 className="text-sm sm:text-base md:text-lg font-mono font-bold neon-text mb-2 md:mb-3">CURRENT PRICE</h3>
-                <div className="text-xl sm:text-2xl md:text-3xl font-mono font-bold text-neon-green mb-1 md:mb-2 break-all">
-                  {currentPrice ? (
-                    currentPrice < 0.01 ? 
-                      `$${currentPrice.toFixed(10).replace(/\.?0+$/, '')}` : 
-                      `$${currentPrice.toFixed(6)}`
-                  ) : '$0'}
-                </div>
-                <p className="text-[10px] sm:text-xs md:text-sm text-muted-foreground font-mono mb-2 break-words">
-                  per token {priceInXRGE && <span className="opacity-50">({priceInXRGE.toFixed(6)} XRGE)</span>}
-                </p>
-                
-                {/* 24h Stats */}
-                <div className="grid grid-cols-2 gap-2 mb-3 md:mb-4">
-                  <div className="p-2 bg-background/50 border border-border rounded">
-                    <div className="text-[10px] sm:text-xs text-muted-foreground font-mono mb-1">24h Change</div>
-                    {priceChange24h !== null ? (
-                      <div className={`font-mono font-semibold text-xs sm:text-sm flex items-center gap-1 ${priceChange24h >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                        {priceChange24h >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                        {priceChange24h >= 0 ? '+' : ''}{priceChange24h.toFixed(2)}%
-                      </div>
-                    ) : (
-                      <div className="text-muted-foreground font-mono text-xs">—</div>
-                    )}
-                  </div>
-                  <div className="p-2 bg-background/50 border border-border rounded">
-                    <div className="text-[10px] sm:text-xs text-muted-foreground font-mono mb-1">Volume (24h)</div>
-                    <div className="font-mono font-semibold text-xs sm:text-sm">
-                      {volume24h > 0 ? (
-                        <>
-                          <div>${(volume24h * xrgeUsdPrice).toLocaleString(undefined, {maximumFractionDigits: 2})}</div>
-                          <div className="text-[9px] text-muted-foreground">{volume24h.toLocaleString(undefined, {maximumFractionDigits: 2})} XRGE</div>
-                        </>
-                      ) : (
-                        <div className="text-muted-foreground">$0</div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                
-                {userBalance && parseFloat(userBalance) > 0 && (
-                  <div className="mb-3 p-2 sm:p-3 bg-neon-green/10 border border-neon-green/30 rounded">
-                    <div className="flex justify-between items-start gap-2 mb-2">
-                      <div className="min-w-0 flex-1">
-                        <div className="text-[10px] sm:text-xs text-muted-foreground font-mono mb-1">Your Holdings</div>
-                        <div className="text-base sm:text-lg font-mono font-bold text-neon-green break-words">
-                          {parseFloat(userBalance).toLocaleString(undefined, {maximumFractionDigits: 2})} {song?.ticker || 'tokens'}
-                        </div>
-                        {currentPriceAfterFee && (
-                          <div className="text-[10px] sm:text-xs text-muted-foreground font-mono mt-1 break-words">
-                            Value: ${(parseFloat(userBalance) * currentPriceAfterFee).toFixed(4)}
-                            <span className="opacity-50 ml-1 text-[9px] sm:text-[10px]">(after 3% sell fee)</span>
-                          </div>
-                        )}
-                      </div>
-                      <button
-                        onClick={addTokenToWallet}
-                        className="flex items-center gap-1 px-2 py-1 text-[10px] sm:text-xs bg-neon-green/20 hover:bg-neon-green/30 text-neon-green rounded font-mono transition-colors shrink-0"
-                        title="Add to wallet"
-                      >
-                        <Wallet className="h-3 w-3" />
-                        <span className="hidden sm:inline">Add</span>
-                      </button>
-                    </div>
-                    <button
-                      onClick={copyTokenAddress}
-                      className="w-full mt-2 flex items-center justify-center gap-1 px-2 py-1 text-[10px] sm:text-xs bg-black/20 hover:bg-black/30 text-muted-foreground rounded font-mono transition-colors overflow-hidden"
-                    >
-                      {copiedAddress ? (
-                        <>
-                          <Check className="h-3 w-3 shrink-0" />
-                          <span>Copied!</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="h-3 w-3 shrink-0" />
-                          <span className="truncate max-w-full">{songTokenAddress}</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                )}
-                
-                {xrgeUsdPrice > 0 && (
-                  <div className="mb-3 p-2 bg-blue-500/10 border border-blue-500/30 rounded text-[10px] sm:text-xs text-blue-400 font-mono flex items-center gap-2">
-                    <img src={xrgeLogo} alt="XRGE" className="w-3 h-3 sm:w-4 sm:h-4 shrink-0" />
-                    <span className="break-words">XRGE = ${xrgeUsdPrice < 0.0001 ? xrgeUsdPrice.toFixed(8) : xrgeUsdPrice.toFixed(6)} USD</span>
-                  </div>
-                )}
-                
-                {!hasRealisticData && (
-                  <div className="mb-3 p-2 bg-yellow-500/10 border border-yellow-500/30 rounded text-[10px] sm:text-xs text-yellow-500 font-mono">
-                    ⚠️ No trading activity yet - Make the first trade!
-                  </div>
-                )}
-                
-                  {songTokenAddress && !userBalance && (
-                    <div className="mb-3 p-2 bg-blue-500/10 border border-blue-500/30 rounded">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs text-blue-400 font-mono">Add token to wallet:</span>
-                        <button
-                          onClick={addTokenToWallet}
-                          className="flex items-center gap-1 px-2 py-1 text-xs bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded font-mono transition-colors"
-                        >
-                          <Wallet className="h-3 w-3" />
-                          Add to Wallet
-                        </button>
-                      </div>
-                      <button
-                        onClick={copyTokenAddress}
-                        className="w-full flex items-center justify-center gap-1 px-2 py-1 text-xs bg-black/20 hover:bg-black/30 text-muted-foreground rounded font-mono transition-colors"
-                      >
-                        {copiedAddress ? (
-                          <>
-                            <Check className="h-3 w-3" />
-                            <span>Copied!</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="h-3 w-3" />
-                            <span className="truncate">{songTokenAddress}</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  )}
-                  
-                  <div className="space-y-2 text-xs md:text-sm font-mono">
-                    {hasRealisticData ? (
-                      <>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground" title="Market cap (current price × total supply)">Market Cap:</span>
-                        <span className="text-neon-green font-semibold">
-                          ${marketCapUSD < 1 ? marketCapUSD.toFixed(6) : marketCapUSD.toLocaleString(undefined, {maximumFractionDigits: 2})}
-                        </span>
-                      </div>
-                      <div className="flex justify-between text-xs opacity-70">
-                        <span className="text-muted-foreground" title="All-time XRGE spent on this token">Total Traded (XRGE):</span>
-                        <span className="text-foreground">
-                          {realizedValueXRGE.toLocaleString(undefined, {maximumFractionDigits: 4})} XRGE
-                        </span>
-                      </div>
-                      {activeTradingSupply !== undefined && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground" title="Number of tokens purchased from bonding curve">Tokens Sold:</span>
-                          <span className="text-foreground">
-                            {(990_000_000 - activeTradingSupply).toLocaleString(undefined, {maximumFractionDigits: 2})}
-                          </span>
-                        </div>
-                      )}
-                      <div className="flex justify-between items-center">
-                        <span className="text-muted-foreground" title="Number of unique wallets holding this token">Holders:</span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-foreground font-semibold">
-                            {loadingHolders ? '...' : holderCount.toLocaleString()}
-                          </span>
-                          {songTokenAddress && (
-                            <a
-                              href={`https://basescan.org/token/${songTokenAddress}#balances`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-neon-green hover:text-neon-green/80 transition-colors"
-                              title="View holders on BaseScan"
-                            >
-                              <ExternalLink className="h-3.5 w-3.5" />
-                            </a>
-                          )}
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Market Cap:</span>
-                        <span className="text-foreground opacity-60">
-                          $0.00
-                        </span>
-                      </div>
-                      {activeTradingSupply !== undefined && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Starting Supply:</span>
-                          <span className="text-foreground opacity-60">
-                            {activeTradingSupply.toLocaleString(undefined, {maximumFractionDigits: 2})}
-                          </span>
-                        </div>
-                      )}
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Volume:</span>
-                        <span className="text-foreground opacity-60">0 XRGE</span>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </>
-            ) : (
-              <div className="text-center py-8">
-                <Rocket className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                <h3 className="text-base md:text-lg font-mono font-bold mb-2">Not Deployed Yet</h3>
-                <p className="text-xs md:text-sm text-muted-foreground font-mono mb-4">
-                  {song.wallet_address?.toLowerCase() === fullAddress?.toLowerCase() 
-                    ? "Deploy this song to enable trading"
-                    : "This song hasn't been deployed to the bonding curve yet"}
-                </p>
-                {song.wallet_address?.toLowerCase() === fullAddress?.toLowerCase() && (
-                  <Button 
-                    onClick={handleDeploy} 
-                    variant="neon" 
-                    size="sm"
-                    disabled={isDeploying || isConfirming}
-                    className="font-mono"
-                  >
-                    {isDeploying || isConfirming ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        {isDeploying ? "DEPLOYING..." : "CONFIRMING..."}
-                      </>
-                    ) : (
-                      <>
-                        <Rocket className="h-4 w-4 mr-2" />
-                        DEPLOY TO BONDING CURVE
-                      </>
-                    )}
-                  </Button>
-                )}
-              </div>
-            )}
-          </Card>
+          <SongTradeStats
+            song={song}
+            songTokenAddress={songTokenAddress}
+            currentPrice={currentPrice}
+            priceInXRGE={priceInXRGE}
+            priceChange24h={priceChange24h}
+            volume24h={volume24h}
+            xrgeUsdPrice={xrgeUsdPrice}
+            userBalance={userBalance}
+            currentPriceAfterFee={currentPriceAfterFee}
+            hasRealisticData={hasRealisticData}
+            marketCapUSD={marketCapUSD}
+            realizedValueXRGE={realizedValueXRGE}
+            activeTradingSupply={activeTradingSupply}
+            holderCount={holderCount}
+            loadingHolders={loadingHolders}
+            copiedAddress={copiedAddress}
+            fullAddress={fullAddress}
+            isDeploying={isDeploying}
+            isConfirming={isConfirming}
+            onAddTokenToWallet={addTokenToWallet}
+            onCopyTokenAddress={copyTokenAddress}
+            onDeploy={handleDeploy}
+          />
         </div>
 
         {/* Price Charts - All 3 chart types with toggle */}
@@ -2102,70 +1774,7 @@ const SongTrade = ({ playSong, currentSong, isPlaying }: SongTradeProps) => {
         </div>
 
         {/* Recent Trades */}
-        {recentTrades.length > 0 && (
-          <div className="mb-6 md:mb-8">
-            <Card className="p-3 sm:p-4 md:p-6 console-bg tech-border">
-              <h3 className="font-mono font-bold text-base sm:text-lg mb-3 sm:mb-4 text-cyan-400">RECENT TRADES</h3>
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {recentTrades.slice(-10).reverse().map((trade, i) => {
-                  const coverUrl = song?.cover_cid ? getIPFSGatewayUrl(song.cover_cid) : '/placeholder-cover.png';
-                  const xrgeAmount = trade.xrgeAmount 
-                    ? trade.xrgeAmount.toLocaleString(undefined, {maximumFractionDigits: 2})
-                    : (trade.amount * trade.price).toLocaleString(undefined, {maximumFractionDigits: 2});
-                  const shortAddress = trade.trader 
-                    ? `${trade.trader.slice(0, 4)}...${trade.trader.slice(-4)}`
-                    : 'Unknown';
-                  
-                  return (
-                    <div 
-                      key={i}
-                      className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 p-2 sm:p-3 bg-background/50 border border-border rounded hover:bg-background/80 transition-colors"
-                    >
-                      {/* Badge in bottom-left corner */}
-                      <div className={`absolute bottom-2 left-2 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded font-mono text-[10px] sm:text-xs font-bold ${
-                        trade.type === 'buy' 
-                          ? 'bg-green-500/20 text-green-500 border border-green-500/30'
-                          : 'bg-red-500/20 text-red-500 border border-red-500/30'
-                      }`}>
-                        {trade.type === 'buy' ? '↑ BUY' : '↓ SELL'}
-                      </div>
-                      
-                      <div className="flex items-center gap-2 sm:gap-3 flex-1">
-                        <img 
-                          src={coverUrl} 
-                          alt={song?.ticker || 'Song'} 
-                          className="w-10 h-10 sm:w-12 sm:h-12 rounded object-cover flex-shrink-0"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src = '/placeholder-cover.png';
-                          }}
-                        />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-xs sm:text-sm font-mono text-muted-foreground">
-                              {shortAddress}
-                            </span>
-                          </div>
-                          <div className="text-[10px] sm:text-xs text-muted-foreground font-mono">
-                            {new Date(trade.timestamp).toLocaleString()}
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className="text-right pl-12 sm:pl-0">
-                        <div className="text-xs sm:text-sm font-mono font-bold">
-                          {trade.amount.toLocaleString(undefined, {maximumFractionDigits: 0})} ${song?.ticker?.toUpperCase()}
-                        </div>
-                        <div className="text-[10px] sm:text-xs text-muted-foreground font-mono">
-                          {xrgeAmount} XRGE
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </Card>
-          </div>
-        )}
+        <SongTradeRecentTrades trades={recentTrades} song={song} />
 
         {/* Trading History - Hidden (only used for data loading) */}
         <div className="hidden">
@@ -2197,509 +1806,45 @@ const SongTrade = ({ playSong, currentSong, isPlaying }: SongTradeProps) => {
 
           {/* Trade Tab */}
           <TabsContent value="trade" className="mt-0">
-            {!isConnected ? (
-              <Card className="console-bg tech-border p-8 text-center">
-                <Wallet className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                <h3 className="text-lg font-mono font-bold mb-2">Connect Wallet to Trade</h3>
-                <p className="text-sm text-muted-foreground font-mono mb-4">
-                  You need to connect your wallet to buy or sell song tokens
-                </p>
-                <Button 
-                  variant="neon" 
-                  onClick={() => navigate('/')}
-                  className="font-mono"
-                >
-                  CONNECT WALLET
-                </Button>
-              </Card>
-            ) : (
-              <div className="space-y-4">
-                {/* Buy/Sell Toggle */}
-                <div className="flex justify-center">
-                  <div className="inline-flex rounded-lg border border-neon-green/30 p-1 bg-black/50 backdrop-blur-sm">
-                    <button
-                      onClick={() => setTradeMode('buy')}
-                      className={`
-                        px-6 md:px-8 py-2 md:py-3 rounded-lg font-mono text-sm md:text-base font-bold transition-all duration-300
-                        ${tradeMode === 'buy' 
-                          ? 'bg-green-500/20 text-green-400 border border-green-500/50 shadow-lg shadow-green-500/30' 
-                          : 'text-white/60 hover:text-green-400 hover:bg-green-500/5'
-                        }
-                      `}
-                    >
-                      <ArrowUpRight className="h-4 w-4 md:h-5 md:w-5 inline mr-2" />
-                      BUY
-                    </button>
-                    <button
-                      onClick={() => setTradeMode('sell')}
-                      className={`
-                        px-6 md:px-8 py-2 md:py-3 rounded-lg font-mono text-sm md:text-base font-bold transition-all duration-300
-                        ${tradeMode === 'sell' 
-                          ? 'bg-red-500/20 text-red-400 border border-red-500/50 shadow-lg shadow-red-500/30' 
-                          : 'text-white/60 hover:text-red-400 hover:bg-red-500/5'
-                        }
-                      `}
-                    >
-                      <ArrowDownRight className="h-4 w-4 md:h-5 md:w-5 inline mr-2" />
-                      SELL
-                    </button>
-                  </div>
-                </div>
-
-                {/* Buy Card */}
-                {tradeMode === 'buy' && (
-                  <Card className="console-bg tech-border p-4 md:p-6">
-                  <h3 className="text-lg md:text-xl font-mono font-bold neon-text mb-4 flex items-center gap-2">
-                    <ArrowUpRight className="h-4 w-4 md:h-5 md:w-5 text-green-500" />
-                    {song?.cover_cid ? (
-                      <Avatar className="h-5 w-5 md:h-6 md:w-6 border border-neon-green">
-                        <AvatarImage
-                          src={getIPFSGatewayUrl(song.cover_cid)}
-                          className="object-cover"
-                        />
-                        <AvatarFallback className="bg-primary/20 text-neon-green font-mono text-xs">
-                          {song.ticker?.substring(0, 2).toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                    ) : null}
-                    BUY ${song?.ticker ? song.ticker.toUpperCase() : ''}
-                  </h3>
-
-                <div className="space-y-3 md:space-y-4">
-                  {/* Transaction Guide - Only show when amount is entered */}
-                  {paymentToken && buyAmount && parseFloat(buyAmount) > 0 && (
-                    <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 mb-4">
-                      <div className="font-mono text-xs space-y-2">
-                        <div className="font-bold text-blue-400">💡 Transaction Guide:</div>
-                        {paymentToken === "XRGE" && (
-                          <div className="bg-green-500/10 p-2 rounded border border-green-500/20">
-                            <div className="font-bold text-green-400">XRGE → Song</div>
-                            <div>⚡ 1 transaction - Direct purchase</div>
-                            <div>💰 No intermediate swaps needed</div>
-                          </div>
-                        )}
-                        {paymentToken === "ETH" && (
-                          <div className="bg-yellow-500/10 p-2 rounded border border-yellow-500/20">
-                            <div className="font-bold text-yellow-400">ETH → Song</div>
-                            <div>⚡ 2 transactions - ETH → XRGE → Song</div>
-                            <div>💰 ETH swap + song purchase</div>
-                          </div>
-                        )}
-                        {paymentToken === "USDC" && (
-                          <div className="bg-orange-500/10 p-2 rounded border border-orange-500/20">
-                            <div className="font-bold text-orange-400">USDC → Song</div>
-                            <div>⚡ 3 transactions - USDC → XRGE → Song</div>
-                            <div>💰 USDC approve + swap + song purchase</div>
-                          </div>
-                        )}
-                        {paymentToken === "KTA" && (
-                          <div className="bg-blue-500/10 p-2 rounded border border-blue-500/20">
-                            <div className="font-bold text-blue-400">KTA → Song</div>
-                            <div>⚡ 5 transactions - KTA → XRGE → Song</div>
-                            <div>💰 KTA reset + approve + swap + XRGE approve + song purchase</div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Payment Token Selector */}
-                  <div>
-                    <label className="text-xs md:text-sm font-mono text-muted-foreground mb-2 block">
-                      Pay with
-                    </label>
-                    <Select value={paymentToken} onValueChange={(value: any) => setPaymentToken(value)}>
-                      <SelectTrigger className="font-mono">
-                        <SelectValue>
-                          {paymentToken === 'ETH' && (
-                            <div className="flex items-center gap-2">
-                              <span>💎</span>
-                              <span>ETH (Ethereum)</span>
-                            </div>
-                          )}
-                          {paymentToken === 'XRGE' && (
-                            <div className="flex items-center gap-2">
-                              <img src={xrgeLogo} alt="XRGE" className="w-4 h-4" />
-                              <span>XRGE (Recommended)</span>
-                            </div>
-                          )}
-                          {paymentToken === 'KTA' && (
-                            <div className="flex items-center gap-2">
-                              <img src={ktaLogo} alt="KTA" className="w-4 h-4" />
-                              <span>KTA</span>
-                            </div>
-                          )}
-                          {paymentToken === 'USDC' && (
-                            <div className="flex items-center gap-2">
-                              <span>💵</span>
-                              <span>USDC (Stablecoin)</span>
-                            </div>
-                          )}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="ETH" className="font-mono">
-                          <div className="flex items-center justify-between w-full">
-                            <div className="flex items-center gap-2">
-                              <span>💎</span>
-                              <span>ETH</span>
-                            </div>
-                            {wagmiAddress && ethBalance && (
-                              <span className="text-xs text-muted-foreground ml-2">
-                                {parseFloat(ethBalance.formatted).toFixed(4)}
-                              </span>
-                            )}
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="XRGE" className="font-mono">
-                          <div className="flex items-center justify-between w-full">
-                            <div className="flex items-center gap-2">
-                              <img src={xrgeLogo} alt="XRGE" className="w-4 h-4" />
-                              <span>XRGE ⭐</span>
-                            </div>
-                            {wagmiAddress && xrgeBalance && (
-                              <span className="text-xs text-muted-foreground ml-2">
-                                {parseFloat(xrgeBalance.formatted).toFixed(2)}
-                              </span>
-                            )}
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="KTA" className="font-mono">
-                          <div className="flex items-center justify-between w-full">
-                            <div className="flex items-center gap-2">
-                              <img src={ktaLogo} alt="KTA" className="w-4 h-4" />
-                              <span>KTA</span>
-                            </div>
-                            {wagmiAddress && ktaBalance && (
-                              <span className="text-xs text-muted-foreground ml-2">
-                                {parseFloat(ktaBalance.formatted).toFixed(2)}
-                              </span>
-                            )}
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="USDC" className="font-mono">
-                          <div className="flex items-center justify-between w-full">
-                            <div className="flex items-center gap-2">
-                              <span>💵</span>
-                              <span>USDC</span>
-                            </div>
-                            {wagmiAddress && usdcBalance && (
-                              <span className="text-xs text-muted-foreground ml-2">
-                                {parseFloat(usdcBalance.formatted).toFixed(2)}
-                              </span>
-                            )}
-                          </div>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <div className="flex justify-between items-center mb-2">
-                      <label className="text-xs md:text-sm font-mono text-muted-foreground">
-                        Amount ({paymentToken})
-                      </label>
-                      {wagmiAddress && (
-                        <span className="text-xs text-muted-foreground font-mono">
-                          Balance: {
-                            paymentToken === 'ETH' ? (ethBalance?.formatted ? parseFloat(ethBalance.formatted).toFixed(4) : '0') :
-                            paymentToken === 'XRGE' ? (xrgeBalance?.formatted ? parseFloat(xrgeBalance.formatted).toFixed(2) : '0') :
-                            paymentToken === 'KTA' ? (ktaBalance?.formatted ? parseFloat(ktaBalance.formatted).toFixed(2) : '0') :
-                            (usdcBalance?.formatted ? parseFloat(usdcBalance.formatted).toFixed(2) : '0')
-                          }
-                        </span>
-                      )}
-                    </div>
-                    <Input
-                      type="number"
-                      placeholder="0.0"
-                      value={buyAmount}
-                      onChange={(e) => setBuyAmount(e.target.value)}
-                      className="font-mono"
-                    />
-                    
-                    {/* Percentage Selector Buttons */}
-                    {wagmiAddress && (
-                      <div className="grid grid-cols-5 gap-1.5 mt-2">
-                        {[
-                          { label: '10%', value: 0.1 },
-                          { label: '25%', value: 0.25 },
-                          { label: '50%', value: 0.5 },
-                          { label: '75%', value: 0.75 },
-                          { label: 'MAX', value: 1 },
-                        ].map((option) => (
-                          <Button
-                            key={option.label}
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              const balance = paymentToken === 'ETH' ? ethBalance :
-                                            paymentToken === 'XRGE' ? xrgeBalance :
-                                            paymentToken === 'KTA' ? ktaBalance :
-                                            usdcBalance;
-                              if (balance?.formatted) {
-                                const amount = (parseFloat(balance.formatted) * option.value).toFixed(4);
-                                setBuyAmount(amount);
-                              }
-                            }}
-                            className="font-mono text-[10px] py-1 h-7 border-neon-green/30 hover:bg-neon-green/10 hover:border-neon-green/50"
-                          >
-                            {option.label}
-                          </Button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="console-bg p-3 md:p-4 rounded-lg border border-border">
-                    {paymentToken !== 'XRGE' && buyAmount && parseFloat(buyAmount) > 0 && (
-                      <div className="flex justify-between text-xs md:text-sm font-mono mb-2 pb-2 border-b border-border">
-                        <span className="text-muted-foreground">XRGE equivalent:</span>
-                        <span className="text-blue-400 flex items-center gap-1">
-                          <img src={xrgeLogo} alt="XRGE" className="w-3 h-3" />
-                          ~{parseFloat(xrgeEquivalent).toFixed(4)} XRGE
-                        </span>
-                      </div>
-                    )}
-                    <div className="flex justify-between text-xs md:text-sm font-mono mb-2">
-                      <span className="text-muted-foreground">You will receive:</span>
-                      <span className="text-foreground">
-                        {buyQuoteLoading ? (
-                          <Loader2 className="h-3 w-3 inline animate-spin" />
-                        ) : (
-                          `~${buyQuote ? parseFloat(buyQuote).toFixed(2) : "0"} tokens`
-                        )}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-xs md:text-sm font-mono">
-                      <span className="text-muted-foreground">Price impact:</span>
-                      <span className="text-green-500">
-                        {xrgeEquivalent && priceInXRGE && buyQuote && parseFloat(buyQuote) > 0 && activeTradingSupply ? (
-                          (() => {
-                            // Calculate market cap change: (new supply * final price) - (current supply * current price)
-                            const newSupply = activeTradingSupply + parseFloat(buyQuote);
-                            const avgPricePerToken = parseFloat(xrgeEquivalent) / parseFloat(buyQuote);
-                            const currentMC = activeTradingSupply * priceInXRGE;
-                            const newMC = newSupply * avgPricePerToken;
-                            const mcImpact = ((newMC - currentMC) / currentMC) * 100;
-                            return `~${mcImpact.toFixed(2)}%`;
-                          })()
-                        ) : (
-                          "~0%"
-                        )}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Button 
-                      onClick={handleBuy} 
-                      className="w-full" 
-                      variant="neon" 
-                      size="sm"
-                      disabled={isProcessingBuy || isBuying || isApproving || isSwapping || !songTokenAddress}
-                    >
-                      {(isProcessingBuy || isBuying || isApproving || isSwapping) ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-                      {isApproving || isSwapping ? "PROCESSING..." : isProcessingBuy || isBuying ? "BUYING..." : `BUY WITH ${paymentToken}`}
-                    </Button>
-
-                    {/* Apple Pay / Fiat Onramp Button */}
-                    <Button
-                      onClick={() => {
-                        if (fullAddress) {
-                          fundWallet({ address: fullAddress as `0x${string}` });
-                          toast({
-                            title: "Opening Fiat Onramp",
-                            description: "Buy ETH with Apple Pay, then return to purchase song tokens!",
-                          });
-                        }
-                      }}
-                      className="w-full font-mono bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white border-0"
-                      size="sm"
-                    >
-                      <CreditCard className="mr-2 h-4 w-4" />
-                      BUY ETH WITH APPLE PAY
-                    </Button>
-                  </div>
-
-                  {(paymentToken === 'KTA' || paymentToken === 'USDC') && (
-                    <div className="p-2 bg-blue-500/10 border border-blue-500/30 rounded text-xs text-blue-400 font-mono text-center">
-                      💡 {paymentToken} purchase requires 3 steps: Approve → Swap to XRGE → Buy
-                    </div>
-                  )}
-
-                  <p className="text-xs text-muted-foreground font-mono text-center">
-                    {songTokenAddress ? '✅ Bonding curve active' : '⚠️ Song not deployed to bonding curve'}
-                  </p>
-                </div>
-                </Card>
-                )}
-
-                {/* Sell Card */}
-                {tradeMode === 'sell' && (
-                  <Card className="console-bg tech-border p-4 md:p-6">
-                <h3 className="text-lg md:text-xl font-mono font-bold neon-text mb-4 flex items-center gap-2">
-                  <ArrowDownRight className="h-4 w-4 md:h-5 md:w-5 text-red-500" />
-                  {song?.cover_cid ? (
-                    <Avatar className="h-5 w-5 md:h-6 md:w-6 border border-neon-green">
-                      <AvatarImage
-                        src={getIPFSGatewayUrl(song.cover_cid)}
-                        className="object-cover"
-                      />
-                      <AvatarFallback className="bg-primary/20 text-neon-green font-mono text-xs">
-                        {song.ticker?.substring(0, 2).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                  ) : null}
-                  SELL ${song?.ticker ? song.ticker.toUpperCase() : ''}
-                </h3>
-
-                <div className="space-y-3 md:space-y-4">
-                  <div>
-                    <div className="flex justify-between items-center mb-2">
-                      <label className="text-xs md:text-sm font-mono text-muted-foreground">
-                        Amount (${song?.ticker ? song.ticker.toUpperCase() : 'Tokens'})
-                      </label>
-                      {userBalance && parseFloat(userBalance) > 0 && (
-                        <span className="text-xs text-muted-foreground font-mono">
-                          Balance: {parseFloat(userBalance).toFixed(2)}
-                        </span>
-                      )}
-                    </div>
-                    <Input
-                      type="number"
-                      placeholder="0.0"
-                      value={sellAmount}
-                      onChange={(e) => setSellAmount(e.target.value)}
-                      className="font-mono"
-                    />
-                    
-                    {/* Percentage Selector Buttons */}
-                    {userBalance && parseFloat(userBalance) > 0 && (
-                      <div className="grid grid-cols-5 gap-1.5 mt-2">
-                        {[
-                          { label: '10%', value: 0.1 },
-                          { label: '25%', value: 0.25 },
-                          { label: '50%', value: 0.5 },
-                          { label: '75%', value: 0.75 },
-                          { label: 'MAX', value: 1 },
-                        ].map((option) => (
-                          <Button
-                            key={option.label}
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              const amount = (parseFloat(userBalance) * option.value).toFixed(4);
-                              setSellAmount(amount);
-                            }}
-                            className="font-mono text-[10px] py-1 h-7 border-red-500/30 hover:bg-red-500/10 hover:border-red-500/50"
-                          >
-                            {option.label}
-                          </Button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="console-bg p-3 md:p-4 rounded-lg border border-border">
-                    <div className="flex justify-between text-xs md:text-sm font-mono mb-2">
-                      <span className="text-muted-foreground">You will receive:</span>
-                      <span className="text-foreground">
-                        {sellQuoteLoading ? (
-                          <Loader2 className="h-3 w-3 inline animate-spin" />
-                        ) : (
-                          `~${sellQuote ? parseFloat(sellQuote).toFixed(6) : "0"} XRGE`
-                        )}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-xs md:text-sm font-mono">
-                      <span className="text-muted-foreground">Price impact:</span>
-                      <span className="text-red-500">
-                        {sellAmount && priceInXRGE && sellQuote && parseFloat(sellAmount) > 0 && activeTradingSupply ? (
-                          (() => {
-                            // Calculate market cap change when selling
-                            const newSupply = activeTradingSupply - parseFloat(sellAmount);
-                            const avgPricePerToken = parseFloat(sellQuote) / parseFloat(sellAmount);
-                            const currentMC = activeTradingSupply * priceInXRGE;
-                            const newMC = newSupply > 0 ? newSupply * avgPricePerToken : 0;
-                            const mcImpact = ((newMC - currentMC) / currentMC) * 100;
-                            return `~${Math.abs(mcImpact).toFixed(2)}%`;
-                          })()
-                        ) : (
-                          "~0%"
-                        )}
-                      </span>
-                    </div>
-                  </div>
-
-                  <Button 
-                    onClick={handleSell} 
-                    className="w-full" 
-                    variant="outline" 
-                    size="sm" 
-                    disabled={isSelling || isApproving || !songTokenAddress}
-                  >
-                    {(isSelling || isApproving) ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-                    {isApproving ? "APPROVING..." : isSelling ? "SELLING..." : `SELL $${song?.ticker ? song.ticker.toUpperCase() : ''}`}
-                  </Button>
-
-                  <div className="p-2 bg-blue-500/10 border border-blue-500/30 rounded text-xs text-blue-400 font-mono text-center">
-                    💡 Selling requires 2 steps: Approve → Sell
-                  </div>
-
-                  <p className="text-xs text-muted-foreground font-mono text-center">
-                    {songTokenAddress ? '✅ Bonding curve active' : '⚠️ Song not deployed to bonding curve'}
-                  </p>
-                </div>
-                </Card>
-                )}
-              </div>
-            )}
+            <SongTradeForm
+              isConnected={isConnected}
+              song={song}
+              songTokenAddress={songTokenAddress}
+              tradeMode={tradeMode}
+              setTradeMode={setTradeMode}
+              buyAmount={buyAmount}
+              setBuyAmount={setBuyAmount}
+              sellAmount={sellAmount}
+              setSellAmount={setSellAmount}
+              paymentToken={paymentToken}
+              setPaymentToken={setPaymentToken}
+              userBalance={userBalance}
+              priceInXRGE={priceInXRGE}
+              activeTradingSupply={activeTradingSupply}
+              xrgeEquivalent={xrgeEquivalent}
+              buyQuote={buyQuote}
+              buyQuoteLoading={buyQuoteLoading}
+              sellQuote={sellQuote}
+              sellQuoteLoading={sellQuoteLoading}
+              wagmiAddress={wagmiAddress}
+              ethBalance={ethBalance}
+              xrgeBalance={xrgeBalance}
+              ktaBalance={ktaBalance}
+              usdcBalance={usdcBalance}
+              fullAddress={fullAddress}
+              isProcessingBuy={isProcessingBuy}
+              isBuying={isBuying}
+              isSelling={isSelling}
+              isApproving={isApproving}
+              isSwapping={isSwapping}
+              onBuy={handleBuy}
+              onSell={handleSell}
+            />
           </TabsContent>
 
           {/* Holders Tab */}
           <TabsContent value="holders" className="mt-0">
-            <Card className="console-bg tech-border p-4 md:p-6">
-              <h3 className="text-lg md:text-xl font-mono font-bold neon-text mb-4 md:mb-6">TOP HOLDERS</h3>
-              
-              <div className="space-y-2 md:space-y-3">
-                {loadingHolders ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
-                    <p className="font-mono text-sm">Loading holders...</p>
-                  </div>
-                ) : holders.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Users className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                    <p className="font-mono text-sm">No holders yet</p>
-                    <p className="font-mono text-xs mt-1">Be the first to buy!</p>
-                  </div>
-                ) : (
-                  holders.map((holder, i) => (
-                    <div key={holder.address} className="flex items-center justify-between p-2 md:p-3 console-bg border border-border rounded-lg">
-                      <div className="flex items-center gap-2 md:gap-3 min-w-0">
-                        <Avatar className="h-8 w-8 md:h-10 md:w-10 border border-neon-green shrink-0">
-                          <AvatarFallback className="bg-primary/20 text-neon-green font-mono text-xs">
-                            #{i + 1}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="min-w-0 flex-1">
-                          <p className="font-mono text-xs md:text-sm truncate">
-                            {holder.address.slice(0, 6)}...{holder.address.slice(-4)}
-                          </p>
-                          <p className="font-mono text-xs text-muted-foreground">
-                            {parseFloat(holder.balance).toLocaleString()} tokens
-                          </p>
-                        </div>
-                      </div>
-                      <Badge variant="outline" className="font-mono text-xs shrink-0">
-                        {holder.percentage.toFixed(2)}%
-                      </Badge>
-                    </div>
-                  ))
-                )}
-              </div>
-            </Card>
+            <SongTradeHolders holders={holders} loadingHolders={loadingHolders} />
           </TabsContent>
 
           {/* Comments Tab */}

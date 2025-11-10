@@ -22,6 +22,7 @@ import { HoldersModal } from "@/components/HoldersModal";
 import { XRGETierBadge } from "@/components/XRGETierBadge";
 import { AiBadge } from "@/components/AiBadge";
 import { SongComments } from "@/components/SongComments";
+import RepostButton from "@/components/RepostButton";
 import { useTokenPrices } from "@/hooks/useTokenPrices";
 import { useSongPrice } from "@/hooks/useSongBondingCurve";
 import { AudioWaveform } from "@/components/AudioWaveform";
@@ -52,6 +53,7 @@ interface FeedPost {
   created_at: string;
   like_count: number;
   comment_count: number;
+  repost_count?: number;
   profiles?: {
     artist_name: string | null;
     display_name: string | null;
@@ -339,6 +341,8 @@ const Artist = ({ playSong, currentSong, isPlaying }: ArtistProps) => {
   const SONGS_PER_PAGE = 12;
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [loadingPosts, setLoadingPosts] = useState(true);
+  const [reposts, setReposts] = useState<FeedPost[]>([]);
+  const [loadingReposts, setLoadingReposts] = useState(true);
   const [holdersCount, setHoldersCount] = useState<number>(0);
   const [holdingsCount, setHoldingsCount] = useState<number>(0);
   const [holderWallets, setHolderWallets] = useState<string[]>([]);
@@ -490,6 +494,82 @@ const Artist = ({ playSong, currentSong, isPlaying }: ArtistProps) => {
       }
     };
     fetchArtistPosts();
+  }, [walletAddress, refreshKey]);
+
+  // Fetch artist reposts (posts that this artist has reposted)
+  useEffect(() => {
+    const fetchArtistReposts = async () => {
+      if (!walletAddress) return;
+      try {
+        setLoadingReposts(true);
+        
+        // First, get all reposts by this artist
+        const { data: repostsData, error: repostsError } = await supabase
+          .from("feed_reposts")
+          .select("post_id")
+          .eq("wallet_address", walletAddress.toLowerCase())
+          .order("created_at", { ascending: false });
+
+        if (repostsError) throw repostsError;
+
+        if (!repostsData || repostsData.length === 0) {
+          setReposts([]);
+          setLoadingReposts(false);
+          return;
+        }
+
+        // Get the post IDs
+        const postIds = repostsData.map(r => r.post_id);
+
+        // Fetch the actual posts
+        const { data: postsData, error: postsError } = await supabase
+          .from("feed_posts")
+          .select(`
+            *,
+            songs (
+              id,
+              title,
+              artist,
+              audio_cid,
+              cover_cid
+            )
+          `)
+          .in("id", postIds)
+          .order("created_at", { ascending: false });
+
+        if (postsError) throw postsError;
+
+        // Get unique wallet addresses from the original posts
+        const walletAddresses = [...new Set(postsData?.map(p => p.wallet_address) || [])];
+        
+        // Fetch profiles for original post authors
+        let profilesData: { wallet_address: string; artist_name: string | null; display_name: string | null; avatar_cid: string | null; verified: boolean | null }[] = [];
+        if (walletAddresses.length) {
+          const orFilter = walletAddresses.map((a) => `wallet_address.ilike.${a}`).join(',');
+          const { data, error: profileError } = await supabase
+            .from('profiles')
+            .select('wallet_address, artist_name, display_name, avatar_cid, verified')
+            .or(orFilter);
+          
+          if (!profileError) {
+            profilesData = data || [];
+          }
+        }
+
+        // Merge posts with profiles
+        const repostsWithProfiles = postsData?.map(post => ({
+          ...post,
+          profiles: profilesData.find(p => p.wallet_address?.toLowerCase() === post.wallet_address?.toLowerCase()) || null
+        })) || [];
+
+        setReposts(repostsWithProfiles);
+      } catch (err) {
+        console.error("Error fetching artist reposts:", err);
+      } finally {
+        setLoadingReposts(false);
+      }
+    };
+    fetchArtistReposts();
   }, [walletAddress, refreshKey]);
 
   // Fetch holders and holdings from blockchain
@@ -753,7 +833,7 @@ const Artist = ({ playSong, currentSong, isPlaying }: ArtistProps) => {
   return (
     <div className="min-h-screen bg-background pb-16 md:pb-0">
       {/* Modern Profile Header */}
-      <div className="max-w-7xl mx-auto px-0 md:px-12 py-8">
+      <div className="max-w-7xl mx-auto px-0 md:px-12 pt-0 pb-8">
         {loading ? (
           <ArtistProfileSkeleton />
         ) : profile ? (
@@ -1273,6 +1353,30 @@ const Artist = ({ playSong, currentSong, isPlaying }: ArtistProps) => {
                           <span>{comments[post.id]?.length || post.comment_count || 0}</span>
                         </button>
 
+                        <RepostButton 
+                          postId={post.id} 
+                          initialRepostCount={post.repost_count || 0} 
+                          size="sm" 
+                          showCount={true}
+                          onRepostChange={async () => {
+                            // Refresh reposts list to remove unreposted items
+                            setRefreshKey(prev => prev + 1);
+                            // Also manually filter out this post if it was unreposted
+                            // The refresh will handle it, but this provides immediate feedback
+                            const { data: repostCheck } = await supabase
+                              .from("feed_reposts")
+                              .select("id")
+                              .eq("post_id", post.id)
+                              .eq("wallet_address", walletAddress?.toLowerCase() || "")
+                              .maybeSingle();
+                            
+                            if (!repostCheck) {
+                              // Repost was removed, filter it out immediately
+                              setReposts(prev => prev.filter(p => p.id !== post.id));
+                            }
+                          }}
+                        />
+
                         <div className="flex items-center gap-2">
                           <Button
                             variant="ghost"
@@ -1398,10 +1502,342 @@ const Artist = ({ playSong, currentSong, isPlaying }: ArtistProps) => {
                 <p className="text-white/60">Playlists coming soon</p>
               </Card>
             </TabsContent>
-            <TabsContent value="reposts" className="mt-0">
-              <Card className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-8 text-center">
-                <p className="text-white/60">Reposts coming soon</p>
-              </Card>
+            <TabsContent value="reposts" className="mt-0 space-y-4">
+              {loadingReposts ? (
+                <div className="flex items-center justify-center gap-2 text-white/70 py-8">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading reposts...
+                </div>
+              ) : reposts.length === 0 ? (
+                <Card className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-8 text-center">
+                  <Music className="h-12 w-12 mx-auto mb-4 text-white/40" />
+                  <p className="font-medium text-white/60">No reposts yet</p>
+                </Card>
+              ) : (
+                <>
+                  {/* Render Reposts */}
+                  {reposts.map(post => (
+                    <Card key={post.id} className="p-4 md:p-6 bg-gradient-to-br from-white/5 via-white/3 to-white/0 backdrop-blur-xl border border-white/10 shadow-[0_8px_32px_0_rgba(0,255,159,0.1)] hover:shadow-[0_12px_48px_0_rgba(0,255,159,0.2)] hover:border-neon-green/20 flex flex-col w-full md:rounded-2xl rounded-none border-x-0 md:border-x border-b md:border-b mb-0 md:mb-4 hover:bg-gradient-to-br hover:from-white/8 hover:via-white/5 hover:to-white/0 active:bg-white/10 active:scale-[0.98] transition-all duration-300 group">
+                      {/* Repost indicator */}
+                      <div className="flex items-center gap-2 mb-3 text-xs text-muted-foreground">
+                        <Share2 className="h-3 w-3" />
+                        <span>Reposted by {profile?.artist_name || profile?.display_name || shortWallet}</span>
+                      </div>
+                      
+                      {/* Post Header */}
+                      <div className="flex items-center gap-3 mb-4">
+                        <div 
+                          className="group/avatar cursor-pointer"
+                          onClick={() => navigate(`/artist/${post.wallet_address}`)}
+                        >
+                          {post.profiles?.avatar_cid ? (
+                            <div className="relative w-10 h-10 md:w-12 md:h-12">
+                              <img
+                                src={getIPFSGatewayUrl(post.profiles.avatar_cid)}
+                                alt={post.profiles.artist_name || 'Avatar'}
+                                className="w-full h-full rounded-full object-cover border-2 border-neon-green/20 group-hover/avatar:border-neon-green/60 transition-all duration-300 shadow-lg"
+                              />
+                              <div className="absolute inset-0 rounded-full bg-neon-green/0 group-hover/avatar:bg-neon-green/10 transition-colors duration-300" />
+                            </div>
+                          ) : (
+                            <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-gradient-to-br from-neon-green/20 to-purple-500/20 flex items-center justify-center border-2 border-neon-green/20 group-hover/avatar:border-neon-green/60 transition-all duration-300">
+                              <span className="text-neon-green text-sm md:text-base font-bold">
+                                {post.profiles?.artist_name?.[0] || '?'}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <p 
+                              className="font-semibold text-sm md:text-base cursor-pointer hover:text-neon-green transition-colors duration-200"
+                              onClick={() => navigate(`/artist/${post.wallet_address}`)}
+                            >
+                              {post.profiles?.artist_name || post.profiles?.display_name || `0x...${post.wallet_address.slice(-4)}`}
+                            </p>
+                            {post.profiles?.verified && (
+                              <CircleCheckBig className="h-4 w-4 text-blue-500 flex-shrink-0" aria-label="Verified artist" />
+                            )}
+                            <XRGETierBadge walletAddress={post.wallet_address} size="sm" />
+                          </div>
+                          <p className="text-xs md:text-sm text-muted-foreground">{formatTimeAgo(post.created_at)}</p>
+                        </div>
+                      </div>
+                      
+                      {/* Post Content Text */}
+                      {post.content_text && !(post.songs && !post.media_cid) && (
+                        <div className="mb-4 text-sm md:text-base whitespace-pre-wrap line-clamp-6 text-foreground/90 leading-relaxed">
+                          <TaggedText text={post.content_text} />
+                        </div>
+                      )}
+
+                      {/* Post Media with Song Player Overlay */}
+                      {post.media_cid && post.songs && (
+                        <div className="mb-4 rounded-xl overflow-hidden relative group/media">
+                          <div className="relative">
+                            <img 
+                              src={getIPFSGatewayUrl(post.media_cid)} 
+                              alt="Post media" 
+                              loading="lazy" 
+                              decoding="async" 
+                              className="w-full max-h-[600px] object-contain bg-gradient-to-br from-black/10 to-black/5 rounded-xl group-hover/media:scale-[1.02] transition-transform duration-500" 
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover/media:opacity-100 transition-opacity duration-300" />
+                          </div>
+
+                          {/* Play/Pause Button Overlay */}
+                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <button
+                              onClick={() => {
+                                if (playSong) {
+                                  playSong({
+                                    id: post.songs.id,
+                                    title: post.songs.title,
+                                    artist: post.songs.artist,
+                                    audio_cid: post.songs.audio_cid,
+                                    cover_cid: post.songs.cover_cid,
+                                    wallet_address: post.wallet_address,
+                                  } as any);
+                                }
+                              }}
+                              className="pointer-events-auto bg-black/70 backdrop-blur-md hover:bg-black/90 transition-all duration-300 p-6 md:p-8 rounded-full opacity-0 group-hover/media:opacity-100 hover:scale-110 active:scale-95 border-2 border-white/20 hover:border-neon-green/50 shadow-[0_0_30px_rgba(0,255,159,0.5)]"
+                            >
+                              {currentSong?.id === post.songs.id && isPlaying ? (
+                                <Pause className="w-12 h-12 md:w-16 md:h-16 text-white" />
+                              ) : (
+                                <Play className="w-12 h-12 md:w-16 md:h-16 text-white ml-1" />
+                              )}
+                            </button>
+                          </div>
+
+                          {/* Bottom Song Scroller */}
+                          <div 
+                            onClick={() => navigate(`/song/${post.songs.id}`)}
+                            className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/95 via-black/80 to-transparent p-4 cursor-pointer hover:bg-black/98 transition-all duration-300 backdrop-blur-sm"
+                          >
+                            <div className="flex items-center gap-2">
+                              {post.songs.cover_cid && (
+                                <img 
+                                  src={getIPFSGatewayUrl(post.songs.cover_cid)} 
+                                  alt={post.songs.title}
+                                  className="w-10 h-10 rounded object-cover flex-shrink-0"
+                                />
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <Music className="w-3 h-3 text-neon-green flex-shrink-0" />
+                                  <p className="font-semibold text-white text-sm truncate">
+                                    {post.songs.title}
+                                  </p>
+                                </div>
+                                <p className="text-xs text-gray-300 truncate">
+                                  {post.songs.artist}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Post Media without Song */}
+                      {post.media_cid && !post.songs && (
+                        <div className="mb-4 rounded-xl overflow-hidden relative">
+                          <img 
+                            src={getIPFSGatewayUrl(post.media_cid)} 
+                            alt="Post media" 
+                            loading="lazy" 
+                            decoding="async" 
+                            className="w-full max-h-[600px] object-contain bg-gradient-to-br from-black/10 to-black/5 rounded-xl" 
+                          />
+                        </div>
+                      )}
+
+                      {/* Text Post with Song - Styled like Post-It Note */}
+                      {!post.media_cid && post.content_text && post.songs && (() => {
+                        const colors = getPostItColors(post.id);
+                        return (
+                          <div 
+                            className={`mb-4 rounded-xl overflow-hidden relative group/media min-h-[300px] flex items-center justify-center bg-gradient-to-br ${colors.bg} cursor-pointer`}
+                            onClick={() => {
+                              if (playSong) {
+                                playSong({
+                                  id: post.songs!.id,
+                                  title: post.songs!.title,
+                                  artist: post.songs!.artist,
+                                  audio_cid: post.songs!.audio_cid,
+                                  cover_cid: post.songs!.cover_cid,
+                                  wallet_address: post.wallet_address,
+                                } as any);
+                              }
+                            }}
+                          >
+                            {/* Cyberpunk Glass Panel */}
+                            <div className={`absolute inset-0 ${colors.glass} border-2 ${colors.circuit} ${colors.glow}`}>
+                              {/* Circuit Lines - Horizontal */}
+                              <div className={`absolute top-1/4 left-0 right-0 h-[1px] ${colors.circuit} border-t opacity-30`} />
+                              <div className={`absolute top-1/2 left-0 right-0 h-[1px] ${colors.circuit} border-t opacity-20`} />
+                              <div className={`absolute top-3/4 left-0 right-0 h-[1px] ${colors.circuit} border-t opacity-30`} />
+                              
+                              {/* Circuit Lines - Vertical */}
+                              <div className={`absolute left-1/4 top-0 bottom-0 w-[1px] ${colors.circuit} border-l opacity-30`} />
+                              <div className={`absolute left-1/2 top-0 bottom-0 w-[1px] ${colors.circuit} border-l opacity-20`} />
+                              <div className={`absolute left-3/4 top-0 bottom-0 w-[1px] ${colors.circuit} border-l opacity-30`} />
+                              
+                              {/* Corner Accents */}
+                              <div className={`absolute top-2 left-2 w-4 h-4 border-t-2 border-l-2 ${colors.circuit}`} />
+                              <div className={`absolute top-2 right-2 w-4 h-4 border-t-2 border-r-2 ${colors.circuit}`} />
+                              <div className={`absolute bottom-2 left-2 w-4 h-4 border-b-2 border-l-2 ${colors.circuit}`} />
+                              <div className={`absolute bottom-2 right-2 w-4 h-4 border-b-2 border-r-2 ${colors.circuit}`} />
+                            </div>
+                          
+                          {/* Text Content */}
+                          <div className="relative z-10 p-6 md:p-8 w-full">
+                            <div className={`text-base md:text-lg whitespace-pre-wrap leading-relaxed font-mono font-semibold ${colors.text} drop-shadow-[0_0_10px_currentColor]`}>
+                              <TaggedText text={post.content_text!} />
+                            </div>
+                          </div>
+
+                          {/* Small Play/Pause Indicator - Top Right */}
+                          <div className="absolute top-3 right-3 z-20">
+                            <div className="bg-black/70 backdrop-blur-md transition-all duration-300 p-2 rounded-full opacity-60 group-hover/media:opacity-100 border border-white/20 group-hover/media:border-neon-green/50 shadow-[0_0_15px_rgba(0,255,159,0.3)]">
+                              {currentSong?.id === post.songs!.id && isPlaying ? (
+                                <Pause className="w-4 h-4 text-white" />
+                              ) : (
+                                <Play className="w-4 h-4 text-white ml-0.5" />
+                              )}
+                            </div>
+                          </div>
+                            <div 
+                              onClick={() => navigate(`/song/${post.songs!.id}`)}
+                              className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/95 via-black/80 to-transparent p-4 cursor-pointer hover:bg-black/98 transition-all duration-300 backdrop-blur-sm z-20"
+                            >
+                              <div className="flex items-center gap-2">
+                                {post.songs!.cover_cid && (
+                                  <img 
+                                    src={getIPFSGatewayUrl(post.songs!.cover_cid)} 
+                                    alt={post.songs!.title}
+                                    className="w-10 h-10 rounded object-cover flex-shrink-0"
+                                  />
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <Music className="w-3 h-3 text-neon-green flex-shrink-0" />
+                                    <p className="font-semibold text-white text-sm truncate">{post.songs!.title}</p>
+                                  </div>
+                                  <p className="text-xs text-gray-300 truncate">{post.songs!.artist}</p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      {/* Post Actions */}
+                      <div className="flex items-center gap-4 pt-3 mt-auto border-t border-border">
+                        <LikeButton songId={post.id} initialLikeCount={post.like_count} size="sm" showCount={true} entityType="post" />
+
+                        <button onClick={() => toggleComments(post.id)} className="flex items-center gap-1.5 text-xs hover:text-primary transition-colors">
+                          <MessageCircle className="w-4 h-4" />
+                          <span>{comments[post.id]?.length || post.comment_count || 0}</span>
+                        </button>
+
+                        <RepostButton 
+                          postId={post.id} 
+                          initialRepostCount={post.repost_count || 0} 
+                          size="sm" 
+                          showCount={true}
+                          onRepostChange={async () => {
+                            // Refresh reposts list to remove unreposted items
+                            setRefreshKey(prev => prev + 1);
+                            // Also manually filter out this post if it was unreposted
+                            // The refresh will handle it, but this provides immediate feedback
+                            const { data: repostCheck } = await supabase
+                              .from("feed_reposts")
+                              .select("id")
+                              .eq("post_id", post.id)
+                              .eq("wallet_address", walletAddress?.toLowerCase() || "")
+                              .maybeSingle();
+                            
+                            if (!repostCheck) {
+                              // Repost was removed, filter it out immediately
+                              setReposts(prev => prev.filter(p => p.id !== post.id));
+                            }
+                          }}
+                        />
+
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleSharePost(post)}
+                            title="Share"
+                          >
+                            {copiedPostId === post.id ? <Check className="h-4 w-4" /> : <Share2 className="h-4 w-4" />}
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Comments Section */}
+                      {expandedComments.has(post.id) && (
+                        <div className="pt-4 mt-4 border-t border-border space-y-4">
+                          {/* Add Comment */}
+                          {fullAddress && (
+                            <div className="flex gap-2">
+                              <Input placeholder="Add a comment..." value={commentText[post.id] || ''} onChange={e => setCommentText(prev => ({
+                    ...prev,
+                    [post.id]: e.target.value
+                  }))} onKeyPress={e => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleAddComment(post.id);
+                    }
+                  }} className="flex-1 text-base" />
+                              <Button size="sm" onClick={() => handleAddComment(post.id)} disabled={!commentText[post.id]?.trim()}>
+                                <Send className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          )}
+
+                          {/* Comments List */}
+                          <div className="space-y-3">
+                            {comments[post.id]?.map(comment => (
+                              <div key={comment.id} className="flex gap-3">
+                                <div 
+                                  className="cursor-pointer hover:opacity-80 transition-opacity"
+                                  onClick={() => navigate(`/artist/${comment.wallet_address}`)}
+                                >
+                                  {comment.profiles?.avatar_cid ? (
+                                    <img src={getIPFSGatewayUrl(comment.profiles.avatar_cid)} alt="Avatar" className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
+                                  ) : (
+                                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                                      <span className="text-primary text-xs">{comment.profiles?.artist_name?.[0] || '?'}</span>
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-1.5 mb-1">
+                                    <p 
+                                      className="text-sm font-semibold cursor-pointer hover:text-neon-green transition-colors"
+                                      onClick={() => navigate(`/artist/${comment.wallet_address}`)}
+                                    >
+                                      {comment.profiles?.artist_name || comment.profiles?.display_name || `0x...${comment.wallet_address.slice(-4)}`}
+                                    </p>
+                                    <XRGETierBadge walletAddress={comment.wallet_address} size="sm" />
+                                  </div>
+                                  <div className="text-sm text-muted-foreground">
+                                    <TaggedText text={comment.comment_text} />
+                                  </div>
+                                  <p className="text-xs text-muted-foreground mt-1">{formatTimeAgo(comment.created_at)}</p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </Card>
+                  ))}
+                </>
+              )}
             </TabsContent>
           </div>
         </Tabs>

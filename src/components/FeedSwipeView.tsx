@@ -117,6 +117,19 @@ export default function FeedSwipeView({
 
   // Handle touch events for swiping
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    // Don't start dragging if touch started on an interactive element
+    const target = e.target as HTMLElement;
+    if (
+      target.closest('button') ||
+      target.closest('input') ||
+      target.closest('textarea') ||
+      target.closest('a') ||
+      target.closest('[role="button"]') ||
+      target.closest('.interactive')
+    ) {
+      return;
+    }
+    
     touchStartY.current = e.touches[0].clientY;
     touchStartTime.current = Date.now();
     setIsDragging(true);
@@ -323,7 +336,11 @@ export default function FeedSwipeView({
             <Button
               variant="ghost"
               size="icon"
-              onClick={onClose}
+              onClick={(e) => {
+                e.stopPropagation();
+                onClose();
+              }}
+              onTouchStart={(e) => e.stopPropagation()}
               className="text-white hover:bg-white/20"
             >
               <X className="h-6 w-6" />
@@ -350,7 +367,8 @@ export default function FeedSwipeView({
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       if (playSong) {
                         playSong({
                           id: song.id,
@@ -361,6 +379,7 @@ export default function FeedSwipeView({
                         });
                       }
                     }}
+                    onTouchStart={(e) => e.stopPropagation()}
                     className="w-20 h-20 rounded-full bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white"
                   >
                     {isCurrentlyPlaying ? (
@@ -409,17 +428,23 @@ export default function FeedSwipeView({
           {/* Bottom Actions */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <LikeButton
-                songId={song.id}
-                initialLikeCount={song.like_count || 0}
-                variant="ghost"
-                className="text-white hover:text-red-500"
-                entityType="song"
-              />
+              <div onClick={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}>
+                <LikeButton
+                  songId={song.id}
+                  initialLikeCount={song.like_count || 0}
+                  variant="ghost"
+                  className="text-white hover:text-red-500"
+                  entityType="song"
+                />
+              </div>
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => toggleComments(song.id)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleComments(song.id);
+                }}
+                onTouchStart={(e) => e.stopPropagation()}
                 className="text-white hover:text-white/80 relative"
               >
                 <MessageCircle className="h-6 w-6" />
@@ -432,7 +457,11 @@ export default function FeedSwipeView({
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => handleShareSong(song)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleShareSong(song);
+                }}
+                onTouchStart={(e) => e.stopPropagation()}
                 className="text-white hover:text-white/80"
               >
                 {copiedSongId === song.id ? <Check className="h-6 w-6" /> : <Share2 className="h-6 w-6" />}
@@ -474,7 +503,11 @@ export default function FeedSwipeView({
             <Button
               variant="ghost"
               size="icon"
-              onClick={onClose}
+              onClick={(e) => {
+                e.stopPropagation();
+                onClose();
+              }}
+              onTouchStart={(e) => e.stopPropagation()}
               className="text-white hover:bg-white/20"
             >
               <X className="h-6 w-6" />
@@ -564,17 +597,23 @@ export default function FeedSwipeView({
           {/* Bottom Actions */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <LikeButton
-                songId={post.id}
-                initialLikeCount={post.like_count}
-                variant="ghost"
-                className="text-white hover:text-red-500"
-                entityType="post"
-              />
+              <div onClick={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}>
+                <LikeButton
+                  songId={post.id}
+                  initialLikeCount={post.like_count}
+                  variant="ghost"
+                  className="text-white hover:text-red-500"
+                  entityType="post"
+                />
+              </div>
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => toggleComments(post.id)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleComments(post.id);
+                }}
+                onTouchStart={(e) => e.stopPropagation()}
                 className="text-white hover:text-white/80 relative"
               >
                 <MessageCircle className="h-6 w-6" />
@@ -584,16 +623,22 @@ export default function FeedSwipeView({
                   </span>
                 )}
               </Button>
-              <RepostButton
-                postId={post.id}
-                initialRepostCount={post.repost_count || 0}
-                variant="ghost"
-                className="text-white hover:text-white/80"
-              />
+              <div onClick={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}>
+                <RepostButton
+                  postId={post.id}
+                  initialRepostCount={post.repost_count || 0}
+                  variant="ghost"
+                  className="text-white hover:text-white/80"
+                />
+              </div>
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => handleSharePost(post)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleSharePost(post);
+                }}
+                onTouchStart={(e) => e.stopPropagation()}
                 className="text-white hover:text-white/80"
               >
                 {copiedPostId === post.id ? <Check className="h-6 w-6" /> : <Share2 className="h-6 w-6" />}

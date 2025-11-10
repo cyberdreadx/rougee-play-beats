@@ -166,8 +166,13 @@ export default function LiveStreams({ className = '', limit = 6 }: LiveStreamsPr
   }
 
   return (
-    <div className={`${className} w-full overflow-x-auto pb-4 mb-0`}>
-      <div className="flex gap-4 px-4">
+    <div className={`${className} w-full`}>
+      <div className="flex items-center gap-2 mb-3 px-4">
+        <Radio className="h-4 w-4 text-red-500" />
+        <h2 className="text-sm font-mono font-bold neon-text">LIVE STREAMS</h2>
+      </div>
+      <div className="w-full overflow-x-auto pb-4 mb-0">
+        <div className="flex gap-4 px-4">
         {streams.map((stream) => {
           const artist = artists[stream.artist_id];
           return (
@@ -179,6 +184,7 @@ export default function LiveStreams({ className = '', limit = 6 }: LiveStreamsPr
             />
           );
         })}
+        </div>
       </div>
     </div>
   );
@@ -188,11 +194,14 @@ export default function LiveStreams({ className = '', limit = 6 }: LiveStreamsPr
 function LiveStreamPreview({ stream, artist, onClick }: { stream: LiveStream; artist?: any; onClick: () => void }) {
   const videoRef = useRef<HTMLDivElement>(null);
   const [isHovered, setIsHovered] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   const {
     remoteUsers,
     join,
-    leave
+    leave,
+    isJoined
   } = useAgoraStream({
     channelName: stream.channel_name,
     userId: `preview-${stream.id}-${Date.now()}`,
@@ -200,25 +209,54 @@ function LiveStreamPreview({ stream, artist, onClick }: { stream: LiveStream; ar
     autoJoin: false
   });
 
-  // Join channel on hover to get video preview
+  // Join channel on hover with delay to avoid too many simultaneous connections
   useEffect(() => {
-    if (isHovered && stream.channel_name) {
-      join(stream.channel_name, `preview-${stream.id}-${Date.now()}`);
-    } else {
-      leave();
+    if (isHovered && stream.channel_name && !isJoined && !isConnecting) {
+      // Wait 500ms before joining to avoid joining on accidental hovers
+      hoverTimeoutRef.current = setTimeout(async () => {
+        try {
+          setIsConnecting(true);
+          await join(stream.channel_name, `preview-${stream.id}-${Date.now()}`);
+        } catch (error) {
+          console.warn('⚠️ Failed to join preview channel:', error);
+          // Silently fail - just show thumbnail instead
+        } finally {
+          setIsConnecting(false);
+        }
+      }, 500);
+    } else if (!isHovered && isJoined) {
+      // Leave immediately when not hovered
+      try {
+        leave();
+      } catch (error) {
+        console.warn('⚠️ Failed to leave preview channel:', error);
+      }
     }
     
     return () => {
-      leave();
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+      }
+      if (isJoined) {
+        try {
+          leave();
+        } catch (error) {
+          // Ignore errors on cleanup
+        }
+      }
     };
-  }, [isHovered, stream.channel_name, stream.id, join, leave]);
+  }, [isHovered, stream.channel_name, stream.id, join, leave, isJoined, isConnecting]);
 
   // Play remote video when available
   useEffect(() => {
     if (remoteUsers.length > 0 && videoRef.current) {
       const remoteUser = remoteUsers[0];
       if (remoteUser.videoTrack) {
-        remoteUser.videoTrack.play(videoRef.current);
+        try {
+          remoteUser.videoTrack.play(videoRef.current);
+        } catch (error) {
+          console.warn('⚠️ Failed to play preview video:', error);
+        }
       }
     }
   }, [remoteUsers]);

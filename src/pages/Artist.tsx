@@ -27,8 +27,6 @@ import { useSongPrice } from "@/hooks/useSongBondingCurve";
 import { AudioWaveform } from "@/components/AudioWaveform";
 import { useAudioStateForSong } from "@/hooks/useAudioState";
 import { TipButton } from "@/components/TipButton";
-import gltchLogo from '@/assets/gltch-logo.png';
-import gltchTabLogo from '@/assets/gltch-tab-logo.png';
 import TaggedText from "@/components/TaggedText";
 
 interface Song {
@@ -1008,18 +1006,6 @@ const Artist = ({ playSong, currentSong, isPlaying }: ArtistProps) => {
                 ALL
               </TabsTrigger>
               <TabsTrigger 
-                value="posts" 
-                className="flex items-center justify-center gap-2 px-3 md:px-5 py-2.5 font-medium text-sm data-[state=active]:bg-gradient-to-r data-[state=active]:from-neon-green/20 data-[state=active]:to-emerald-500/20 data-[state=active]:shadow-[0_0_15px_rgba(0,255,159,0.5)] data-[state=active]:border data-[state=active]:border-neon-green/50 data-[state=inactive]:opacity-50 data-[state=inactive]:hover:opacity-80 rounded-xl transition-all duration-300 flex-shrink-0"
-              >
-                <img src={gltchTabLogo} alt="GLTCH" className="h-6 w-auto" />
-              </TabsTrigger>
-              <TabsTrigger 
-                value="popular" 
-                className="px-3 md:px-5 py-2.5 font-medium text-sm font-mono uppercase data-[state=active]:bg-gradient-to-r data-[state=active]:from-neon-green/20 data-[state=active]:to-emerald-500/20 data-[state=active]:text-neon-green data-[state=active]:shadow-[0_0_15px_rgba(0,255,159,0.5)] data-[state=active]:border data-[state=active]:border-neon-green/50 data-[state=inactive]:text-white/50 data-[state=inactive]:hover:text-white/80 rounded-xl transition-all duration-300 flex-shrink-0"
-              >
-                POPULAR
-              </TabsTrigger>
-              <TabsTrigger 
                 value="tracks" 
                 className="px-3 md:px-5 py-2.5 font-medium text-sm font-mono uppercase data-[state=active]:bg-gradient-to-r data-[state=active]:from-neon-green/20 data-[state=active]:to-emerald-500/20 data-[state=active]:text-neon-green data-[state=active]:shadow-[0_0_15px_rgba(0,255,159,0.5)] data-[state=active]:border data-[state=active]:border-neon-green/50 data-[state=inactive]:text-white/50 data-[state=inactive]:hover:text-white/80 rounded-xl transition-all duration-300 flex-shrink-0"
               >
@@ -1030,6 +1016,12 @@ const Artist = ({ playSong, currentSong, isPlaying }: ArtistProps) => {
                 className="px-3 md:px-5 py-2.5 font-medium text-sm font-mono uppercase data-[state=active]:bg-gradient-to-r data-[state=active]:from-neon-green/20 data-[state=active]:to-emerald-500/20 data-[state=active]:text-neon-green data-[state=active]:shadow-[0_0_15px_rgba(0,255,159,0.5)] data-[state=active]:border data-[state=active]:border-neon-green/50 data-[state=inactive]:text-white/50 data-[state=inactive]:hover:text-white/80 rounded-xl transition-all duration-300 flex-shrink-0"
               >
                 ALBUMS
+              </TabsTrigger>
+              <TabsTrigger 
+                value="popular" 
+                className="px-3 md:px-5 py-2.5 font-medium text-sm font-mono uppercase data-[state=active]:bg-gradient-to-r data-[state=active]:from-neon-green/20 data-[state=active]:to-emerald-500/20 data-[state=active]:text-neon-green data-[state=active]:shadow-[0_0_15px_rgba(0,255,159,0.5)] data-[state=active]:border data-[state=active]:border-neon-green/50 data-[state=inactive]:text-white/50 data-[state=inactive]:hover:text-white/80 rounded-xl transition-all duration-300 flex-shrink-0"
+              >
+                POPULAR
               </TabsTrigger>
               <TabsTrigger 
                 value="playlists" 

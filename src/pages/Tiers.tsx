@@ -2,7 +2,6 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { XRGE_TIERS } from "@/hooks/useXRGETier";
-import NetworkInfo from "@/components/NetworkInfo";
 import { ArrowLeft, Trophy } from "lucide-react";
 
 export default function Tiers() {
@@ -10,7 +9,6 @@ export default function Tiers() {
 
   return (
     <div className="min-h-screen bg-background pb-16 md:pb-0">
-      <NetworkInfo />
 
       <div className="max-w-4xl mx-auto px-6 py-8">
         {/* Header */}

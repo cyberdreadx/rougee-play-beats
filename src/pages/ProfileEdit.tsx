@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import NetworkInfo from "@/components/NetworkInfo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -424,7 +423,6 @@ const ProfileEdit = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <NetworkInfo />
 
       <div className="max-w-4xl mx-auto px-6 py-8 space-y-6">
 

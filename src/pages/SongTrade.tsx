@@ -16,7 +16,6 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
-import NetworkInfo from "@/components/NetworkInfo";
 import LikeButton from "@/components/LikeButton";
 import { ReportButton } from "@/components/ReportButton";
 import { SongTradingChart } from "@/components/SongTradingChart";
@@ -1735,8 +1734,6 @@ const SongTrade = ({ playSong, currentSong, isPlaying }: SongTradeProps) => {
         <meta name="twitter:image" content={coverImageUrl} />
         <meta name="twitter:image:src" content={coverImageUrl} />
       </Helmet>
-
-      <NetworkInfo />
 
       <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 py-4 md:py-8">
         {/* Song Header */}

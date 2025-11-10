@@ -94,7 +94,7 @@ export function HoldersModal({ open, onOpenChange, walletAddresses, title }: Hol
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="console-bg tech-border max-w-md max-h-[80vh] overflow-y-auto">
+      <DialogContent className="console-bg tech-border max-w-md max-h-[80vh] overflow-y-auto overflow-x-hidden">
         <DialogHeader>
           <DialogTitle className="font-mono text-neon-green">{title}</DialogTitle>
         </DialogHeader>
@@ -137,14 +137,14 @@ export function HoldersModal({ open, onOpenChange, walletAddresses, title }: Hol
                     )}
 
                     <div className="flex-1 min-w-0">
-                      <p className="font-mono font-semibold flex items-center gap-1">
-                        {holder.artist_name || `${holder.wallet_address.slice(0, 6)}...${holder.wallet_address.slice(-4)}`}
+                      <p className="font-mono font-semibold flex items-center gap-1 truncate">
+                        <span className="truncate">{holder.artist_name || `${holder.wallet_address.slice(0, 6)}...${holder.wallet_address.slice(-4)}`}</span>
                         {holder.verified && (
                           <CheckCircle className="h-3 w-3 text-neon-green flex-shrink-0" aria-label="Verified" />
                         )}
                       </p>
                       <button
-                        className="text-xs font-mono text-muted-foreground hover:text-neon-green transition-colors truncate text-left"
+                        className="text-xs font-mono text-muted-foreground hover:text-neon-green transition-colors truncate text-left block w-full"
                         onClick={(e) => {
                           e.stopPropagation();
                           navigator.clipboard.writeText(holder.wallet_address);

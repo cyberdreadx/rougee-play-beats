@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import NetworkInfo from "@/components/NetworkInfo";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -149,7 +148,6 @@ export default function PostPage({ playSong, currentSong, isPlaying }: PostProps
 
   return (
     <div className="min-h-screen bg-background pb-24 md:pb-20">
-      <NetworkInfo />
       <div className="max-w-3xl mx-auto px-4 py-6">
         {loading || !post ? (
           <Card className="p-10 bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl text-center">

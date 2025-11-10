@@ -61,9 +61,9 @@ const Navigation = ({ activeTab = "DISCOVER", onTabChange }: NavigationProps) =>
   
   // Desktop tabs - show all (How It Works moved to header)
   const desktopTabs = [
-    { name: "TRENDING", path: "/", icon: TrendingUp },
+    { name: "DISCOVER", path: "/", icon: Compass },
+    { name: "TRENDING", path: "/trending", icon: TrendingUp },
     { name: "GLTCH FEED", path: "/feed", icon: Radio },
-    { name: "DISCOVER", path: "/discover", icon: Compass },
     ...(isArtist || profile?.verified || profile?.artist_name
       ? [
           { name: "MY PROFILE", path: `/artist/${fullAddress}`, icon: User },
@@ -81,9 +81,9 @@ const Navigation = ({ activeTab = "DISCOVER", onTabChange }: NavigationProps) =>
 
   // Mobile tabs - Only essentials (4-5 max for clean UX)
   const mobileTabs = [
-    { name: "Trending", path: "/", icon: TrendingUp },
+    { name: "Discover", path: "/", icon: Compass },
+    { name: "Trending", path: "/trending", icon: TrendingUp },
     { name: "Feed", path: "/feed", icon: Radio },
-    { name: "Discover", path: "/discover", icon: Compass },
     { name: "Wallet", path: "/wallet", icon: Wallet },
     { name: "Menu", path: "#", icon: Menu, isMenu: true }, // Hamburger menu
   ];

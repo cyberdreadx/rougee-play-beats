@@ -2,7 +2,6 @@ import { useEffect, useState, useMemo, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { debounce } from "@/lib/throttle";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import NetworkInfo from "@/components/NetworkInfo";
 import { Loader2, TrendingUp, TrendingDown, Flame, Music, Play, Pause, ChevronDown, ChevronUp, Clock, Zap, BarChart3, Sparkles } from "lucide-react";
 import { getIPFSGatewayUrl } from "@/lib/ipfs";
 import logo from "@/assets/logo.png";
@@ -333,9 +332,9 @@ interface Song {
   const marketCap = marketCapUSD;
   
   return (
-      <div className="mb-6 relative overflow-hidden rounded-2xl bg-white/5 backdrop-blur-2xl p-6 pb-8 hover:bg-white/8 transition-all duration-300 h-full flex flex-col" 
+      <div className="mb-6 relative overflow-hidden rounded-2xl bg-gradient-to-br from-white/5 via-white/3 to-white/0 backdrop-blur-2xl p-4 md:p-6 pb-6 md:pb-8 hover:bg-gradient-to-br hover:from-white/8 hover:via-white/5 hover:to-white/2 transition-all duration-300 min-h-full flex flex-col hover:scale-[1.02] active:scale-[0.98]"
            style={{
-             border: '1px solid rgba(255, 255, 255, 0.2)',
+             border: '1px solid rgba(255, 255, 255, 0.15)',
              boxShadow: `
                0 0 0 1px rgba(0, 255, 159, 0.1),
                0 4px 16px rgba(0, 255, 159, 0.1),
@@ -362,7 +361,7 @@ interface Song {
                inset 0 1px 0 rgba(255, 255, 255, 0.1),
                inset 0 -1px 0 rgba(0, 0, 0, 0.2)
              `;
-             e.currentTarget.style.border = '1px solid rgba(255, 255, 255, 0.2)';
+             e.currentTarget.style.border = '1px solid rgba(255, 255, 255, 0.15)';
            }}>
       {/* Faded background album cover */}
       {song.cover_cid && (
@@ -378,7 +377,7 @@ interface Song {
           <Flame className="w-3 h-3" />
           #{rank || 1} TRENDING
         </div>
-      <div className="flex flex-col md:flex-row items-start md:items-center gap-4 mb-4">
+      <div className="flex flex-col md:flex-row items-start md:items-center gap-4 mb-3 md:mb-4">
         <div className="relative group">
           {song.cover_cid ? (
             <img
@@ -418,10 +417,10 @@ interface Song {
           <p className="text-muted-foreground font-mono mb-3">
             By {song.artist || 'Unknown'} • {song.ticker && `$${song.ticker}`}
           </p>
-          <div className="flex flex-wrap gap-3 mb-4">
-            <div className="bg-black/40 rounded-lg px-3 py-2 transition-all duration-300"
+          <div className="flex flex-wrap gap-3 mb-2 md:mb-4">
+            <div className="bg-gradient-to-br from-black/40 via-black/30 to-black/20 rounded-lg px-3 py-2 transition-all duration-300 hover:scale-105 active:scale-95"
                  style={{
-                   border: '1px solid rgba(255, 255, 255, 0.05)',
+                   border: '1px solid rgba(255, 255, 255, 0.1)',
                    boxShadow: `
                      0 0 0 1px rgba(0, 0, 0, 0.3),
                      inset 0 1px 0 rgba(255, 255, 255, 0.05),
@@ -1088,9 +1087,9 @@ const SongCard = memo(({ song, index, onStatsUpdate, playSong, currentSong, isPl
   return (
     <div
       onClick={() => navigate(`/song/${song.id}`)}
-      className="relative flex items-center gap-2 p-3 bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl hover:bg-white/8 active:bg-white/10 active:scale-[0.98] transition-all cursor-pointer shadow-[0_4px_16px_0_rgba(0,255,159,0.05)]"
+      className="relative flex items-center gap-2 p-2 bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl hover:bg-white/8 active:bg-white/10 active:scale-[0.98] transition-all cursor-pointer shadow-[0_4px_16px_0_rgba(0,255,159,0.05)]"
     >
-      <div className="flex-shrink-0 text-xs font-mono text-muted-foreground w-6">
+      <div className="flex-shrink-0 text-xs font-mono text-muted-foreground w-5">
         #{index + 1}
       </div>
       
@@ -1099,11 +1098,11 @@ const SongCard = memo(({ song, index, onStatsUpdate, playSong, currentSong, isPl
           <img
             src={getIPFSGatewayUrl(song.cover_cid)}
             alt={song.title}
-            className="w-12 h-12 rounded object-cover"
+            className="w-10 h-10 rounded object-cover"
           />
         ) : (
-          <div className="w-12 h-12 rounded bg-neon-green/10 flex items-center justify-center">
-            <Music className="w-6 h-6 text-neon-green" />
+          <div className="w-10 h-10 rounded bg-neon-green/10 flex items-center justify-center">
+            <Music className="w-5 h-5 text-neon-green" />
           </div>
         )}
         {playSong && song.audio_cid && (
@@ -1112,37 +1111,37 @@ const SongCard = memo(({ song, index, onStatsUpdate, playSong, currentSong, isPl
               e.stopPropagation();
               playSong(song);
             }}
-            className="absolute bottom-0 right-0 w-6 h-6 rounded-full bg-neon-green hover:bg-neon-green/80 active:bg-neon-green/70 flex items-center justify-center transition-all hover:scale-110 active:scale-95 shadow-lg"
+            className="absolute bottom-0 right-0 w-5 h-5 rounded-full bg-neon-green hover:bg-neon-green/80 active:bg-neon-green/70 flex items-center justify-center transition-all hover:scale-110 active:scale-95 shadow-lg"
           >
             {isThisSongPlaying ? (
-              <Pause className="w-3 h-3 text-black fill-black" />
+              <Pause className="w-2.5 h-2.5 text-black fill-black" />
             ) : (
-              <Play className="w-3 h-3 text-black fill-black ml-0.5" />
+              <Play className="w-2.5 h-2.5 text-black fill-black ml-0.5" />
             )}
           </button>
         )}
         {index < 3 && (
-          <div className="absolute -top-1 -right-1 bg-orange-500 rounded-full p-1">
+          <div className="absolute -top-1 -right-1 bg-orange-500 rounded-full p-0.5">
             <Flame className="w-2 h-2 text-white" />
           </div>
         )}
       </div>
       
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
+        <div className="flex items-center gap-1 mb-0.5 flex-wrap">
           <span className="text-xs font-semibold truncate">{song.title}</span>
           {song.ticker && (
-            <span className="text-[10px] text-neon-green font-mono flex-shrink-0">${song.ticker}</span>
+            <span className="text-[9px] text-neon-green font-mono flex-shrink-0">${song.ticker}</span>
           )}
           <AiBadge aiUsage={song.ai_usage} size="sm" />
           {change24h > 50 && (
-            <span className="text-[9px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded-full font-mono font-bold flex-shrink-0">
+            <span className="text-[8px] bg-green-500/20 text-green-400 px-1 py-0.5 rounded-full font-mono font-bold flex-shrink-0">
               🚀
             </span>
           )}
         </div>
         <div 
-          className="text-[10px] text-muted-foreground hover:text-neon-green transition-colors cursor-pointer truncate"
+          className="text-[9px] text-muted-foreground hover:text-neon-green transition-colors cursor-pointer truncate"
           onClick={(e) => {
             e.stopPropagation();
             if (song.wallet_address) navigate(`/artist/${song.wallet_address}`);
@@ -1151,18 +1150,18 @@ const SongCard = memo(({ song, index, onStatsUpdate, playSong, currentSong, isPl
           {song.artist || 'Unknown'}
         </div>
         
-        <div className="flex items-center gap-3 mt-1.5">
+        <div className="flex items-center gap-2 mt-1">
           <div className="flex items-center gap-1">
-            <Flame className="w-3 h-3 text-orange-500" />
-            <span className="text-[10px] font-mono">{song.play_count || 0}</span>
+            <Flame className="w-2.5 h-2.5 text-orange-500" />
+            <span className="text-[9px] font-mono">{song.play_count || 0}</span>
           </div>
           
-          <div className={`text-[10px] font-mono font-bold ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
+          <div className={`text-[9px] font-mono font-bold ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
             {isPositive ? '+' : ''}{change24h.toFixed(1)}%
           </div>
           
-          <div className="text-[10px] font-mono text-muted-foreground">
-            ${currentPrice ? (currentPrice < 0.000001 ? currentPrice.toFixed(10) : currentPrice < 0.01 ? currentPrice.toFixed(8) : currentPrice.toFixed(6)) : '$0.000000'}
+          <div className="text-[9px] font-mono text-muted-foreground">
+            ${currentPrice ? (currentPrice < 0.000001 ? currentPrice.toFixed(8) : currentPrice < 0.01 ? currentPrice.toFixed(6) : currentPrice.toFixed(4)) : '$0.0000'}
           </div>
         </div>
       </div>
@@ -1789,9 +1788,8 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
   // Don't show full page loading - show skeleton instead
 
   return (
-    <div className="min-h-screen bg-background pb-24 md:pb-20">
+    <div className="min-h-screen bg-background pb-24 md:pb-20 pt-16 md:pt-20">
       <AppTutorial />
-      <NetworkInfo />
       
       {/* Stunning Hero Section */}
       <div className="relative overflow-hidden">
@@ -1799,27 +1797,27 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
         <div className="absolute inset-0 bg-gradient-to-br from-neon-green/20 via-purple-500/10 to-pink-500/10 blur-3xl opacity-50 animate-pulse" />
         <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent z-10" />
         
-        <div className="relative z-20 text-center px-4 md:px-6 pt-8 md:pt-12 pb-8">
-          <div className="mb-4 flex justify-center items-center gap-3">
-            <MusicBars bars={6} className="h-8 md:h-12 flex-shrink-0 animate-pulse" />
+        <div className="relative z-20 text-center px-4 md:px-6 pt-4 md:pt-6 pb-4 md:pb-6">
+          <div className="mb-3 md:mb-4 flex justify-center items-center gap-2 md:gap-3">
+            <MusicBars bars={6} className="h-6 md:h-12 flex-shrink-0 animate-pulse" />
             <div className="relative">
-              <img src={logo} alt="ROUGEE Logo" className="w-12 h-12 md:w-16 md:h-16 rounded-full object-cover border-2 border-neon-green/30 shadow-[0_0_30px_rgba(0,255,159,0.3)] animate-pulse" />
+              <img src={logo} alt="ROUGEE Logo" className="w-10 h-10 md:w-16 md:h-16 rounded-full object-cover border-2 border-neon-green/30 shadow-[0_0_30px_rgba(0,255,159,0.3)] animate-pulse" />
               <div className="absolute inset-0 bg-neon-green/20 rounded-full animate-ping" />
             </div>
-            <MusicBars bars={6} className="h-8 md:h-12 flex-shrink-0 animate-pulse" />
+            <MusicBars bars={6} className="h-6 md:h-12 flex-shrink-0 animate-pulse" />
           </div>
-          <h1 className="text-3xl md:text-5xl font-bold mb-3 bg-gradient-to-r from-neon-green via-purple-400 to-pink-500 bg-clip-text text-transparent drop-shadow-[0_0_20px_rgba(0,255,159,0.5)]">
+          <h1 className="text-2xl md:text-5xl font-bold mb-2 md:mb-3 bg-gradient-to-r from-neon-green via-purple-400 to-pink-500 bg-clip-text text-transparent drop-shadow-[0_0_20px_rgba(0,255,159,0.5)]">
             TRENDING
           </h1>
-          <p className="text-sm md:text-base text-muted-foreground max-w-2xl mx-auto">
+          <p className="text-xs md:text-base text-muted-foreground max-w-2xl mx-auto leading-tight">
             Discover the hottest tracks and rising artists on the decentralized music platform
           </p>
         </div>
       </div>
       
-      <main className="w-full px-0 md:container md:mx-auto md:px-4 py-6 md:py-8" data-tour="trending">
+      <main className="w-full px-0 md:px-0 md:container md:mx-auto py-2 md:py-4" data-tour="trending">
         {/* Enhanced Live Stats Ticker */}
-        <div className="mb-8 grid grid-cols-2 md:grid-cols-4 gap-4 px-4 md:px-0">
+        <div className="mb-4 md:mb-6 grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 px-0 md:px-0">
           {loading ? (
             <>
               <StatsCardSkeleton />
@@ -1829,7 +1827,7 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
             </>
           ) : (
             <>
-              <div className="group relative bg-gradient-to-br from-white/5 to-white/0 backdrop-blur-xl rounded-xl p-5 transition-all duration-300 overflow-hidden"
+              <div className="group relative bg-gradient-to-br from-white/5 via-white/2 to-white/0 backdrop-blur-xl rounded-xl p-3 md:p-5 transition-all duration-300 overflow-hidden hover:scale-105 active:scale-95 hover:shadow-[0_0_20px_rgba(0,255,159,0.3)] active:shadow-[0_0_10px_rgba(0,255,159,0.2)]"
                    style={{
                      border: '1px solid rgba(255, 255, 255, 0.1)',
                      boxShadow: `
@@ -1860,12 +1858,12 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
                        inset 0 -1px 0 rgba(0, 0, 0, 0.3)
                      `;
                    }}>
-                <div className="absolute top-0 right-0 w-20 h-20 bg-neon-green/10 rounded-full blur-2xl group-hover:bg-neon-green/20 transition-all" />
-                <Music className="w-5 h-5 text-neon-green/70 mb-2" />
-                <div className="text-xs text-muted-foreground font-mono mb-1">TOTAL SONGS</div>
-                <div className="text-3xl font-bold font-mono neon-text drop-shadow-[0_0_8px_rgba(0,255,159,0.6)]">{songs.length}</div>
+                <div className="absolute top-0 right-0 w-16 h-16 md:w-20 md:h-20 bg-neon-green/10 rounded-full blur-2xl group-hover:bg-neon-green/20 transition-all" />
+                <Music className="w-4 h-4 md:w-5 md:h-5 text-neon-green/70 mb-1 md:mb-2" />
+                <div className="text-[10px] md:text-xs text-muted-foreground font-mono mb-1">TOTAL SONGS</div>
+                <div className="text-2xl md:text-3xl font-bold font-mono neon-text drop-shadow-[0_0_8px_rgba(0,255,159,0.6)]">{songs.length}</div>
               </div>
-              <div className="group relative bg-gradient-to-br from-white/5 to-white/0 backdrop-blur-xl rounded-xl p-5 transition-all duration-300 overflow-hidden"
+              <div className="group relative bg-gradient-to-br from-white/5 via-purple-500/5 to-white/0 backdrop-blur-xl rounded-xl p-3 md:p-5 transition-all duration-300 overflow-hidden hover:scale-105 active:scale-95 hover:shadow-[0_0_20px_rgba(168,85,247,0.3)] active:shadow-[0_0_10px_rgba(168,85,247,0.2)]"
                    style={{
                      border: '1px solid rgba(255, 255, 255, 0.1)',
                      boxShadow: `
@@ -1896,10 +1894,10 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
                        inset 0 -1px 0 rgba(0, 0, 0, 0.3)
                      `;
                    }}>
-                <div className="absolute top-0 right-0 w-20 h-20 bg-purple-500/10 rounded-full blur-2xl group-hover:bg-purple-500/20 transition-all" />
-                <BarChart3 className="w-5 h-5 text-purple-400/70 mb-2" />
-                <div className="text-xs text-muted-foreground font-mono mb-1">TOTAL VOLUME (24H)</div>
-                <div className="text-3xl font-bold font-mono text-purple-400 drop-shadow-[0_0_8px_rgba(168,85,247,0.6)]">
+                <div className="absolute top-0 right-0 w-16 h-16 md:w-20 md:h-20 bg-purple-500/10 rounded-full blur-2xl group-hover:bg-purple-500/20 transition-all" />
+                <BarChart3 className="w-4 h-4 md:w-5 md:h-5 text-purple-400/70 mb-1 md:mb-2" />
+                <div className="text-[10px] md:text-xs text-muted-foreground font-mono mb-1">TOTAL VOLUME (24H)</div>
+                <div className="text-2xl md:text-3xl font-bold font-mono text-purple-400 drop-shadow-[0_0_8px_rgba(168,85,247,0.6)]">
                   {calculatingVolume ? (
                     <span className="animate-pulse">...</span>
                   ) : (
@@ -1907,7 +1905,7 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
                   )}
                 </div>
               </div>
-              <div className="group relative bg-gradient-to-br from-white/5 to-white/0 backdrop-blur-xl rounded-xl p-5 transition-all duration-300 overflow-hidden"
+              <div className="group relative bg-gradient-to-br from-white/5 via-orange-500/5 to-white/0 backdrop-blur-xl rounded-xl p-3 md:p-5 transition-all duration-300 overflow-hidden hover:scale-105 active:scale-95 hover:shadow-[0_0_20px_rgba(249,115,22,0.3)] active:shadow-[0_0_10px_rgba(249,115,22,0.2)]"
                    style={{
                      border: '1px solid rgba(255, 255, 255, 0.1)',
                      boxShadow: `
@@ -1938,14 +1936,14 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
                        inset 0 -1px 0 rgba(0, 0, 0, 0.3)
                      `;
                    }}>
-                <div className="absolute top-0 right-0 w-20 h-20 bg-orange-500/10 rounded-full blur-2xl group-hover:bg-orange-500/20 transition-all" />
-                <Zap className="w-5 h-5 text-orange-400/70 mb-2" />
-                <div className="text-xs text-muted-foreground font-mono mb-1">TOP GAINER</div>
-                <div className="text-3xl font-bold font-mono text-orange-400 drop-shadow-[0_0_8px_rgba(249,115,22,0.6)]">
+                <div className="absolute top-0 right-0 w-16 h-16 md:w-20 md:h-20 bg-orange-500/10 rounded-full blur-2xl group-hover:bg-orange-500/20 transition-all" />
+                <Zap className="w-4 h-4 md:w-5 md:h-5 text-orange-400/70 mb-1 md:mb-2" />
+                <div className="text-[10px] md:text-xs text-muted-foreground font-mono mb-1">TOP GAINER</div>
+                <div className="text-2xl md:text-3xl font-bold font-mono text-orange-400 drop-shadow-[0_0_8px_rgba(249,115,22,0.6)]">
                   {topGainerPercent > 0 ? `+${topGainerPercent.toFixed(1)}%` : '0%'}
                 </div>
               </div>
-              <div className="group relative bg-gradient-to-br from-white/5 to-white/0 backdrop-blur-xl rounded-xl p-5 transition-all duration-300 overflow-hidden"
+              <div className="group relative bg-gradient-to-br from-white/5 via-blue-500/5 to-white/0 backdrop-blur-xl rounded-xl p-3 md:p-5 transition-all duration-300 overflow-hidden hover:scale-105 active:scale-95 hover:shadow-[0_0_20px_rgba(59,130,246,0.3)] active:shadow-[0_0_10px_rgba(59,130,246,0.2)]"
                    style={{
                      border: '1px solid rgba(255, 255, 255, 0.1)',
                      boxShadow: `
@@ -1976,10 +1974,10 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
                        inset 0 -1px 0 rgba(0, 0, 0, 0.3)
                      `;
                    }}>
-                <div className="absolute top-0 right-0 w-20 h-20 bg-blue-500/10 rounded-full blur-2xl group-hover:bg-blue-500/20 transition-all" />
-                <Sparkles className="w-5 h-5 text-blue-400/70 mb-2" />
-                <div className="text-xs text-muted-foreground font-mono mb-1">ARTISTS</div>
-                <div className="text-3xl font-bold font-mono text-blue-400 drop-shadow-[0_0_8px_rgba(59,130,246,0.6)]">{artists.length}</div>
+                <div className="absolute top-0 right-0 w-16 h-16 md:w-20 md:h-20 bg-blue-500/10 rounded-full blur-2xl group-hover:bg-blue-500/20 transition-all" />
+                <Sparkles className="w-4 h-4 md:w-5 md:h-5 text-blue-400/70 mb-1 md:mb-2" />
+                <div className="text-[10px] md:text-xs text-muted-foreground font-mono mb-1">ARTISTS</div>
+                <div className="text-2xl md:text-3xl font-bold font-mono text-blue-400 drop-shadow-[0_0_8px_rgba(59,130,246,0.6)]">{artists.length}</div>
               </div>
             </>
           )}
@@ -1987,13 +1985,13 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
 
         {/* Featured/Promoted Banner with Real Data - Cycles through top 5 songs */}
         {loading ? (
-          <div className="mb-20 px-4 md:px-0">
+          <div className="mb-6 md:mb-10 px-4 md:px-0">
             <FeaturedSongSkeleton />
           </div>
         ) : featuredSong && top5Songs.length > 0 ? (
-          <div className="relative mb-20 px-4 md:px-0" style={{ zIndex: 1 }}>
-            {/* Container for both cards during transition - fixed height prevents layout shift */}
-            <div className="relative w-full overflow-hidden" style={{ height: '520px' }}>
+          <div className="relative mb-6 md:mb-10 px-0 md:px-0" style={{ zIndex: 1 }}>
+            {/* Container for both cards during transition - dynamic height prevents content cutoff */}
+            <div className="relative w-full overflow-hidden min-h-[380px] md:h-[520px]">
               {/* Skeleton loader - shows during transition */}
               {isTransitioning && (
                 <div
@@ -2102,14 +2100,14 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
         ) : null}
 
         {/* Time Filter & Section Header */}
-        <div className="mb-8 px-4 md:px-0 relative" style={{ zIndex: 10 }}>
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+        <div className="mb-6 md:mb-8 px-0 md:px-0 relative" style={{ zIndex: 10 }}>
+          <div className="flex flex-col gap-4 mb-4 md:mb-6">
             <div>
-              <h1 className="text-3xl md:text-4xl font-bold font-mono mb-2 neon-text flex items-center gap-3">
-                <Flame className="w-8 h-8 text-orange-500 animate-pulse" />
+              <h1 className="text-2xl md:text-4xl font-bold font-mono mb-2 neon-text flex items-center gap-2 md:gap-3">
+                <Flame className="w-6 md:w-8 h-6 md:h-8 text-orange-500 animate-pulse" />
                 {searchQuery ? `SEARCH RESULTS` : `TRENDING`}
               </h1>
-              <p className="text-muted-foreground font-mono text-sm">
+              <p className="text-muted-foreground font-mono text-xs md:text-sm">
                 {searchQuery 
                   ? `Search results for "${searchQuery}"` 
                   : `Top artists and songs ranked by trading activity & plays`
@@ -2118,11 +2116,11 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
             </div>
             
             {/* Time Filter Buttons */}
-            <div className="flex items-center gap-2 bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-1">
-              <Clock className="w-4 h-4 text-muted-foreground mr-1" />
+            <div className="flex items-center gap-1 md:gap-2 bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-1 w-fit">
+              <Clock className="w-3 h-3 md:w-4 md:h-4 text-muted-foreground ml-1" />
               <button
                 onClick={() => setTimeFilter('24H')}
-                className={`px-4 py-2 rounded-lg text-xs font-mono transition-all ${
+                className={`px-2 md:px-4 py-1.5 md:py-2 rounded-lg text-[10px] md:text-xs font-mono transition-all ${
                   timeFilter === '24H'
                     ? 'bg-neon-green text-black shadow-[0_0_12px_rgba(0,255,159,0.5)]'
                     : 'text-muted-foreground hover:text-neon-green hover:bg-white/5'
@@ -2132,7 +2130,7 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
               </button>
               <button
                 onClick={() => setTimeFilter('7D')}
-                className={`px-4 py-2 rounded-lg text-xs font-mono transition-all ${
+                className={`px-2 md:px-4 py-1.5 md:py-2 rounded-lg text-[10px] md:text-xs font-mono transition-all ${
                   timeFilter === '7D'
                     ? 'bg-neon-green text-black shadow-[0_0_12px_rgba(0,255,159,0.5)]'
                     : 'text-muted-foreground hover:text-neon-green hover:bg-white/5'
@@ -2142,7 +2140,7 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
               </button>
               <button
                 onClick={() => setTimeFilter('30D')}
-                className={`px-4 py-2 rounded-lg text-xs font-mono transition-all ${
+                className={`px-2 md:px-4 py-1.5 md:py-2 rounded-lg text-[10px] md:text-xs font-mono transition-all ${
                   timeFilter === '30D'
                     ? 'bg-neon-green text-black shadow-[0_0_12px_rgba(0,255,159,0.5)]'
                     : 'text-muted-foreground hover:text-neon-green hover:bg-white/5'
@@ -2152,7 +2150,7 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
               </button>
               <button
                 onClick={() => setTimeFilter('ALL')}
-                className={`px-4 py-2 rounded-lg text-xs font-mono transition-all ${
+                className={`px-2 md:px-4 py-1.5 md:py-2 rounded-lg text-[10px] md:text-xs font-mono transition-all ${
                   timeFilter === 'ALL'
                     ? 'bg-neon-green text-black shadow-[0_0_12px_rgba(0,255,159,0.5)]'
                     : 'text-muted-foreground hover:text-neon-green hover:bg-white/5'
@@ -2164,17 +2162,17 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
           </div>
         </div>
 
-        <Tabs defaultValue="songs" className="w-full px-4 md:px-0 relative" style={{ zIndex: 10 }}>
-          <TabsList className="grid w-full max-w-md grid-cols-2 mb-6 bg-black/20 backdrop-blur-xl border border-white/10 rounded-xl p-1 relative" style={{ zIndex: 10 }}>
+        <Tabs defaultValue="songs" className="w-full px-0 md:px-0 relative" style={{ zIndex: 10 }}>
+          <TabsList className="grid w-full max-w-sm md:max-w-md grid-cols-2 mb-4 md:mb-6 bg-black/20 backdrop-blur-xl border border-white/10 rounded-xl p-1 relative" style={{ zIndex: 10 }}>
             <TabsTrigger 
               value="songs"
-              className="data-[state=active]:bg-neon-green/20 data-[state=active]:text-neon-green font-mono rounded-lg transition-all"
+              className="data-[state=active]:bg-neon-green/20 data-[state=active]:text-neon-green font-mono rounded-lg transition-all text-xs md:text-sm"
             >
               SONGS
             </TabsTrigger>
             <TabsTrigger 
               value="artists"
-              className="data-[state=active]:bg-neon-green/20 data-[state=active]:text-neon-green font-mono rounded-lg transition-all"
+              className="data-[state=active]:bg-neon-green/20 data-[state=active]:text-neon-green font-mono rounded-lg transition-all text-xs md:text-sm"
             >
               ARTISTS
             </TabsTrigger>
@@ -2182,13 +2180,13 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
 
           <TabsContent value="songs" className="space-y-4">
             {/* Enhanced Sort & Filter Controls */}
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4 bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-4">
-              <div className="flex items-center gap-3 flex-wrap">
-                <span className="text-xs text-muted-foreground font-mono flex items-center gap-1">
+            <div className="flex flex-col gap-3 md:gap-4 mb-4 bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-3 md:p-4">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[10px] md:text-xs text-muted-foreground font-mono flex items-center gap-1">
                   <TrendingUp className="w-3 h-3" />
                   SORT BY:
                 </span>
-                <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-1 md:gap-2 flex-wrap">
                   {[
                     { field: 'trending' as SortField, label: '🔥 TRENDING', icon: Flame },
                     { field: 'price' as SortField, label: 'PRICE', icon: TrendingUp },
@@ -2199,7 +2197,7 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
                     <button
                       key={field}
                       onClick={() => handleSort(field)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-mono transition-all flex items-center gap-1 ${
+                      className={`px-2 md:px-3 py-1 md:py-1.5 rounded-lg text-[10px] md:text-xs font-mono transition-all flex items-center gap-1 ${
                         sortField === field 
                           ? 'bg-neon-green/20 text-neon-green border border-neon-green/50 shadow-[0_0_8px_rgba(0,255,159,0.3)]' 
                           : 'bg-background/50 text-muted-foreground border border-border hover:border-neon-green/30 hover:text-neon-green'
@@ -2214,7 +2212,7 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
               
               {/* Display Limit Filter */}
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs text-muted-foreground font-mono flex items-center gap-1">
+                <span className="text-[10px] md:text-xs text-muted-foreground font-mono flex items-center gap-1">
                   <BarChart3 className="w-3 h-3" />
                   SHOW:
                 </span>
@@ -2222,7 +2220,7 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
                   <button
                     key={limit}
                     onClick={() => setDisplayLimit(limit)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-mono transition-all ${
+                    className={`px-2 md:px-3 py-1 md:py-1.5 rounded-lg text-[10px] md:text-xs font-mono transition-all ${
                       displayLimit === limit
                         ? 'bg-neon-green/20 text-neon-green border border-neon-green/50 shadow-[0_0_8px_rgba(0,255,159,0.3)]' 
                         : 'bg-background/50 text-muted-foreground border border-border hover:border-neon-green/30 hover:text-neon-green'
@@ -2233,7 +2231,7 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
                 ))}
                 <button
                   onClick={() => setDisplayLimit(null)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-mono transition-all ${
+                  className={`px-2 md:px-3 py-1 md:py-1.5 rounded-lg text-[10px] md:text-xs font-mono transition-all ${
                     displayLimit === null
                       ? 'bg-neon-green/20 text-neon-green border border-neon-green/50 shadow-[0_0_8px_rgba(0,255,159,0.3)]' 
                       : 'bg-background/50 text-muted-foreground border border-border hover:border-neon-green/30 hover:text-neon-green'
@@ -2364,7 +2362,7 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
             </div>
             
             {/* Mobile Card View */}
-            <div className="md:hidden space-y-2">
+            <div className="md:hidden space-y-1.5">
               {loading ? (
                 <>
                   {[...Array(5)].map((_, i) => (

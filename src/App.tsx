@@ -195,6 +195,24 @@ const AppContent = () => {
           <Route 
             path="/" 
             element={
+              <Index 
+                playSong={handlePlaySong} 
+                currentSong={activeSong} 
+                isPlaying={activeIsPlaying}
+                isRadioMode={radioPlayer.isRadioMode}
+                onToggleRadio={() => {
+                  if (radioPlayer.isRadioMode) {
+                    radioPlayer.stopRadio();
+                  } else {
+                    radioPlayer.startRadio();
+                  }
+                }}
+              />
+            } 
+          />
+          <Route 
+            path="/trending" 
+            element={
               <Trending 
                 playSong={handlePlaySong} 
                 currentSong={activeSong} 

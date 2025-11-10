@@ -1,7 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { useWallet } from "@/hooks/useWallet";
 import { useCurrentUserProfile } from "@/hooks/useCurrentUserProfile";
-import NetworkInfo from "@/components/NetworkInfo";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -113,7 +112,6 @@ const BecomeArtist = () => {
 
   return (
     <div className="min-h-screen bg-background pb-16 md:pb-0">
-      <NetworkInfo />
 
       <div className="max-w-6xl mx-auto px-6 py-12">
         {/* Hero Section */}

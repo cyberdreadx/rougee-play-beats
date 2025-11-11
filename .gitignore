@@ -12,6 +12,11 @@ dist
 dist-ssr
 *.local
 
+# Capacitor
+ios/
+android/
+.capacitor/
+
 # x402 example files (not part of our app)
 x402-temp/
 

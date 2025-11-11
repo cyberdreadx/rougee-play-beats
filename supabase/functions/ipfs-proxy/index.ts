@@ -8,10 +8,10 @@ const corsHeaders = {
 
 const IPFS_GATEWAYS = [
   'https://gateway.lighthouse.storage/ipfs', // Lighthouse (PRIMARY - your gateway)
-  'https://cloudflare-ipfs.com/ipfs',        // Cloudflare IPFS gateway (fast and reliable)
-  'https://ipfs.io/ipfs',                    // Public IPFS gateway
+  'https://dweb.link/ipfs',                  // Protocol Labs gateway (fast and reliable) - Fallback
+  'https://ipfs.io/ipfs',                    // Public IPFS gateway (reliable but slower)
+  'https://cloudflare-ipfs.com/ipfs',        // Cloudflare IPFS gateway
   'https://gateway.pinata.cloud/ipfs',       // Pinata gateway
-  'https://dweb.link/ipfs',                  // Protocol Labs gateway
   'https://ipfs.fleek.co/ipfs',              // Fleek gateway
   'https://gateway.ipfs.io/ipfs',            // Alternative IPFS.io
   'https://ipfs.infura.io/ipfs',             // Infura gateway

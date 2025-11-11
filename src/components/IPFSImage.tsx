@@ -29,13 +29,17 @@ export const IPFSImage = ({
   const attemptedUrls = useRef<Set<string>>(new Set());
   const gatewayUrls = useRef<string[]>([]);
   const currentAttempt = useRef(0);
+  const fallbackSet = useRef(false); // Track if fallback has been set to prevent re-requests
 
   // Reset state when CID changes
   useEffect(() => {
     if (!cid) {
-      setCurrentSrc(fallback);
-      setIsLoading(false);
-      setHasError(true);
+      if (!fallbackSet.current) {
+        setCurrentSrc(fallback);
+        setIsLoading(false);
+        setHasError(true);
+        fallbackSet.current = true;
+      }
       return;
     }
 
@@ -44,6 +48,7 @@ export const IPFSImage = ({
     gatewayUrls.current = getIPFSGatewayUrls(cid, maxRetries, true); // Use proxy = true
     attemptedUrls.current.clear();
     currentAttempt.current = 0;
+    fallbackSet.current = false; // Reset fallback flag for new CID
     setHasError(false);
     setIsLoading(true);
 
@@ -56,6 +61,7 @@ export const IPFSImage = ({
       setCurrentSrc(fallback);
       setIsLoading(false);
       setHasError(true);
+      fallbackSet.current = true;
     }
   }, [cid, fallback, maxRetries]);
 
@@ -65,9 +71,13 @@ export const IPFSImage = ({
     // If we've tried all gateways, show fallback
     if (currentAttempt.current >= gatewayUrls.current.length) {
       console.warn(`[IPFSImage] All gateways failed for CID: ${cid}`);
-      setCurrentSrc(fallback);
-      setIsLoading(false);
-      setHasError(true);
+      // Only set fallback if not already set to prevent re-requests
+      if (!fallbackSet.current) {
+        setCurrentSrc(fallback);
+        setIsLoading(false);
+        setHasError(true);
+        fallbackSet.current = true;
+      }
       return;
     }
 

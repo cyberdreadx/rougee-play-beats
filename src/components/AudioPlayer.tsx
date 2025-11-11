@@ -728,7 +728,7 @@ const AudioPlayer = ({
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
-  const preferredGateway = 'https://gateway.lighthouse.storage/ipfs';
+  const preferredGateway = 'https://gateway.lighthouse.storage/ipfs'; // Use Lighthouse as primary (your gateway)
   // Prefer Supabase IPFS proxy first for reliable streaming & CORS; fallback to direct gateways
   const proxyUrl = isAd 
     ? getIPFSGatewayUrl(currentAd.audio_cid, undefined, true)

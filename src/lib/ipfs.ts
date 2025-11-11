@@ -3,11 +3,11 @@
 // Multiple IPFS gateways for redundancy and to avoid security blocks
 // Ordered by actual working status and speed based on debug results
 const IPFS_GATEWAYS = [
-  'https://gateway.lighthouse.storage/ipfs', // Lighthouse (PRIMARY - your gateway, fastest working)
-  'https://dweb.link/ipfs',                  // Protocol Labs gateway (fast and reliable)
+  'https://gateway.lighthouse.storage/ipfs', // Lighthouse (PRIMARY - your gateway)
+  'https://dweb.link/ipfs',                  // Protocol Labs gateway (fast and reliable) - Fallback
   'https://ipfs.io/ipfs',                    // Public IPFS gateway (reliable but slower)
-  'https://cloudflare-ipfs.com/ipfs',        // Cloudflare IPFS gateway (CORS issues, moved to fallback)
-  'https://gateway.pinata.cloud/ipfs',       // Pinata gateway (timeout issues, moved to fallback)
+  'https://cloudflare-ipfs.com/ipfs',        // Cloudflare IPFS gateway
+  'https://gateway.pinata.cloud/ipfs',       // Pinata gateway
   'https://ipfs.fleek.co/ipfs',              // Fleek gateway
   'https://gateway.ipfs.io/ipfs',            // Alternative IPFS.io
   'https://ipfs.infura.io/ipfs',             // Infura gateway
@@ -37,7 +37,7 @@ export const getIPFSGatewayUrl = (cid: string, preferredGateway?: string, usePro
     }
   }
   
-  // Fallback to first gateway (Lighthouse is most reliable for this app)
+  // Fallback to first gateway (Lighthouse is your primary gateway)
   return `${IPFS_GATEWAYS[0]}/${cid}`;
 };
 
@@ -83,7 +83,26 @@ export const getIPFSGatewayUrls = (cid: string, count: number = 3, useProxy = fa
 export const fetchFromIPFS = async (cid: string, preferredGateway?: string): Promise<any> => {
   if (!cid) throw new Error('CID is required');
   
-  // Try multiple gateways with fallback
+  // Try proxy first to avoid CORS issues (especially with Lighthouse)
+  const proxyUrl = `https://phybdsfwycygroebrsdx.supabase.co/functions/v1/ipfs-proxy/${cid}`;
+  
+  try {
+    const proxyResponse = await fetch(proxyUrl, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+      },
+      signal: AbortSignal.timeout(10000), // 10 second timeout
+    });
+    
+    if (proxyResponse.ok) {
+      return proxyResponse.json();
+    }
+  } catch (error) {
+    console.warn('Proxy fetch failed, trying direct gateways:', error);
+  }
+  
+  // Fallback to direct gateways if proxy fails
   const gatewaysToTry = preferredGateway 
     ? [preferredGateway, ...IPFS_GATEWAYS]
     : IPFS_GATEWAYS;

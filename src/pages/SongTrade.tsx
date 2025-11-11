@@ -223,10 +223,45 @@ const SongTrade = ({ playSong, currentSong, isPlaying }: SongTradeProps) => {
   
   // Get all token balances - use fullAddress as wagmi should sync with Privy
   const walletForBalance = (wagmiAddress || fullAddress) as `0x${string}` | undefined;
-  const { data: ethBalance } = useBalance({ address: walletForBalance });
-  const { data: xrgeBalance } = useBalance({ address: walletForBalance, token: XRGE_TOKEN });
-  const { data: ktaBalance } = useBalance({ address: walletForBalance, token: KTA_TOKEN_ADDRESS });
-  const { data: usdcBalance } = useBalance({ address: walletForBalance, token: USDC_TOKEN_ADDRESS });
+  const { data: ethBalance, refetch: refetchEthBalance } = useBalance({ 
+    address: walletForBalance,
+    query: {
+      enabled: !!walletForBalance,
+      refetchInterval: 5000, // Refetch every 5 seconds
+      refetchOnMount: true,
+      staleTime: 0, // Always consider data stale to ensure fresh data
+    },
+  });
+  const { data: xrgeBalance, refetch: refetchXrgeBalance } = useBalance({ 
+    address: walletForBalance, 
+    token: XRGE_TOKEN,
+    query: {
+      enabled: !!walletForBalance,
+      refetchInterval: 5000, // Refetch every 5 seconds
+      refetchOnMount: true,
+      staleTime: 0, // Always consider data stale to ensure fresh data
+    },
+  });
+  const { data: ktaBalance, refetch: refetchKtaBalance } = useBalance({ 
+    address: walletForBalance, 
+    token: KTA_TOKEN_ADDRESS,
+    query: {
+      enabled: !!walletForBalance,
+      refetchInterval: 5000, // Refetch every 5 seconds
+      refetchOnMount: true,
+      staleTime: 0, // Always consider data stale to ensure fresh data
+    },
+  });
+  const { data: usdcBalance, refetch: refetchUsdcBalance } = useBalance({ 
+    address: walletForBalance, 
+    token: USDC_TOKEN_ADDRESS,
+    query: {
+      enabled: !!walletForBalance,
+      refetchInterval: 5000, // Refetch every 5 seconds
+      refetchOnMount: true,
+      staleTime: 0, // Always consider data stale to ensure fresh data
+    },
+  });
   
   // Get XRGE quotes based on payment token
   const { expectedXRGE: xrgeFromETH } = useXRGEQuote(paymentToken === 'ETH' ? buyAmount : '0');
@@ -273,6 +308,21 @@ const SongTrade = ({ playSong, currentSong, isPlaying }: SongTradeProps) => {
       fetchSong();
     }
   }, [songId]);
+
+  // Refetch balances when wallet address changes or page loads
+  useEffect(() => {
+    if (walletForBalance) {
+      console.log('🔄 Refetching token balances for:', walletForBalance);
+      // Small delay to ensure wallet is fully connected
+      const timer = setTimeout(() => {
+        refetchEthBalance();
+        refetchXrgeBalance();
+        refetchKtaBalance();
+        refetchUsdcBalance();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [walletForBalance, refetchEthBalance, refetchXrgeBalance, refetchKtaBalance, refetchUsdcBalance]);
 
   useEffect(() => {
     // Load token address from database

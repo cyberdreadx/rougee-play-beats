@@ -513,6 +513,12 @@ const Wallet = ({ playSong, currentSong, isPlaying }: WalletProps = {}) => {
 
   const { data: balance, isLoading: balanceLoading, refetch: refetchBalance } = useBalance({
     address: fullAddress as `0x${string}`,
+    query: {
+      enabled: !!fullAddress,
+      refetchInterval: 5000, // Refetch every 5 seconds
+      refetchOnMount: true,
+      staleTime: 0, // Always consider data stale to ensure fresh data
+    },
   });
 
   const { data: xrgeBalance, isLoading: xrgeLoading, refetch: refetchXrge } = useReadContract({
@@ -523,6 +529,8 @@ const Wallet = ({ playSong, currentSong, isPlaying }: WalletProps = {}) => {
     query: {
       enabled: !!fullAddress,
       refetchInterval: 5000, // Refetch every 5 seconds
+      refetchOnMount: true,
+      staleTime: 0, // Always consider data stale to ensure fresh data
     },
   });
 
@@ -537,6 +545,12 @@ const Wallet = ({ playSong, currentSong, isPlaying }: WalletProps = {}) => {
     abi: ERC20_ABI,
     functionName: "balanceOf",
     args: fullAddress ? [fullAddress as `0x${string}`] : undefined,
+    query: {
+      enabled: !!fullAddress,
+      refetchInterval: 5000, // Refetch every 5 seconds
+      refetchOnMount: true,
+      staleTime: 0, // Always consider data stale to ensure fresh data
+    },
   });
 
   const { data: ktaDecimals } = useReadContract({
@@ -550,6 +564,12 @@ const Wallet = ({ playSong, currentSong, isPlaying }: WalletProps = {}) => {
     abi: ERC20_ABI,
     functionName: "balanceOf",
     args: fullAddress ? [fullAddress as `0x${string}`] : undefined,
+    query: {
+      enabled: !!fullAddress,
+      refetchInterval: 5000, // Refetch every 5 seconds
+      refetchOnMount: true,
+      staleTime: 0, // Always consider data stale to ensure fresh data
+    },
   });
 
   const { data: usdcDecimals } = useReadContract({
@@ -576,6 +596,21 @@ const Wallet = ({ playSong, currentSong, isPlaying }: WalletProps = {}) => {
       navigate("/");
     }
   }, [hasAnyWallet, isPrivyReady, navigate]);
+
+  // Refetch all balances when wallet address changes or page loads
+  useEffect(() => {
+    if (fullAddress && isConnected) {
+      console.log('🔄 Refetching balances for:', fullAddress);
+      // Small delay to ensure wallet is fully connected
+      const timer = setTimeout(() => {
+        refetchBalance();
+        refetchXrge();
+        refetchKta();
+        refetchUsdc();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [fullAddress, isConnected, refetchBalance, refetchXrge, refetchKta, refetchUsdc]);
 
   const fetchAllSongs = useCallback(async () => {
     console.log('🔄 fetchAllSongs called, fullAddress:', fullAddress);

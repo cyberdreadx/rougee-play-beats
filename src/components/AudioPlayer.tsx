@@ -14,6 +14,8 @@ import { useWallet } from "@/hooks/useWallet";
 import { usePrivy } from "@privy-io/react-auth";
 import LoginModal from "@/components/LoginModal";
 import { usePlayTracking } from "@/hooks/usePlayTracking";
+import { useSongTokenBalance, useSongPrice } from "@/hooks/useSongBondingCurve";
+import { useTokenPrices } from "@/hooks/useTokenPrices";
 import { updateAudioState } from "@/hooks/useAudioState";
 import { useConnectionAwareLoading } from "@/hooks/useConnectionAwareLoading";
 interface Song {
@@ -118,12 +120,31 @@ const AudioPlayer = ({
   const loginPromptDismissedRef = useRef<{ songId: string | null; dismissed: boolean }>({ songId: null, dismissed: false });
   const { toast } = useToast();
   const { isPWA, audioSupported, handlePWAAudioPlay, isAudioUnlocked } = usePWAAudio();
-  const { isConnected } = useWallet();
+  const { isConnected, fullAddress } = useWallet();
   const { authenticated } = usePrivy();
   const { playStatus, recordPlay, checkPlayStatus, refetchBalance } = usePlayTracking(
     currentSong?.id,
     currentSong?.token_address as `0x${string}` | undefined
   );
+  
+  // Get token balance and price to calculate USD value for ownership check
+  const { balance: tokenBalance } = useSongTokenBalance(
+    currentSong?.token_address as `0x${string}` | undefined,
+    fullAddress as `0x${string}` | undefined
+  );
+  const { price: priceInXRGE } = useSongPrice(
+    currentSong?.token_address as `0x${string}` | undefined
+  );
+  const { prices } = useTokenPrices();
+  
+  // Calculate USD value of user's token balance
+  const tokenValueUSD = tokenBalance && priceInXRGE && prices.xrge
+    ? parseFloat(tokenBalance) * parseFloat(priceInXRGE) * prices.xrge
+    : 0;
+  
+  // Check if user has tokens but less than $0.01 worth
+  const hasTokensButLowValue = tokenBalance && parseFloat(tokenBalance) > 0 && tokenValueUSD < 0.01;
+  
   const { getPreloadStrategy, getGatewayCount, shouldPreloadNext } = useConnectionAwareLoading();
 
   // Track mobile nav visibility on scroll
@@ -1606,8 +1627,23 @@ const AudioPlayer = ({
               <Music className="w-16 h-16 mx-auto mb-4 text-primary" />
               <h3 className="text-xl font-semibold mb-2">Play Limit Reached!</h3>
               <p className="text-muted-foreground mb-4">
-                You've played this song {playStatus.playCount} times. 
-                {playStatus.remainingPlays > 0 ? ` You have ${playStatus.remainingPlays} free plays remaining.` : ' Purchase this song to play it unlimited times!'}
+                {hasTokensButLowValue ? (
+                  <>
+                    You've played this song {playStatus.playCount} times. 
+                    You currently hold tokens worth ${tokenValueUSD.toFixed(4)}, but you need at least $0.01 worth to unlock unlimited plays. 
+                    Purchase more tokens to reach the minimum ownership threshold!
+                  </>
+                ) : playStatus.remainingPlays > 0 ? (
+                  <>
+                    You've played this song {playStatus.playCount} times. 
+                    You have {playStatus.remainingPlays} free plays remaining.
+                  </>
+                ) : (
+                  <>
+                    You've played this song {playStatus.playCount} times. 
+                    Purchase this song to play it unlimited times!
+                  </>
+                )}
               </p>
               <div className="space-y-3">
                 <Button 
@@ -1618,7 +1654,11 @@ const AudioPlayer = ({
                   }}
                   className="w-full"
                 >
-                  {playStatus.remainingPlays > 0 ? 'Continue Playing' : 'Purchase Song'}
+                  {hasTokensButLowValue 
+                    ? 'Purchase More Tokens' 
+                    : playStatus.remainingPlays > 0 
+                      ? 'Continue Playing' 
+                      : 'Purchase Song'}
                 </Button>
                 <Button 
                   variant="outline" 

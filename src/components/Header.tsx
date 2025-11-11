@@ -95,11 +95,6 @@ const Header = () => {
           className="flex items-center gap-2 md:gap-3 cursor-pointer"
           onClick={() => navigate("/")}
         >
-          <div className="flex items-center gap-2 min-h-[28px] md:min-h-[32px]">
-            <img src="/favicon.png" alt="Rougee logo" className="h-5 w-5 md:h-6 md:w-6" />
-            <span className="text-xs md:text-sm font-bold neon-text font-mono tracking-wider">ROUGEE</span>
-          </div>
-          
           {/* User wallet info - hidden on mobile */}
           <div className="hidden lg:flex items-center gap-2 text-[10px] text-muted-foreground font-mono ml-4">
             <span>USER:</span>

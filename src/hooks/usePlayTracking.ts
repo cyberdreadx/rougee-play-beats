@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useWallet } from './useWallet';
-import { useSongTokenBalance } from './useSongBondingCurve';
+import { useSongTokenBalance, useSongPrice } from './useSongBondingCurve';
 import { usePrivyToken } from './usePrivyToken';
+import { useTokenPrices } from './useTokenPrices';
 import type { Address } from 'viem';
 
 interface PlayStatus {
@@ -34,6 +35,27 @@ export const usePlayTracking = (songId?: string, songTokenAddress?: Address): Us
     songTokenAddress,
     fullAddress as Address | undefined
   );
+
+  // Get song token price and XRGE price to calculate USD value
+  const { price: priceInXRGE } = useSongPrice(songTokenAddress || undefined);
+  const { prices } = useTokenPrices();
+  
+  // Calculate if user has at least $0.01 worth of tokens
+  const hasMinimumValue = useCallback(() => {
+    if (!tokenBalance || !priceInXRGE || !prices.xrge || parseFloat(tokenBalance) <= 0) {
+      return false;
+    }
+    
+    const balance = parseFloat(tokenBalance);
+    const priceXRGE = parseFloat(priceInXRGE);
+    const xrgeUsdPrice = prices.xrge;
+    
+    // Calculate USD value: balance * priceInXRGE * xrgeUsdPrice
+    const valueUSD = balance * priceXRGE * xrgeUsdPrice;
+    
+    // Must have at least $0.01 worth
+    return valueUSD >= 0.01;
+  }, [tokenBalance, priceInXRGE, prices.xrge]);
 
   const checkPlayStatus = useCallback(async (targetSongId: string) => {
     if (!fullAddress || !targetSongId) {
@@ -86,9 +108,9 @@ export const usePlayTracking = (songId?: string, songTokenAddress?: Address): Us
         wallet: normalizedWallet 
       });
 
-      // Verify ownership by checking token balance
-      // If user has tokens (> 0), they are an owner regardless of database status
-      const hasTokens = tokenBalance && parseFloat(tokenBalance) > 0;
+      // Verify ownership by checking token balance value
+      // User must have at least $0.01 worth of tokens to be considered an owner
+      const hasTokens = hasMinimumValue();
       
       // Also check if user is the song creator (wallet_address matches)
       // The creator should always be considered an owner
@@ -146,7 +168,7 @@ export const usePlayTracking = (songId?: string, songTokenAddress?: Address): Us
     } finally {
       setIsLoading(false);
     }
-  }, [fullAddress, tokenBalance]);
+  }, [fullAddress, hasMinimumValue]);
 
   const recordPlay = useCallback(async (targetSongId: string, durationSeconds: number = 0): Promise<boolean> => {
     if (!fullAddress || !targetSongId) {
@@ -179,7 +201,7 @@ export const usePlayTracking = (songId?: string, songTokenAddress?: Address): Us
       // Update play status from response (if provided)
       if (result.playStatus) {
         const status = result.playStatus;
-        const hasTokens = tokenBalance && parseFloat(tokenBalance) > 0;
+        const hasTokens = hasMinimumValue();
         
         // Also check if user is the song creator (wallet_address matches)
         let isCreator = false;
@@ -228,27 +250,27 @@ export const usePlayTracking = (songId?: string, songTokenAddress?: Address): Us
       setError(err instanceof Error ? err.message : 'Failed to record play');
       return false;
     }
-  }, [fullAddress, checkPlayStatus, getAuthHeaders, tokenBalance]);
+  }, [fullAddress, checkPlayStatus, getAuthHeaders, hasMinimumValue]);
 
-  // Check play status when songId, wallet address, or token balance changes
+  // Check play status when songId, wallet address, token balance, or price changes
   useEffect(() => {
     if (songId && fullAddress) {
       checkPlayStatus(songId);
     } else {
       setPlayStatus(null);
     }
-  }, [songId, fullAddress, tokenBalance, checkPlayStatus]);
+  }, [songId, fullAddress, tokenBalance, priceInXRGE, prices.xrge, checkPlayStatus]);
   
-  // Also check play status when token balance changes (e.g., after purchase)
+  // Also check play status when token balance or price changes (e.g., after purchase)
   useEffect(() => {
     if (songId && fullAddress) {
-      // Small delay to ensure balance has fully updated
+      // Small delay to ensure balance/price has fully updated
       const timer = setTimeout(() => {
         checkPlayStatus(songId);
       }, 500);
       return () => clearTimeout(timer);
     }
-  }, [tokenBalance, songId, fullAddress, checkPlayStatus]);
+  }, [tokenBalance, priceInXRGE, prices.xrge, songId, fullAddress, checkPlayStatus]);
   
   // Periodic check for ownership changes (e.g., after purchase) - every 2 seconds if not owned
   useEffect(() => {

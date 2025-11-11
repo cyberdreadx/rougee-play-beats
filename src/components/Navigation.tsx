@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import { Compass, TrendingUp, User, Wallet, Upload, Radio, ArrowLeftRight, HelpCircle, Music, MessageSquare, Search, ChevronLeft, ChevronRight, Settings as SettingsIcon, Video, Menu, X } from "lucide-react";
 import MusicBars from "./MusicBars";
 import { useState, useEffect } from "react";
+import logo from "@/assets/logo.png";
 
 interface NavigationProps {
   activeTab?: string;
@@ -174,14 +175,14 @@ const Navigation = ({ activeTab = "DISCOVER", onTabChange }: NavigationProps) =>
           {!isSidebarCollapsed ? (
             <>
               <div className="flex items-center gap-3">
-                <MusicBars bars={4} className="text-neon-green/80" />
+                <img src={logo} alt="ROUGEE Logo" className="h-8 w-8 object-contain flex-shrink-0" />
                 <h1 className="font-mono font-bold text-xl text-neon-green tracking-wider">ROUGEE</h1>
               </div>
               <p className="text-[10px] font-mono text-white/50 mt-2 tracking-widest">DECENTRALIZED MUSIC</p>
             </>
           ) : (
             <div className="flex justify-center">
-              <MusicBars bars={4} className="text-neon-green/80" />
+              <img src={logo} alt="ROUGEE Logo" className="h-8 w-8 object-contain" />
             </div>
           )}
           

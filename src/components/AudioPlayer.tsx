@@ -5,6 +5,7 @@ import { Slider } from "@/components/ui/slider";
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Play, Pause, Volume2, VolumeX, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, CheckCircle, Music, X, ChevronRight, ChevronLeft, Filter, Check, Settings, ExternalLink } from "lucide-react";
+import { VolumeKnob } from "@/components/VolumeKnob";
 import { supabase } from "@/integrations/supabase/client";
 import { getIPFSGatewayUrl, getIPFSGatewayUrls } from "@/lib/ipfs";
 import { useToast } from "@/hooks/use-toast";
@@ -640,6 +641,20 @@ const AudioPlayer = ({
       try { audio.pause(); } catch {}
       onPlayPause();
     } else {
+      // Check if preview time expired and was dismissed - block replay
+      if (currentSong && !authenticated) {
+        const isSameSong = loginPromptDismissedRef.current.songId === currentSong.id;
+        const wasDismissed = loginPromptDismissedRef.current.dismissed;
+        const previewExpired = previewTimeRemaining === 0;
+        
+        if (isSameSong && wasDismissed && previewExpired) {
+          // Preview expired and user dismissed - block replay
+          console.log('🚫 Preview expired and dismissed, blocking replay');
+          setShowLoginPrompt(true);
+          return;
+        }
+      }
+      
       // Check play limits BEFORE starting playback
       if (authenticated && currentSong) {
         // Refresh play status immediately before playing
@@ -655,7 +670,19 @@ const AudioPlayer = ({
           const isOwner = playStatus.isOwner || false;
           const maxFreePlays = playStatus.maxFreePlays || 3;
           
+          // Check if preview expired and was dismissed for authenticated users too
+          const isSameSong = loginPromptDismissedRef.current.songId === currentSong.id;
+          const wasDismissed = loginPromptDismissedRef.current.dismissed;
+          const previewExpired = previewTimeRemaining === 0;
+          
           if (!isOwner && currentPlayCount >= maxFreePlays) {
+            if (isSameSong && wasDismissed && previewExpired) {
+              // Preview expired and user dismissed - block replay
+              console.log('🚫 Preview expired and dismissed, blocking replay');
+              setShowOwnershipPrompt(true);
+              return;
+            }
+            
             // User has exceeded play limit - allow 20-second preview
             console.log('🚫 Play limit reached, allowing 20-second preview only:', { 
               playCount: currentPlayCount, 
@@ -1224,10 +1251,10 @@ const AudioPlayer = ({
         )}
       </div>
 
-      {/* Desktop Full Player - Compact single row layout */}
-      <div className="hidden md:flex items-center gap-2 py-1.5 px-3 relative z-10">
-        {/* Close and Dock buttons - Desktop */}
-        <div className="flex items-center gap-1 flex-shrink-0">
+      {/* Desktop Full Player - Centered layout */}
+      <div className="hidden md:flex items-center justify-center gap-3 py-1.5 px-3 relative z-10">
+        {/* Close and Dock buttons - Desktop (Absolute positioned) */}
+        <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center gap-1 flex-shrink-0">
           <Button
             variant="ghost"
             size="icon"
@@ -1253,8 +1280,9 @@ const AudioPlayer = ({
           )}
         </div>
         
-        {/* Left info area with cover art and title/artist */}
-        <div className="flex items-center gap-2 min-w-0 flex-1">
+        {/* Centered Content Area */}
+        <div className="flex items-center gap-3 justify-center flex-1 max-w-4xl mx-auto">
+          {/* Cover art */}
           {displayCover && (
             <div 
               className="relative w-12 h-12 rounded-lg overflow-hidden border border-neon-green/30 shadow-lg shadow-neon-green/20 cursor-pointer hover:border-neon-green/60 transition-all hover:scale-105 flex-shrink-0"
@@ -1271,95 +1299,103 @@ const AudioPlayer = ({
               )}
             </div>
           )}
-          {/* Scrolling title/artist info - Desktop */}
-          <div className="flex-1 min-w-0 overflow-hidden">
-            <div className="marquee-container">
-              <div className="marquee font-mono text-[10px] text-muted-foreground">
-                <span className="text-foreground font-semibold">{displayTitle}</span>
-                <span className="mx-2">—</span>
-                <span>{displayArtist}</span>
-                {!isAd && currentSong?.ticker && (
-                  <span className="ml-2 text-neon-green">${currentSong.ticker}</span>
-                )}
-                {authenticated && currentSong && playStatus && (
-                  <span className="ml-2 text-blue-400">
-                    <Music className="w-2.5 h-2.5 inline mr-1" />
-                    {playStatus.playCount} plays
+          
+          {/* Title/Artist and Play Status */}
+          <div className="flex flex-col min-w-0 max-w-[200px]">
+            <div className="font-mono text-[10px] text-foreground font-semibold truncate">
+              {displayTitle}
+            </div>
+            <div className="font-mono text-[9px] text-muted-foreground truncate">
+              {displayArtist}
+            </div>
+            {authenticated && currentSong && playStatus && (
+              <div className="font-mono text-[9px] mt-0.5">
+                {playStatus.isOwner ? (
+                  <span className="text-green-400 flex items-center gap-1">
+                    <CheckCircle className="w-2.5 h-2.5" />
+                    <span>Owned</span>
+                  </span>
+                ) : (
+                  <span className="text-blue-400 flex items-center gap-1">
+                    <Music className="w-2.5 h-2.5" />
+                    <span>{playStatus.playCount}/{playStatus.maxFreePlays}</span>
+                    {playStatus.remainingPlays > 0 && (
+                      <span className="text-green-400 ml-1">({playStatus.remainingPlays} free)</span>
+                    )}
                   </span>
                 )}
               </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Controls + Progress bar - Single row on desktop */}
-        <div className="flex items-center gap-2 flex-[2] max-w-3xl mx-auto min-w-0">
-          {/* Main control buttons */}
-          {onShuffle && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onShuffle}
-              className={`h-7 w-7 flex-shrink-0 transition-colors ${shuffleEnabled ? 'text-neon-green' : 'text-muted-foreground hover:text-foreground'}`}
-            >
-              <Shuffle className="w-3.5 h-3.5" />
-            </Button>
-          )}
-          
-          {onPrevious && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onPrevious}
-              className="h-7 w-7 flex-shrink-0 text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <SkipBack className="w-3.5 h-3.5" />
-            </Button>
-          )}
-          
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handlePlayPauseClick}
-            className="h-9 w-9 flex-shrink-0 rounded-full bg-neon-green/20 hover:bg-neon-green/30 border-2 border-neon-green/50 transition-all hover:scale-110 shadow-lg shadow-neon-green/20"
-          >
-            {isPlaying ? (
-              <Pause className="w-4 h-4 text-neon-green" />
-            ) : (
-              <Play className="w-4 h-4 text-neon-green fill-neon-green" />
             )}
-          </Button>
+          </div>
 
-          {onNext && (
+          {/* Main control buttons */}
+          <div className="flex items-center gap-1 flex-shrink-0">
+            {onShuffle && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onShuffle}
+                className={`h-7 w-7 flex-shrink-0 transition-colors ${shuffleEnabled ? 'text-neon-green' : 'text-muted-foreground hover:text-foreground'}`}
+              >
+                <Shuffle className="w-3.5 h-3.5" />
+              </Button>
+            )}
+            
+            {onPrevious && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onPrevious}
+                className="h-7 w-7 flex-shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <SkipBack className="w-3.5 h-3.5" />
+              </Button>
+            )}
+            
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => {
-                onNext();
-              }}
-              className="h-7 w-7 flex-shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+              onClick={handlePlayPauseClick}
+              className="h-9 w-9 flex-shrink-0 rounded-full bg-neon-green/20 hover:bg-neon-green/30 border-2 border-neon-green/50 transition-all hover:scale-110 shadow-lg shadow-neon-green/20"
             >
-              <SkipForward className="w-3.5 h-3.5" />
-            </Button>
-          )}
-
-          {onRepeat && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onRepeat}
-              className={`h-7 w-7 flex-shrink-0 transition-colors ${repeatMode !== 'off' ? 'text-neon-green' : 'text-muted-foreground hover:text-foreground'}`}
-            >
-              {repeatMode === 'one' ? (
-                <Repeat1 className="w-3.5 h-3.5" />
+              {isPlaying ? (
+                <Pause className="w-4 h-4 text-neon-green" />
               ) : (
-                <Repeat className="w-3.5 h-3.5" />
+                <Play className="w-4 h-4 text-neon-green fill-neon-green" />
               )}
             </Button>
-          )}
 
-          {/* Progress bar - Inline with controls */}
-          <div className="flex items-center gap-1 flex-1 min-w-0">
+            {onNext && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => {
+                  onNext();
+                }}
+                className="h-7 w-7 flex-shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <SkipForward className="w-3.5 h-3.5" />
+              </Button>
+            )}
+
+            {onRepeat && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onRepeat}
+                className={`h-7 w-7 flex-shrink-0 transition-colors ${repeatMode !== 'off' ? 'text-neon-green' : 'text-muted-foreground hover:text-foreground'}`}
+              >
+                {repeatMode === 'one' ? (
+                  <Repeat1 className="w-3.5 h-3.5" />
+                ) : (
+                  <Repeat className="w-3.5 h-3.5" />
+                )}
+              </Button>
+            )}
+          </div>
+
+          {/* Progress bar */}
+          <div className="flex items-center gap-1 flex-1 min-w-0 max-w-md">
             <span className="font-mono text-[10px] text-muted-foreground min-w-[28px] text-right flex-shrink-0">
               {formatTime(currentTime)}
             </span>
@@ -1375,6 +1411,7 @@ const AudioPlayer = ({
             </span>
           </div>
 
+          {/* Trade button */}
           {currentSong && (
             <Button
               variant="outline"
@@ -1385,32 +1422,15 @@ const AudioPlayer = ({
               Trade
             </Button>
           )}
-        </div>
-
-        {/* Volume - Desktop */}
-        <div className="flex items-center gap-2 justify-end flex-shrink-0 min-w-[140px]">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleMute}
-            className="h-7 w-7 flex-shrink-0 hover:bg-white/10"
-          >
-            {isMuted ? (
-              <VolumeX className="w-4 h-4 text-muted-foreground" />
-            ) : (
-              <Volume2 className="w-4 h-4 text-muted-foreground" />
-            )}
-          </Button>
-          <Slider
-            value={[isMuted ? 0 : volume]}
-            max={1}
-            step={0.1}
-            className="w-24 flex-shrink-0"
-            onValueChange={handleVolumeChange}
+          
+          {/* Volume - Desktop (Knob) */}
+          <VolumeKnob
+            value={volume}
+            onChange={(val) => handleVolumeChange([val])}
+            onMuteToggle={toggleMute}
+            isMuted={isMuted}
+            className="flex-shrink-0"
           />
-          <span className="font-mono text-[10px] text-muted-foreground min-w-[32px] flex-shrink-0 text-right">
-            {Math.round((isMuted ? 0 : volume) * 100)}%
-          </span>
         </div>
       </div>
     </Card>
@@ -1536,8 +1556,9 @@ const AudioPlayer = ({
                   variant="outline" 
                   onClick={() => {
                     setShowLoginPrompt(false);
-                    // Mark as dismissed so it doesn't show again for this song
+                    // Mark as dismissed and ensure preview time is 0 to block replay
                     if (currentSong) {
+                      setPreviewTimeRemaining(0); // Ensure preview is expired
                       loginPromptDismissedRef.current = { songId: currentSong.id, dismissed: true };
                     }
                     // Stop the audio
@@ -1603,8 +1624,9 @@ const AudioPlayer = ({
                   variant="outline" 
                   onClick={() => {
                     setShowOwnershipPrompt(false);
-                    // Mark as dismissed so it doesn't show again for this song
+                    // Mark as dismissed and ensure preview time is 0 to block replay
                     if (currentSong) {
+                      setPreviewTimeRemaining(0); // Ensure preview is expired
                       loginPromptDismissedRef.current = { songId: currentSong.id, dismissed: true };
                     }
                     // Stop the audio

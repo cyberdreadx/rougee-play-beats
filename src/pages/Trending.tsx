@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { supabase } from "@/integrations/supabase/client";
 import { debounce } from "@/lib/throttle";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -179,6 +180,7 @@ interface TrendingProps {
 }
 
 const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
+  const { t } = useTranslation();
   const [artists, setArtists] = useState<Artist[]>([]);
   const [songs, setSongs] = useState<Song[]>([]);
   const [loading, setLoading] = useState(true);
@@ -806,10 +808,10 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
             <MusicBars bars={6} className="h-6 md:h-12 flex-shrink-0 animate-pulse" />
           </div>
           <h1 className="text-2xl md:text-5xl font-bold mb-2 md:mb-3 bg-gradient-to-r from-neon-green via-purple-400 to-pink-500 bg-clip-text text-transparent drop-shadow-[0_0_20px_rgba(0,255,159,0.5)]">
-            TRENDING
+            {t('trending.title').toUpperCase()}
           </h1>
           <p className="text-xs md:text-base text-muted-foreground max-w-2xl mx-auto leading-tight">
-            Discover the hottest tracks and rising artists on the decentralized music platform
+            {t('trending.topArtistsSongs')}
           </p>
         </div>
       </div>
@@ -960,12 +962,12 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
             <div>
               <h1 className="text-2xl md:text-4xl font-bold font-mono mb-2 neon-text flex items-center gap-2 md:gap-3">
                 <Flame className="w-6 md:w-8 h-6 md:h-8 text-orange-500 animate-pulse" />
-                {searchQuery ? `SEARCH RESULTS` : `TRENDING`}
+                {searchQuery ? t('trending.searchResults').toUpperCase() : t('trending.title').toUpperCase()}
               </h1>
               <p className="text-muted-foreground font-mono text-xs md:text-sm">
                 {searchQuery 
-                  ? `Search results for "${searchQuery}"` 
-                  : `Top artists and songs ranked by trading activity & plays`
+                  ? `${t('trending.searchResultsFor')} "${searchQuery}"` 
+                  : t('trending.topArtistsSongs')
                 }
               </p>
             </div>
@@ -1011,7 +1013,7 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
                     : 'text-muted-foreground hover:text-neon-green hover:bg-white/5'
                 }`}
               >
-                ALL
+                {t('trending.allTime').toUpperCase()}
               </button>
             </div>
           </div>

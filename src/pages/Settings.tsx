@@ -10,10 +10,13 @@ import { useCurrentUserProfile } from "@/hooks/useCurrentUserProfile";
 import { Settings as SettingsIcon, User, Music, Check, Filter, Shield } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { usePrivy } from "@privy-io/react-auth";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { useTranslation } from "react-i18next";
 
 type AiFilter = 'all' | 'no-ai' | 'partial';
 
 const Settings = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { fullAddress, isConnected, isPrivyReady } = useWallet();
   const { profile, loading: profileLoading } = useCurrentUserProfile();
@@ -89,11 +92,14 @@ const Settings = () => {
   return (
     <div className="container mx-auto px-4 py-6 md:py-8 max-w-4xl">
       <div className="mb-6 md:mb-8">
-        <div className="flex items-center gap-3 mb-2">
-          <SettingsIcon className="w-6 h-6 md:w-8 md:h-8 text-neon-green" />
-          <h1 className="text-2xl md:text-3xl font-bold font-mono uppercase tracking-wider text-neon-green">
-            Settings
-          </h1>
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-3">
+            <SettingsIcon className="w-6 h-6 md:w-8 md:h-8 text-neon-green" />
+            <h1 className="text-2xl md:text-3xl font-bold font-mono uppercase tracking-wider text-neon-green">
+              {t('settings.title')}
+            </h1>
+          </div>
+          <LanguageSwitcher />
         </div>
         <p className="text-sm md:text-base text-muted-foreground font-mono">
           Manage your profile and audio preferences

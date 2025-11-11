@@ -1,0 +1,111 @@
+{
+  "common": {
+    "loading": "Carregando...",
+    "error": "Erro",
+    "success": "Sucesso",
+    "cancel": "Cancelar",
+    "save": "Salvar",
+    "delete": "Excluir",
+    "edit": "Editar",
+    "close": "Fechar",
+    "confirm": "Confirmar",
+    "search": "Pesquisar",
+    "filter": "Filtrar",
+    "sort": "Ordenar",
+    "share": "Compartilhar",
+    "like": "Curtir",
+    "comment": "Comentar",
+    "play": "Reproduzir",
+    "pause": "Pausar",
+    "next": "Próximo",
+    "previous": "Anterior"
+  },
+  "nav": {
+    "discover": "Descobrir",
+    "trending": "Em Alta",
+    "feed": "GLTCH Feed",
+    "wallet": "Carteira",
+    "upload": "Enviar",
+    "messages": "Mensagens",
+    "settings": "Configurações",
+    "profile": "Meu Perfil",
+    "goLive": "Ao Vivo"
+  },
+  "auth": {
+    "connectWallet": "Conectar Carteira",
+    "disconnect": "Desconectar",
+    "walletNotConnected": "Carteira não conectada",
+    "pleaseConnectWallet": "Por favor, conecte sua carteira"
+  },
+  "artist": {
+    "title": "Perfil do Artista",
+    "songs": "Músicas",
+    "albums": "Álbuns",
+    "popular": "Popular",
+    "reposts": "Republicações",
+    "follow": "Seguir",
+    "unfollow": "Deixar de Seguir",
+    "tip": "Dar Gorjeta ao Artista"
+  },
+  "feed": {
+    "title": "Feed",
+    "songs": "Músicas",
+    "posts": "Postagens GLTCH",
+    "noPosts": "Ainda não há postagens",
+    "noSongs": "Ainda não há músicas",
+    "loadMore": "Carregar Mais"
+  },
+  "wallet": {
+    "title": "Carteira",
+    "balances": "Saldos de Tokens",
+    "music": "Biblioteca Musical",
+    "totalValue": "Valor Total"
+  },
+  "upload": {
+    "title": "Enviar Música",
+    "selectFile": "Selecionar Arquivo de Áudio",
+    "titleLabel": "Título",
+    "artistLabel": "Artista",
+    "genreLabel": "Gênero",
+    "descriptionLabel": "Descrição"
+  },
+  "profile": {
+    "edit": "Editar Perfil",
+    "artistName": "Nome do Artista",
+    "displayName": "Nome de Exibição",
+    "bio": "Biografia",
+    "avatar": "Avatar",
+    "coverPhoto": "Foto de Capa"
+  },
+  "settings": {
+    "title": "Configurações",
+    "language": "Idioma",
+    "theme": "Tema",
+    "notifications": "Notificações"
+  },
+  "search": {
+    "button": "Pesquisar",
+    "placeholder": "Pesquisar artistas, músicas, gêneros...",
+    "noResults": "Nenhum resultado encontrado",
+    "searching": "Pesquisando..."
+  },
+  "discover": {
+    "topCharts": "Top Charts",
+    "genres": "Gêneros",
+    "hotNow": "Em Alta",
+    "exploreGenres": "Explorar Gêneros",
+    "genresAvailable": "gêneros disponíveis",
+    "noGenres": "Ainda não há gêneros"
+  },
+  "trending": {
+    "title": "Em Alta",
+    "searchResults": "Resultados da Pesquisa",
+    "searchResultsFor": "Resultados da pesquisa para",
+    "topArtistsSongs": "Top artistas e músicas classificados por atividade comercial e reproduções",
+    "allTime": "Todo o Tempo",
+    "today": "Hoje",
+    "thisWeek": "Esta Semana",
+    "thisMonth": "Este Mês"
+  }
+}
+

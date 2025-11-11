@@ -1,0 +1,111 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "cancel": "Cancel",
+    "save": "Save",
+    "delete": "Delete",
+    "edit": "Edit",
+    "close": "Close",
+    "confirm": "Confirm",
+    "search": "Search",
+    "filter": "Filter",
+    "sort": "Sort",
+    "share": "Share",
+    "like": "Like",
+    "comment": "Comment",
+    "play": "Play",
+    "pause": "Pause",
+    "next": "Next",
+    "previous": "Previous"
+  },
+  "nav": {
+    "discover": "Discover",
+    "trending": "Trending",
+    "feed": "GLTCH Feed",
+    "wallet": "Wallet",
+    "upload": "Upload",
+    "messages": "Messages",
+    "settings": "Settings",
+    "profile": "My Profile",
+    "goLive": "Go Live"
+  },
+  "auth": {
+    "connectWallet": "Connect Wallet",
+    "disconnect": "Disconnect",
+    "walletNotConnected": "Wallet not connected",
+    "pleaseConnectWallet": "Please connect your wallet"
+  },
+  "artist": {
+    "title": "Artist Profile",
+    "songs": "Songs",
+    "albums": "Albums",
+    "popular": "Popular",
+    "reposts": "Reposts",
+    "follow": "Follow",
+    "unfollow": "Unfollow",
+    "tip": "Tip Artist"
+  },
+  "feed": {
+    "title": "Feed",
+    "songs": "Songs",
+    "posts": "GLTCH Posts",
+    "noPosts": "No posts yet",
+    "noSongs": "No songs yet",
+    "loadMore": "Load More"
+  },
+  "wallet": {
+    "title": "Wallet",
+    "balances": "Token Balances",
+    "music": "Music Library",
+    "totalValue": "Total Value"
+  },
+  "upload": {
+    "title": "Upload Music",
+    "selectFile": "Select Audio File",
+    "titleLabel": "Title",
+    "artistLabel": "Artist",
+    "genreLabel": "Genre",
+    "descriptionLabel": "Description"
+  },
+  "profile": {
+    "edit": "Edit Profile",
+    "artistName": "Artist Name",
+    "displayName": "Display Name",
+    "bio": "Bio",
+    "avatar": "Avatar",
+    "coverPhoto": "Cover Photo"
+  },
+  "settings": {
+    "title": "Settings",
+    "language": "Language",
+    "theme": "Theme",
+    "notifications": "Notifications"
+  },
+  "search": {
+    "button": "Search",
+    "placeholder": "Search artists, songs, genres...",
+    "noResults": "No results found",
+    "searching": "Searching..."
+  },
+  "discover": {
+    "topCharts": "Top Charts",
+    "genres": "Genres",
+    "hotNow": "Hot Now",
+    "exploreGenres": "Explore Genres",
+    "genresAvailable": "genres available",
+    "noGenres": "No genres found yet"
+  },
+  "trending": {
+    "title": "Trending",
+    "searchResults": "Search Results",
+    "searchResultsFor": "Search results for",
+    "topArtistsSongs": "Top artists and songs ranked by trading activity & plays",
+    "allTime": "All Time",
+    "today": "Today",
+    "thisWeek": "This Week",
+    "thisMonth": "This Month"
+  }
+}
+

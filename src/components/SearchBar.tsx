@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { supabase } from "@/integrations/supabase/client";
 import { Music, User, Loader2, CheckCircle } from "lucide-react";
 import { getIPFSGatewayUrl } from "@/lib/ipfs";
@@ -20,6 +21,7 @@ interface SearchResult {
 }
 
 const SearchBar = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -119,7 +121,7 @@ const SearchBar = () => {
         <div className="flex space-x-2 md:space-x-4">
           <Input
             type="text"
-            placeholder="Search artists, songs, genres..."
+            placeholder={t('search.placeholder')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="flex-1 glass text-foreground placeholder:text-muted-foreground font-mono border-neon-green/30"
@@ -128,7 +130,7 @@ const SearchBar = () => {
             {isSearching ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              "[SEARCH]"
+              `[${t('search.button').toUpperCase()}]`
             )}
           </Button>
         </div>
@@ -205,7 +207,7 @@ const SearchBar = () => {
         {showDropdown && results.length === 0 && searchQuery.trim().length >= 2 && !isSearching && (
           <div className="absolute top-full left-0 right-16 mt-2 glass-card shadow-lg z-50 p-4">
             <p className="font-mono text-sm text-muted-foreground text-center">
-              No results found
+              {t('search.noResults')}
             </p>
           </div>
         )}

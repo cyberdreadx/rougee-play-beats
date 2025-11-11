@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect, memo } from "react";
+import { useTranslation } from "react-i18next";
 import { useWallet } from "@/hooks/useWallet";
 import { useNavigate } from "react-router-dom";
 import SearchBar from "@/components/SearchBar";
@@ -106,6 +107,7 @@ const PostGridCardSkeleton = memo(() => (
 PostGridCardSkeleton.displayName = 'PostGridCardSkeleton';
 
 const Index = ({ playSong, currentSong, isPlaying, isRadioMode, onToggleRadio }: IndexProps) => {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = React.useState("artists");
   const topSongsRef = useRef<TopSongsRef>(null);
   const tabsContentRef = useRef<HTMLDivElement>(null);
@@ -368,7 +370,7 @@ const Index = ({ playSong, currentSong, isPlaying, isRadioMode, onToggleRadio }:
                   className="flex-shrink-0 border-neon-green/30 hover:border-neon-green/60 hover:bg-neon-green/10"
                 >
                   <TrendingUp className="w-3 h-3 mr-2" />
-                  Top Charts
+                  {t('discover.topCharts')}
                 </Button>
                 <Button
                   variant="outline"
@@ -387,7 +389,7 @@ const Index = ({ playSong, currentSong, isPlaying, isRadioMode, onToggleRadio }:
                   className="flex-shrink-0 border-neon-green/30 hover:border-neon-green/60 hover:bg-neon-green/10"
                 >
                   <Music className="w-3 h-3 mr-2" />
-                  Genres
+                  {t('discover.genres')}
                 </Button>
                 <Button
                   variant="outline"
@@ -396,7 +398,7 @@ const Index = ({ playSong, currentSong, isPlaying, isRadioMode, onToggleRadio }:
                   className="flex-shrink-0 border-neon-green/30 hover:border-neon-green/60 hover:bg-neon-green/10"
                 >
                   <Flame className="w-3 h-3 mr-2" />
-                  Hot Now
+                  {t('discover.hotNow')}
                 </Button>
                 <Button
                   variant="outline"
@@ -405,7 +407,7 @@ const Index = ({ playSong, currentSong, isPlaying, isRadioMode, onToggleRadio }:
                   className="flex-shrink-0 border-neon-green/30 hover:border-neon-green/60 hover:bg-neon-green/10"
                 >
                   <Radio className="w-3 h-3 mr-2" />
-                  GLTCH Feed
+                  {t('nav.feed')}
                 </Button>
               </div>
             </div>

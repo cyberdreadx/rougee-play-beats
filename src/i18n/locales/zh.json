@@ -1,0 +1,111 @@
+{
+  "common": {
+    "loading": "加载中...",
+    "error": "错误",
+    "success": "成功",
+    "cancel": "取消",
+    "save": "保存",
+    "delete": "删除",
+    "edit": "编辑",
+    "close": "关闭",
+    "confirm": "确认",
+    "search": "搜索",
+    "filter": "筛选",
+    "sort": "排序",
+    "share": "分享",
+    "like": "喜欢",
+    "comment": "评论",
+    "play": "播放",
+    "pause": "暂停",
+    "next": "下一个",
+    "previous": "上一个"
+  },
+  "nav": {
+    "discover": "发现",
+    "trending": "趋势",
+    "feed": "GLTCH动态",
+    "wallet": "钱包",
+    "upload": "上传",
+    "messages": "消息",
+    "settings": "设置",
+    "profile": "我的资料",
+    "goLive": "开始直播"
+  },
+  "auth": {
+    "connectWallet": "连接钱包",
+    "disconnect": "断开连接",
+    "walletNotConnected": "钱包未连接",
+    "pleaseConnectWallet": "请连接您的钱包"
+  },
+  "artist": {
+    "title": "艺术家资料",
+    "songs": "歌曲",
+    "albums": "专辑",
+    "popular": "热门",
+    "reposts": "转发",
+    "follow": "关注",
+    "unfollow": "取消关注",
+    "tip": "打赏艺术家"
+  },
+  "feed": {
+    "title": "动态",
+    "songs": "歌曲",
+    "posts": "GLTCH帖子",
+    "noPosts": "还没有帖子",
+    "noSongs": "还没有歌曲",
+    "loadMore": "加载更多"
+  },
+  "wallet": {
+    "title": "钱包",
+    "balances": "代币余额",
+    "music": "音乐库",
+    "totalValue": "总价值"
+  },
+  "upload": {
+    "title": "上传音乐",
+    "selectFile": "选择音频文件",
+    "titleLabel": "标题",
+    "artistLabel": "艺术家",
+    "genreLabel": "流派",
+    "descriptionLabel": "描述"
+  },
+  "profile": {
+    "edit": "编辑资料",
+    "artistName": "艺术家名称",
+    "displayName": "显示名称",
+    "bio": "简介",
+    "avatar": "头像",
+    "coverPhoto": "封面照片"
+  },
+  "settings": {
+    "title": "设置",
+    "language": "语言",
+    "theme": "主题",
+    "notifications": "通知"
+  },
+  "search": {
+    "button": "搜索",
+    "placeholder": "搜索艺术家、歌曲、流派...",
+    "noResults": "未找到结果",
+    "searching": "搜索中..."
+  },
+  "discover": {
+    "topCharts": "热门榜单",
+    "genres": "流派",
+    "hotNow": "热门",
+    "exploreGenres": "探索流派",
+    "genresAvailable": "个流派可用",
+    "noGenres": "还没有流派"
+  },
+  "trending": {
+    "title": "趋势",
+    "searchResults": "搜索结果",
+    "searchResultsFor": "搜索结果",
+    "topArtistsSongs": "按交易活动和播放次数排名的顶级艺术家和歌曲",
+    "allTime": "全部时间",
+    "today": "今天",
+    "thisWeek": "本周",
+    "thisMonth": "本月"
+  }
+}
+

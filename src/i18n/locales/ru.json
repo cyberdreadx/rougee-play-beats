@@ -1,0 +1,111 @@
+{
+  "common": {
+    "loading": "Загрузка...",
+    "error": "Ошибка",
+    "success": "Успех",
+    "cancel": "Отмена",
+    "save": "Сохранить",
+    "delete": "Удалить",
+    "edit": "Редактировать",
+    "close": "Закрыть",
+    "confirm": "Подтвердить",
+    "search": "Поиск",
+    "filter": "Фильтр",
+    "sort": "Сортировать",
+    "share": "Поделиться",
+    "like": "Нравится",
+    "comment": "Комментировать",
+    "play": "Воспроизвести",
+    "pause": "Пауза",
+    "next": "Следующий",
+    "previous": "Предыдущий"
+  },
+  "nav": {
+    "discover": "Открыть",
+    "trending": "В тренде",
+    "feed": "GLTCH Лента",
+    "wallet": "Кошелек",
+    "upload": "Загрузить",
+    "messages": "Сообщения",
+    "settings": "Настройки",
+    "profile": "Мой Профиль",
+    "goLive": "Выйти в Эфир"
+  },
+  "auth": {
+    "connectWallet": "Подключить Кошелек",
+    "disconnect": "Отключить",
+    "walletNotConnected": "Кошелек не подключен",
+    "pleaseConnectWallet": "Пожалуйста, подключите ваш кошелек"
+  },
+  "artist": {
+    "title": "Профиль Артиста",
+    "songs": "Песни",
+    "albums": "Альбомы",
+    "popular": "Популярное",
+    "reposts": "Репосты",
+    "follow": "Подписаться",
+    "unfollow": "Отписаться",
+    "tip": "Дать Чаевые Артисту"
+  },
+  "feed": {
+    "title": "Лента",
+    "songs": "Песни",
+    "posts": "GLTCH Посты",
+    "noPosts": "Пока нет постов",
+    "noSongs": "Пока нет песен",
+    "loadMore": "Загрузить Еще"
+  },
+  "wallet": {
+    "title": "Кошелек",
+    "balances": "Балансы Токенов",
+    "music": "Музыкальная Библиотека",
+    "totalValue": "Общая Стоимость"
+  },
+  "upload": {
+    "title": "Загрузить Музыку",
+    "selectFile": "Выбрать Аудио Файл",
+    "titleLabel": "Название",
+    "artistLabel": "Артист",
+    "genreLabel": "Жанр",
+    "descriptionLabel": "Описание"
+  },
+  "profile": {
+    "edit": "Редактировать Профиль",
+    "artistName": "Имя Артиста",
+    "displayName": "Отображаемое Имя",
+    "bio": "Биография",
+    "avatar": "Аватар",
+    "coverPhoto": "Обложка"
+  },
+  "settings": {
+    "title": "Настройки",
+    "language": "Язык",
+    "theme": "Тема",
+    "notifications": "Уведомления"
+  },
+  "search": {
+    "button": "Поиск",
+    "placeholder": "Поиск артистов, песен, жанров...",
+    "noResults": "Результаты не найдены",
+    "searching": "Поиск..."
+  },
+  "discover": {
+    "topCharts": "Топ Чарты",
+    "genres": "Жанры",
+    "hotNow": "В Тренде",
+    "exploreGenres": "Исследовать Жанры",
+    "genresAvailable": "жанров доступно",
+    "noGenres": "Жанры пока не найдены"
+  },
+  "trending": {
+    "title": "В тренде",
+    "searchResults": "Результаты Поиска",
+    "searchResultsFor": "Результаты поиска для",
+    "topArtistsSongs": "Топ артисты и песни, отсортированные по торговой активности и воспроизведениям",
+    "allTime": "За Все Время",
+    "today": "Сегодня",
+    "thisWeek": "На Этой Неделе",
+    "thisMonth": "В Этом Месяце"
+  }
+}
+

@@ -2,6 +2,7 @@ import './polyfills/node-globals';
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./index.css";
+import "./i18n/config"; // Initialize i18n
 
 // Register service worker for PWA functionality (disabled in development)
 if ('serviceWorker' in navigator && import.meta.env.PROD) {

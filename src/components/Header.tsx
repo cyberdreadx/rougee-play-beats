@@ -6,8 +6,9 @@ import { useCurrentUserProfile } from "@/hooks/useCurrentUserProfile";
 import { useLockCode } from "@/hooks/useLockCode";
 import WalletButton from "@/components/WalletButton";
 import ThemeSwitcher from "@/components/ThemeSwitcher";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
-import { User, Shield, CheckCircle, HelpCircle, Lock, ChevronDown, Network, Wallet as WalletIcon, LogOut, Link as LinkIcon } from "lucide-react";
+import { User, Shield, CheckCircle, HelpCircle, Lock, ChevronDown, Network, Wallet as WalletIcon, LogOut, Link as LinkIcon, Globe } from "lucide-react";
 import { UploadSlotsBadge } from "@/components/UploadSlotsBadge";
 import { toast } from "@/hooks/use-toast";
 import { useAccount, useChainId, useSwitchChain } from 'wagmi';
@@ -24,6 +25,7 @@ import {
 
 
 const Header = () => {
+  const { i18n } = useTranslation();
   const navigate = useNavigate();
   const { isConnected, fullAddress, isPrivyReady } = useWallet();
   const { profile, isArtist } = useCurrentUserProfile();
@@ -192,6 +194,39 @@ const Header = () => {
                 <HelpCircle className="h-4 w-4 mr-2 text-primary" />
                 How It Works
               </DropdownMenuItem>
+              
+              {/* Language Selection */}
+              <DropdownMenuSeparator className="bg-white/10" />
+              <div className="px-2 py-1">
+                <p className="text-xs font-mono text-muted-foreground mb-2 uppercase">Language:</p>
+                <div className="space-y-1">
+                  {[
+                    { code: 'en', name: 'English', flag: '🇺🇸' },
+                    { code: 'es', name: 'Español', flag: '🇪🇸' },
+                    { code: 'fr', name: 'Français', flag: '🇫🇷' },
+                    { code: 'de', name: 'Deutsch', flag: '🇩🇪' },
+                    { code: 'ja', name: '日本語', flag: '🇯🇵' },
+                    { code: 'zh', name: '中文', flag: '🇨🇳' },
+                    { code: 'pt', name: 'Português', flag: '🇵🇹' },
+                    { code: 'ru', name: 'Русский', flag: '🇷🇺' },
+                  ].map((lang) => (
+                    <DropdownMenuItem
+                      key={lang.code}
+                      onClick={() => i18n.changeLanguage(lang.code)}
+                      className={`font-mono text-sm ${
+                        i18n.language === lang.code 
+                          ? 'bg-neon-green/10 text-neon-green' 
+                          : 'hover:bg-white/5'
+                      }`}
+                    >
+                      <Globe className="h-4 w-4 mr-2" />
+                      <span className="mr-2">{lang.flag}</span>
+                      {lang.name}
+                      {i18n.language === lang.code && <CheckCircle className="h-3 w-3 ml-auto text-neon-green" />}
+                    </DropdownMenuItem>
+                  ))}
+                </div>
+              </div>
               
               {isConnected && (
                 <>

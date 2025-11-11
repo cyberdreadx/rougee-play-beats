@@ -1,0 +1,111 @@
+{
+  "common": {
+    "loading": "読み込み中...",
+    "error": "エラー",
+    "success": "成功",
+    "cancel": "キャンセル",
+    "save": "保存",
+    "delete": "削除",
+    "edit": "編集",
+    "close": "閉じる",
+    "confirm": "確認",
+    "search": "検索",
+    "filter": "フィルター",
+    "sort": "並び替え",
+    "share": "共有",
+    "like": "いいね",
+    "comment": "コメント",
+    "play": "再生",
+    "pause": "一時停止",
+    "next": "次へ",
+    "previous": "前へ"
+  },
+  "nav": {
+    "discover": "発見",
+    "trending": "トレンド",
+    "feed": "GLTCHフィード",
+    "wallet": "ウォレット",
+    "upload": "アップロード",
+    "messages": "メッセージ",
+    "settings": "設定",
+    "profile": "マイプロフィール",
+    "goLive": "ライブ配信"
+  },
+  "auth": {
+    "connectWallet": "ウォレットを接続",
+    "disconnect": "切断",
+    "walletNotConnected": "ウォレットが接続されていません",
+    "pleaseConnectWallet": "ウォレットを接続してください"
+  },
+  "artist": {
+    "title": "アーティストプロフィール",
+    "songs": "楽曲",
+    "albums": "アルバム",
+    "popular": "人気",
+    "reposts": "リポスト",
+    "follow": "フォロー",
+    "unfollow": "フォロー解除",
+    "tip": "アーティストにチップ"
+  },
+  "feed": {
+    "title": "フィード",
+    "songs": "楽曲",
+    "posts": "GLTCH投稿",
+    "noPosts": "投稿はまだありません",
+    "noSongs": "楽曲はまだありません",
+    "loadMore": "さらに読み込む"
+  },
+  "wallet": {
+    "title": "ウォレット",
+    "balances": "トークン残高",
+    "music": "音楽ライブラリ",
+    "totalValue": "合計価値"
+  },
+  "upload": {
+    "title": "音楽をアップロード",
+    "selectFile": "オーディオファイルを選択",
+    "titleLabel": "タイトル",
+    "artistLabel": "アーティスト",
+    "genreLabel": "ジャンル",
+    "descriptionLabel": "説明"
+  },
+  "profile": {
+    "edit": "プロフィールを編集",
+    "artistName": "アーティスト名",
+    "displayName": "表示名",
+    "bio": "バイオ",
+    "avatar": "アバター",
+    "coverPhoto": "カバー写真"
+  },
+  "settings": {
+    "title": "設定",
+    "language": "言語",
+    "theme": "テーマ",
+    "notifications": "通知"
+  },
+  "search": {
+    "button": "検索",
+    "placeholder": "アーティスト、楽曲、ジャンルを検索...",
+    "noResults": "結果が見つかりません",
+    "searching": "検索中..."
+  },
+  "discover": {
+    "topCharts": "トップチャート",
+    "genres": "ジャンル",
+    "hotNow": "今ホット",
+    "exploreGenres": "ジャンルを探索",
+    "genresAvailable": "ジャンル利用可能",
+    "noGenres": "まだジャンルが見つかりません"
+  },
+  "trending": {
+    "title": "トレンド",
+    "searchResults": "検索結果",
+    "searchResultsFor": "検索結果",
+    "topArtistsSongs": "取引活動と再生回数でランク付けされたトップアーティストと楽曲",
+    "allTime": "全期間",
+    "today": "今日",
+    "thisWeek": "今週",
+    "thisMonth": "今月"
+  }
+}
+

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
@@ -17,6 +18,7 @@ interface GenresListProps {
 }
 
 const GenresList = ({ playSong }: GenresListProps) => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [genres, setGenres] = useState<GenreData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -177,7 +179,7 @@ const GenresList = ({ playSong }: GenresListProps) => {
         <Card className="p-6 text-center">
           <Music className="h-12 w-12 mx-auto mb-3 text-muted-foreground" />
           <p className="text-sm text-muted-foreground font-mono">
-            No genres found yet
+            {t('discover.noGenres')}
           </p>
         </Card>
       </div>
@@ -188,10 +190,10 @@ const GenresList = ({ playSong }: GenresListProps) => {
     <div className="w-full px-4 py-4">
       <div className="mb-4">
         <h2 className="text-xl md:text-2xl font-bold font-mono text-neon-green mb-2">
-          🎵 EXPLORE GENRES
+          🎵 {t('discover.exploreGenres').toUpperCase()}
         </h2>
         <p className="text-sm text-muted-foreground font-mono">
-          Discover music by genre • {genres.length} genres available
+          {t('discover.exploreGenres')} • {genres.length} {t('discover.genresAvailable')}
         </p>
       </div>
 
@@ -265,7 +267,7 @@ const GenresList = ({ playSong }: GenresListProps) => {
                       className="flex-1 h-8 text-xs font-mono"
                     >
                       <Play className="w-3 h-3 mr-1" />
-                      Play
+                      {t('common.play')}
                     </Button>
                     {genreData.count > 1 && (
                       <Button

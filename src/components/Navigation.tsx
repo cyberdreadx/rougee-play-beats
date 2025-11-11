@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useCurrentUserProfile } from "@/hooks/useCurrentUserProfile";
 import { useWallet } from "@/hooks/useWallet";
+import { useTranslation } from "react-i18next";
 import { Compass, TrendingUp, User, Wallet, Upload, Radio, ArrowLeftRight, HelpCircle, Music, MessageSquare, Search, ChevronLeft, ChevronRight, Settings as SettingsIcon, Video, Menu, X } from "lucide-react";
 import MusicBars from "./MusicBars";
 import { useState, useEffect } from "react";
@@ -13,6 +14,7 @@ interface NavigationProps {
 }
 
 const Navigation = ({ activeTab = "DISCOVER", onTabChange }: NavigationProps) => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const { fullAddress } = useWallet();
@@ -61,30 +63,30 @@ const Navigation = ({ activeTab = "DISCOVER", onTabChange }: NavigationProps) =>
   
   // Desktop tabs - show all (How It Works moved to header)
   const desktopTabs = [
-    { name: "DISCOVER", path: "/", icon: Compass },
-    { name: "TRENDING", path: "/trending", icon: TrendingUp },
-    { name: "GLTCH FEED", path: "/feed", icon: Radio },
+    { name: t('nav.discover').toUpperCase(), path: "/", icon: Compass },
+    { name: t('nav.trending').toUpperCase(), path: "/trending", icon: TrendingUp },
+    { name: t('nav.feed').toUpperCase(), path: "/feed", icon: Radio },
     ...(isArtist || profile?.verified || profile?.artist_name
       ? [
-          { name: "MY PROFILE", path: `/artist/${fullAddress}`, icon: User },
-          { name: "GO LIVE", path: "/go-live", icon: Video, highlight: true }
+          { name: t('nav.profile').toUpperCase(), path: `/artist/${fullAddress}`, icon: User },
+          { name: t('nav.goLive').toUpperCase(), path: "/go-live", icon: Video, highlight: true }
         ]
       : [{ name: "BECOME ARTIST", path: "/become-artist", icon: User }]
     ),
     { name: "PLAYLISTS", path: "/playlists", icon: Music, comingSoon: true },
-    { name: "MESSAGES", path: "/messages", icon: MessageSquare },
-    { name: "WALLET", path: "/wallet", icon: Wallet },
+    { name: t('nav.messages').toUpperCase(), path: "/messages", icon: MessageSquare },
+    { name: t('nav.wallet').toUpperCase(), path: "/wallet", icon: Wallet },
     { name: "SWAP", path: "/swap", icon: ArrowLeftRight },
-    { name: "UPLOAD", path: "/upload", icon: Upload },
-    { name: "SETTINGS", path: "/settings", icon: SettingsIcon },
+    { name: t('nav.upload').toUpperCase(), path: "/upload", icon: Upload },
+    { name: t('nav.settings').toUpperCase(), path: "/settings", icon: SettingsIcon },
   ];
 
   // Mobile tabs - Only essentials (4-5 max for clean UX)
   const mobileTabs = [
-    { name: "Discover", path: "/", icon: Compass },
-    { name: "Trending", path: "/trending", icon: TrendingUp },
-    { name: "Feed", path: "/feed", icon: Radio },
-    { name: "Wallet", path: "/wallet", icon: Wallet },
+    { name: t('nav.discover'), path: "/", icon: Compass },
+    { name: t('nav.trending'), path: "/trending", icon: TrendingUp },
+    { name: t('nav.feed'), path: "/feed", icon: Radio },
+    { name: t('nav.wallet'), path: "/wallet", icon: Wallet },
     { name: "Menu", path: "#", icon: Menu, isMenu: true }, // Hamburger menu
   ];
 
@@ -92,16 +94,16 @@ const Navigation = ({ activeTab = "DISCOVER", onTabChange }: NavigationProps) =>
   const mobileSidebarItems = [
     ...(isArtist || profile?.verified || profile?.artist_name
       ? [
-          { name: "MY PROFILE", path: `/artist/${fullAddress}`, icon: User },
-          { name: "GO LIVE", path: "/go-live", icon: Video, highlight: true }
+          { name: t('nav.profile').toUpperCase(), path: `/artist/${fullAddress}`, icon: User },
+          { name: t('nav.goLive').toUpperCase(), path: "/go-live", icon: Video, highlight: true }
         ]
       : [{ name: "BECOME ARTIST", path: "/become-artist", icon: User }]
     ),
-    { name: "UPLOAD", path: "/upload", icon: Upload },
+    { name: t('nav.upload').toUpperCase(), path: "/upload", icon: Upload },
     { name: "SWAP", path: "/swap", icon: ArrowLeftRight },
-    { name: "SETTINGS", path: "/settings", icon: SettingsIcon },
+    { name: t('nav.settings').toUpperCase(), path: "/settings", icon: SettingsIcon },
     { name: "PLAYLISTS", path: "/playlists", icon: Music, comingSoon: true },
-    { name: "MESSAGES", path: "/messages", icon: MessageSquare },
+    { name: t('nav.messages').toUpperCase(), path: "/messages", icon: MessageSquare },
   ];
 
   const handleTabClick = (tab: typeof desktopTabs[0]) => {

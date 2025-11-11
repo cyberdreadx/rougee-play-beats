@@ -28,6 +28,9 @@ interface FeedSwipeViewProps {
   playSong: (song: any) => void;
   onClose: () => void;
   type: 'songs' | 'posts';
+  onLoadMore?: () => void;
+  hasMore?: boolean;
+  isLoadingMore?: boolean;
 }
 
 interface SongPost {
@@ -87,7 +90,10 @@ export default function FeedSwipeView({
   isPlaying, 
   playSong, 
   onClose,
-  type 
+  type,
+  onLoadMore,
+  hasMore = false,
+  isLoadingMore = false
 }: FeedSwipeViewProps) {
   const navigate = useNavigate();
   const { user } = usePrivy();
@@ -106,6 +112,7 @@ export default function FeedSwipeView({
   const touchStartY = useRef(0);
   const touchStartTime = useRef(0);
   const loadingCommentsRef = useRef<Set<string>>(new Set());
+  const loadMoreTriggeredRef = useRef<Set<number>>(new Set()); // Track which indices have triggered load more
   const { xrgeUsdPrice } = useTokenPrices();
 
   const currentItem = items[currentIndex];
@@ -173,10 +180,23 @@ export default function FeedSwipeView({
         setCurrentIndex(prev => Math.max(0, prev - 1));
       } else {
         // Swipe up - go to next
-        setCurrentIndex(prev => Math.min(items.length - 1, prev + 1));
+        setCurrentIndex(prev => {
+          const nextIndex = Math.min(items.length - 1, prev + 1);
+          // Load more if we're near the end (within 2 items) and there's more to load
+          // Only trigger once per index to prevent multiple loads
+          if (nextIndex >= items.length - 2 && hasMore && onLoadMore && !isLoadingMore) {
+            // Check if we've already triggered load more for this index
+            if (!loadMoreTriggeredRef.current.has(nextIndex)) {
+              console.log('📥 Near end of feed, loading more items...', { nextIndex, itemsLength: items.length });
+              loadMoreTriggeredRef.current.add(nextIndex);
+              onLoadMore();
+            }
+          }
+          return nextIndex;
+        });
       }
     }
-  }, [isDragging, items.length]);
+  }, [isDragging, items.length, hasMore, onLoadMore, isLoadingMore]);
 
   // Auto-play song when item changes - debounced to prevent rapid changes
   const lastPlayedIndexRef = useRef<number>(-1);
@@ -226,6 +246,15 @@ export default function FeedSwipeView({
       document.body.style.overflow = '';
     };
   }, []);
+
+  // Reset load more trigger when items change (new items loaded)
+  useEffect(() => {
+    // Clear triggers that are no longer near the end
+    const currentLength = items.length;
+    loadMoreTriggeredRef.current = new Set(
+      Array.from(loadMoreTriggeredRef.current).filter(index => index >= currentLength - 5)
+    );
+  }, [items.length]);
 
   // Fetch unlock status for locked posts
   useEffect(() => {

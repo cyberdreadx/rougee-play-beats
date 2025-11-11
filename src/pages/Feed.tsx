@@ -256,7 +256,8 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
   const [hasMorePosts, setHasMorePosts] = useState(true);
   const [hasMoreSongs, setHasMoreSongs] = useState(true);
   const [songsLoadingRef, setSongsLoadingRef] = useState(false); // Prevent concurrent loads
-  const ITEMS_PER_PAGE = 5;
+  const POSTS_PER_PAGE = 3; // Load 3 posts at a time for better mobile performance
+  const SONGS_PER_PAGE = 5; // Keep songs at 5 per page
   const [posting, setPosting] = useState(false);
   const [contentText, setContentText] = useState('');
   const [mediaFile, setMediaFile] = useState<File | null>(null);
@@ -358,10 +359,21 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
       scrollTimeout = setTimeout(() => {
         const scrollPosition = window.innerHeight + window.scrollY;
         const pageHeight = document.documentElement.scrollHeight;
+        const clientHeight = window.innerHeight;
         const scrollPercentage = scrollPosition / pageHeight;
         
-        // Only load when 75% down (lower threshold for earlier loading)
-        if (scrollPercentage >= 0.75) {
+        // CRITICAL FIX: Only trigger infinite scroll if page is actually scrollable
+        // This prevents infinite loading on mobile when content is shorter than viewport
+        const isScrollable = pageHeight > clientHeight * 1.2; // Page must be at least 20% taller than viewport
+        
+        if (!isScrollable) {
+          // Page is too short, don't trigger infinite scroll yet
+          console.log('⏸️ Page too short for infinite scroll:', { pageHeight, clientHeight });
+          return;
+        }
+        
+        // Only load when 80% down (higher threshold to prevent premature loading)
+        if (scrollPercentage >= 0.80) {
           // Use state to determine which tab is active
           const isPostsTab = activeTab === 'posts';
           const isSongsTab = activeTab === 'songs';
@@ -422,8 +434,8 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
       }
 
       const page = loadMore ? postsPage + 1 : 1;
-      const from = (page - 1) * ITEMS_PER_PAGE;
-      const to = from + ITEMS_PER_PAGE - 1;
+      const from = (page - 1) * POSTS_PER_PAGE;
+      const to = from + POSTS_PER_PAGE - 1;
 
       const {
         data: postsData,
@@ -464,7 +476,7 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
       }
 
       // Check if there are more posts
-      const hasMore = postsData && postsData.length === ITEMS_PER_PAGE;
+      const hasMore = postsData && postsData.length === POSTS_PER_PAGE;
       setHasMorePosts(hasMore);
 
       // Fetch profiles separately (case-insensitive matching)
@@ -584,8 +596,8 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
       }
 
       const page = loadMore ? songsPage + 1 : 1;
-      const from = (page - 1) * ITEMS_PER_PAGE;
-      const to = from + ITEMS_PER_PAGE - 1;
+      const from = (page - 1) * SONGS_PER_PAGE;
+      const to = from + SONGS_PER_PAGE - 1;
 
       // Fetch songs
       const { data: songsData, error } = await supabase
@@ -597,7 +609,7 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
       if (error) throw error;
 
       // Check if there are more songs
-      const hasMore = songsData && songsData.length === ITEMS_PER_PAGE;
+      const hasMore = songsData && songsData.length === SONGS_PER_PAGE;
       setHasMoreSongs(hasMore);
 
       if (!songsData || songsData.length === 0) {
@@ -1549,6 +1561,9 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
                 localStorage.setItem('feed_swipe_view', 'false');
               }}
               type={activeTab}
+              onLoadMore={activeTab === 'posts' ? () => loadPosts(true) : activeTab === 'songs' ? () => loadSongs(true) : undefined}
+              hasMore={activeTab === 'posts' ? hasMorePosts : activeTab === 'songs' ? hasMoreSongs : false}
+              isLoadingMore={activeTab === 'posts' ? loadingMorePosts : activeTab === 'songs' ? loadingMoreSongs : false}
             />
           )}
 
@@ -2192,12 +2207,29 @@ export default function Feed({ playSong, currentSong, isPlaying }: FeedProps = {
                 </div>
               )}
               
-              {/* Show indicator when there are more songs but not loading yet */}
+              {/* Load More Button - Prevents infinite scroll issues on mobile */}
               {!loadingMoreSongs && !loadingSongs && songs.length > 0 && hasMoreSongs && (
-                <div className="flex justify-center py-4 px-4 md:px-0">
-                  <div className="flex items-center gap-2 text-muted-foreground/70">
-                    <span className="text-xs font-mono">Scroll down for more songs</span>
-                  </div>
+                <div className="flex justify-center py-4 px-4 md:px-0 md:pt-4">
+                  <Button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      loadSongs(true);
+                    }}
+                    type="button"
+                    disabled={loadingMoreSongs}
+                    variant="outline"
+                    size="lg"
+                    className="w-full md:max-w-md font-mono"
+                  >
+                    {loadingMoreSongs ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Loading...
+                      </>
+                    ) : (
+                      'Load More Songs'
+                    )}
+                  </Button>
                 </div>
               )}
             </TabsContent>

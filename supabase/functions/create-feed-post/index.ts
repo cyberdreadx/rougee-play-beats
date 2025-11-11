@@ -55,6 +55,24 @@ serve(async (req) => {
     const contentText = formData.get('content_text') as string;
     const mediaFile = formData.get('media') as File | null;
     const songId = formData.get('song_id') as string | null;
+    
+    // Lock settings
+    const isLockedRaw = formData.get('is_locked');
+    const isLocked = isLockedRaw === 'true' || isLockedRaw === true;
+    const unlockPrice = formData.get('unlock_price') as string | null;
+    const unlockTokenType = formData.get('unlock_token_type') as string | null;
+    const unlockTokenAddress = formData.get('unlock_token_address') as string | null;
+    
+    console.log('🔒 Lock settings received (raw):', { 
+      isLockedRaw, 
+      isLockedRawType: typeof isLockedRaw,
+      isLocked, 
+      unlockPrice, 
+      unlockPriceType: typeof unlockPrice,
+      unlockTokenType, 
+      unlockTokenTypeType: typeof unlockTokenType,
+      unlockTokenAddress 
+    });
 
     // Validate that song_id is provided (mandatory for new posts)
     if (!songId) {
@@ -164,22 +182,82 @@ serve(async (req) => {
     }
 
     // Insert post into database
+    const postData: any = {
+      wallet_address: walletAddress,
+      content_text: contentText || null,
+      media_cid: mediaCid,
+      media_type: mediaType,
+      song_id: songId,
+    };
+    
+    // Add lock settings if post is locked
+    // Validate: isLocked must be true, unlockPrice must be a valid number > 0, unlockTokenType must be provided
+    const hasValidUnlockPrice = unlockPrice && !isNaN(parseFloat(unlockPrice)) && parseFloat(unlockPrice) > 0;
+    const hasValidUnlockTokenType = unlockTokenType && unlockTokenType.trim().length > 0;
+    
+    console.log('🔍 Lock validation:', {
+      isLocked,
+      hasValidUnlockPrice,
+      hasValidUnlockTokenType,
+      unlockPriceValue: unlockPrice,
+      parsedPrice: unlockPrice ? parseFloat(unlockPrice) : null
+    });
+    
+    if (isLocked && hasValidUnlockPrice && hasValidUnlockTokenType) {
+      postData.is_locked = true;
+      postData.unlock_price = parseFloat(unlockPrice);
+      postData.unlock_token_type = unlockTokenType.trim();
+      if (unlockTokenAddress && unlockTokenAddress.trim().length > 0) {
+        postData.unlock_token_address = unlockTokenAddress.trim();
+      } else {
+        postData.unlock_token_address = null;
+      }
+      console.log('✅ Post will be created as LOCKED:', {
+        is_locked: postData.is_locked,
+        unlock_price: postData.unlock_price,
+        unlock_token_type: postData.unlock_token_type,
+        unlock_token_address: postData.unlock_token_address
+      });
+    } else {
+      postData.is_locked = false;
+      postData.unlock_price = null;
+      postData.unlock_token_type = null;
+      postData.unlock_token_address = null;
+      console.log('ℹ️ Post will be created as UNLOCKED (public). Reason:', {
+        isLocked,
+        hasValidUnlockPrice,
+        hasValidUnlockTokenType
+      });
+    }
+    
+    console.log('📤 Inserting post data:', JSON.stringify(postData, null, 2));
+    
     const { data: post, error: insertError } = await supabase
       .from('feed_posts')
-      .insert({
-        wallet_address: walletAddress,
-        content_text: contentText || null,
-        media_cid: mediaCid,
-        media_type: mediaType,
-        song_id: songId,
-      })
+      .insert(postData)
       .select()
       .single();
 
     if (insertError) {
-      console.error('Database insert error:', insertError);
+      console.error('❌ Database insert error:', {
+        message: insertError.message,
+        details: insertError.details,
+        hint: insertError.hint,
+        code: insertError.code
+      });
+      // If it's a constraint violation, provide more specific error
+      if (insertError.code === '23514') {
+        throw new Error(`Database constraint violation: ${insertError.message}. Make sure unlock_price > 0 and unlock_token_type is provided when is_locked is true.`);
+      }
       throw insertError;
     }
+    
+    console.log('✅ Post created successfully:', {
+      id: post.id,
+      is_locked: post.is_locked,
+      unlock_price: post.unlock_price,
+      unlock_token_type: post.unlock_token_type
+    });
 
     console.log('Feed post created:', post.id);
 

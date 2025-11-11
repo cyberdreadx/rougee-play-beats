@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Lock, Music, X, Send, ImageIcon as ImageIconLucide, ChevronsUpDown, Check, Play, Pause, Loader2 } from "lucide-react";
+import { Lock, Music, X, Send, ImageIcon as ImageIconLucide, ChevronsUpDown, Check, Play, Pause, Loader2, DollarSign } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import TagAutocomplete from "@/components/TagAutocomplete";
@@ -47,6 +47,12 @@ export default function CreatePostModal({
   const [songSearchQuery, setSongSearchQuery] = useState("");
   const [allSongs, setAllSongs] = useState<any[]>([]);
   const [loadingAllSongs, setLoadingAllSongs] = useState(false);
+  
+  // Lock settings
+  const [isLocked, setIsLocked] = useState(false);
+  const [unlockPrice, setUnlockPrice] = useState("");
+  const [unlockTokenType, setUnlockTokenType] = useState<'XRGE' | 'ETH' | 'KTA' | 'USDC' | 'SONG_TOKEN'>('XRGE');
+  const [selectedUnlockSong, setSelectedUnlockSong] = useState<any>(null);
 
   const loadAllSongsForSearch = async () => {
     if (allSongs.length > 0) return;
@@ -111,6 +117,24 @@ export default function CreatePostModal({
       formData.append('walletAddress', fullAddress || '');
       if (mediaFile) {
         formData.append('media', mediaFile);
+      }
+      
+      // Add lock settings if post is locked
+      console.log('🔒 Lock settings:', { isLocked, unlockPrice, unlockTokenType, selectedUnlockSong });
+      if (isLocked && unlockPrice && unlockTokenType) {
+        formData.append('is_locked', 'true');
+        formData.append('unlock_price', unlockPrice);
+        formData.append('unlock_token_type', unlockTokenType);
+        if (unlockTokenType === 'SONG_TOKEN' && selectedUnlockSong) {
+          formData.append('unlock_token_address', selectedUnlockSong.token_address || '');
+        }
+        console.log('✅ Lock settings added to formData');
+      } else {
+        console.log('❌ Lock settings NOT added - missing:', { 
+          isLocked, 
+          hasUnlockPrice: !!unlockPrice, 
+          hasUnlockTokenType: !!unlockTokenType 
+        });
       }
 
       const authHeaders = await getAuthHeaders();
@@ -368,6 +392,145 @@ export default function CreatePostModal({
             )}
           </div>
 
+          {/* Lock Settings */}
+          <div className="space-y-3 p-4 rounded-xl border-2 border-purple-500/30 bg-gradient-to-r from-purple-500/10 via-pink-500/10 to-purple-500/10 backdrop-blur-sm">
+            <div className="flex items-center justify-between">
+              <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
+                <Lock className="w-4 h-4 text-purple-400" />
+                <span className="text-purple-300 font-mono">Lock Post (Premium Content)</span>
+              </label>
+              <input
+                type="checkbox"
+                checked={isLocked}
+                onChange={(e) => {
+                  setIsLocked(e.target.checked);
+                  if (!e.target.checked) {
+                    setUnlockPrice("");
+                    setSelectedUnlockSong(null);
+                  }
+                }}
+                className="w-4 h-4 rounded border-purple-500/50 bg-black/60 text-purple-500 focus:ring-purple-500/50"
+                disabled={!hasXRGE}
+              />
+            </div>
+            
+            {isLocked && (
+              <div className="space-y-3 pt-2 border-t border-purple-500/20">
+                <div className="space-y-2">
+                  <label className="text-xs font-mono text-purple-300">Unlock Price</label>
+                  <Input
+                    type="number"
+                    step="0.00000001"
+                    min="0"
+                    placeholder="0.00"
+                    value={unlockPrice}
+                    onChange={(e) => setUnlockPrice(e.target.value)}
+                    className="bg-black/60 border-purple-500/30 text-white font-mono"
+                    disabled={!hasXRGE}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <label className="text-xs font-mono text-purple-300">Payment Token</label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="w-full justify-between bg-black/60 border-purple-500/30 text-white font-mono"
+                        disabled={!hasXRGE}
+                      >
+                        {unlockTokenType === 'SONG_TOKEN' && selectedUnlockSong
+                          ? `${selectedUnlockSong.title} Token`
+                          : unlockTokenType}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[300px] p-0" align="start">
+                      <Command>
+                        <CommandList>
+                          <CommandGroup>
+                            {(['XRGE', 'ETH', 'KTA', 'USDC', 'SONG_TOKEN'] as const).map((token) => (
+                              <CommandItem
+                                key={token}
+                                value={token}
+                                onSelect={() => {
+                                  setUnlockTokenType(token);
+                                  if (token !== 'SONG_TOKEN') {
+                                    setSelectedUnlockSong(null);
+                                  }
+                                }}
+                              >
+                                <Check className={unlockTokenType === token ? "h-4 w-4 mr-2" : "h-4 w-4 mr-2 opacity-0"} />
+                                {token}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                
+                {unlockTokenType === 'SONG_TOKEN' && (
+                  <div className="space-y-2">
+                    <label className="text-xs font-mono text-purple-300">Select Song Token</label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className="w-full justify-between bg-black/60 border-purple-500/30 text-white font-mono"
+                          disabled={!hasXRGE}
+                          onClick={() => {
+                            if (allSongs.length === 0) {
+                              loadAllSongsForSearch();
+                            }
+                          }}
+                        >
+                          {selectedUnlockSong ? selectedUnlockSong.title : "Select song..."}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[400px] p-0" align="start">
+                        <Command shouldFilter={false}>
+                          <CommandInput 
+                            placeholder="Search songs..." 
+                            value={songSearchQuery}
+                            onValueChange={setSongSearchQuery}
+                          />
+                          <CommandList>
+                            {loadingAllSongs ? (
+                              <div className="p-4 text-center text-sm">Loading...</div>
+                            ) : (
+                              <CommandGroup>
+                                {allSongs
+                                  .filter(song => song.token_address)
+                                  .filter(song => 
+                                    !songSearchQuery || 
+                                    song.title.toLowerCase().includes(songSearchQuery.toLowerCase()) ||
+                                    song.artist?.toLowerCase().includes(songSearchQuery.toLowerCase())
+                                  )
+                                  .map((song) => (
+                                    <CommandItem
+                                      key={song.id}
+                                      value={song.id}
+                                      onSelect={() => setSelectedUnlockSong(song)}
+                                    >
+                                      <Check className={selectedUnlockSong?.id === song.id ? "h-4 w-4 mr-2" : "h-4 w-4 mr-2 opacity-0"} />
+                                      {song.title} - {song.artist}
+                                    </CommandItem>
+                                  ))}
+                              </CommandGroup>
+                            )}
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           <div className="flex gap-3">
             <Input type="file" accept="image/*" onChange={handleMediaChange} className="hidden" id="media-upload-modal" disabled={!hasXRGE} />
             <label htmlFor="media-upload-modal">
@@ -381,7 +544,7 @@ export default function CreatePostModal({
 
             <Button 
               onClick={handlePost} 
-              disabled={posting || !selectedSong || !contentText && !mediaFile || !hasXRGE} 
+              disabled={posting || !selectedSong || (!contentText && !mediaFile) || !hasXRGE || (isLocked && (!unlockPrice || parseFloat(unlockPrice) <= 0 || (unlockTokenType === 'SONG_TOKEN' && !selectedUnlockSong)))} 
               className="ml-auto bg-gradient-to-r from-neon-green to-emerald-500 hover:from-neon-green/90 hover:to-emerald-500/90 text-black font-mono font-bold uppercase tracking-wider shadow-[0_0_20px_rgba(0,255,159,0.4)] hover:shadow-[0_0_30px_rgba(0,255,159,0.6)] border-2 border-neon-green/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {posting ? (

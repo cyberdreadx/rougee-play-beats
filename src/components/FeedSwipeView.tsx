@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { MessageCircle, Share2, Heart, MoreVertical, Play, Pause, X, Check } from 'lucide-react';
+import { MessageCircle, Share2, Heart, MoreVertical, Play, Pause, X, Check, Lock } from 'lucide-react';
 import { getIPFSGatewayUrl } from '@/lib/ipfs';
 import LikeButton from '@/components/LikeButton';
 import RepostButton from '@/components/RepostButton';
@@ -19,6 +19,7 @@ import { useTokenPrices } from '@/hooks/useTokenPrices';
 import { supabase } from '@/integrations/supabase/client';
 import { usePrivy } from '@privy-io/react-auth';
 import { toast } from '@/hooks/use-toast';
+import UnlockPostButton from '@/components/UnlockPostButton';
 
 interface FeedSwipeViewProps {
   items: (SongPost | FeedPost)[];
@@ -61,6 +62,10 @@ interface FeedPost {
   like_count: number;
   comment_count: number;
   repost_count?: number;
+  is_locked?: boolean;
+  unlock_price?: string | null;
+  unlock_token_type?: string | null;
+  unlock_token_address?: string | null;
   profiles?: {
     artist_name: string | null;
     display_name: string | null;
@@ -96,6 +101,7 @@ export default function FeedSwipeView({
   const [commentText, setCommentText] = useState<Record<string, string>>({});
   const [copiedPostId, setCopiedPostId] = useState<string | null>(null);
   const [copiedSongId, setCopiedSongId] = useState<string | null>(null);
+  const [unlockedPosts, setUnlockedPosts] = useState<Set<string>>(new Set());
   const containerRef = useRef<HTMLDivElement>(null);
   const touchStartY = useRef(0);
   const touchStartTime = useRef(0);
@@ -220,6 +226,36 @@ export default function FeedSwipeView({
       document.body.style.overflow = '';
     };
   }, []);
+
+  // Fetch unlock status for locked posts
+  useEffect(() => {
+    const fetchUnlockStatus = async () => {
+      if (!fullAddress) return;
+      
+      const lockedPosts = items.filter(item => 
+        type === 'posts' && 
+        'is_locked' in item && 
+        item.is_locked === true &&
+        item.wallet_address !== fullAddress
+      ) as FeedPost[];
+      
+      if (lockedPosts.length === 0) return;
+      
+      const lockedPostIds = lockedPosts.map(p => p.id);
+      const { data: unlockData } = await supabase
+        .from('feed_post_unlocks')
+        .select('post_id')
+        .eq('wallet_address', fullAddress.toLowerCase())
+        .in('post_id', lockedPostIds);
+      
+      if (unlockData) {
+        const unlockedIds = new Set(unlockData.map(u => u.post_id));
+        setUnlockedPosts(unlockedIds);
+      }
+    };
+    
+    fetchUnlockStatus();
+  }, [items, fullAddress, type]);
 
   // Load comments for a post
   const loadComments = useCallback(async (postId: string) => {
@@ -485,19 +521,80 @@ export default function FeedSwipeView({
     );
   }, [currentSong, isPlaying, playSong, onClose, currentIndex, items.length]);
 
+  // Color scheme function for cyberpunk styling (same as Feed.tsx)
+  const getPostItColors = useCallback((id: string) => {
+    const colorSchemes = [
+      { 
+        bg: 'from-neon-green/5 via-emerald-500/10 to-black/20', 
+        glass: 'bg-black/40 backdrop-blur-xl border-neon-green/30', 
+        circuit: 'border-neon-green/20',
+        glow: 'shadow-[0_0_20px_rgba(0,255,159,0.3)]',
+        text: 'text-neon-green/90' 
+      },
+      { 
+        bg: 'from-blue-500/5 via-cyan-500/10 to-black/20', 
+        glass: 'bg-black/40 backdrop-blur-xl border-cyan-500/30', 
+        circuit: 'border-cyan-500/20',
+        glow: 'shadow-[0_0_20px_rgba(0,255,255,0.3)]',
+        text: 'text-cyan-400/90' 
+      },
+      { 
+        bg: 'from-purple-500/5 via-pink-500/10 to-black/20', 
+        glass: 'bg-black/40 backdrop-blur-xl border-pink-500/30', 
+        circuit: 'border-pink-500/20',
+        glow: 'shadow-[0_0_20px_rgba(255,0,255,0.3)]',
+        text: 'text-pink-400/90' 
+      },
+      { 
+        bg: 'from-orange-500/5 via-red-500/10 to-black/20', 
+        glass: 'bg-black/40 backdrop-blur-xl border-orange-500/30', 
+        circuit: 'border-orange-500/20',
+        glow: 'shadow-[0_0_20px_rgba(255,165,0,0.3)]',
+        text: 'text-orange-400/90' 
+      },
+    ];
+    const hash = id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    return colorSchemes[hash % colorSchemes.length];
+  }, []);
+
   const renderPostItem = (post: FeedPost) => {
+    const isLocked = post.is_locked === true && !unlockedPosts.has(post.id) && post.wallet_address !== fullAddress;
+    const colors = getPostItColors(post.id);
+    const isTextOnly = !post.media_cid && !post.songs && post.content_text;
+    
     return (
       <div className="relative w-full h-full flex flex-col bg-black">
         {/* Media Background */}
         {post.media_cid && (
           <div className="absolute inset-0">
-            <img
-              src={getIPFSGatewayUrl(post.media_cid)}
-              alt="Post media"
-              className="w-full h-full object-cover"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
+            {isLocked ? (
+              <>
+                {/* Blurred preview for locked content */}
+                <div className="absolute inset-0 blur-md pointer-events-none">
+                  <img
+                    src={getIPFSGatewayUrl(post.media_cid)}
+                    alt="Post media"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div className="absolute inset-0 bg-black/70" />
+              </>
+            ) : (
+              <>
+                <img
+                  src={getIPFSGatewayUrl(post.media_cid)}
+                  alt="Post media"
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
+              </>
+            )}
           </div>
+        )}
+        
+        {/* Cyberpunk gradient background for text-only posts */}
+        {isTextOnly && (
+          <div className={`absolute inset-0 bg-gradient-to-br ${colors.bg}`} />
         )}
 
         {/* Content Overlay */}
@@ -524,11 +621,69 @@ export default function FeedSwipeView({
           </div>
 
           {/* Center Content */}
-          <div className="flex-1 flex flex-col justify-center">
-            {post.content_text && (
-              <div className="max-w-md mx-auto">
-                <TaggedText text={post.content_text} />
+          <div className="flex-1 flex flex-col justify-center relative">
+            {isLocked ? (
+              /* Lock Overlay - positioned absolutely to cover center area */
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 backdrop-blur-md p-6 gap-4 z-30" style={{ top: '80px', bottom: '80px' }}>
+                <Lock className="w-16 h-16 text-purple-400" />
+                <p className="text-white font-mono font-bold text-xl">Premium Content</p>
+                <p className="text-white/80 font-mono text-sm text-center">
+                  Unlock for {post.unlock_price} {post.unlock_token_type}
+                </p>
+                <div onClick={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}>
+                  <UnlockPostButton
+                    postId={post.id}
+                    unlockPrice={post.unlock_price || '0'}
+                    unlockTokenType={post.unlock_token_type || 'XRGE'}
+                    unlockTokenAddress={post.unlock_token_address}
+                    onUnlocked={() => {
+                      setUnlockedPosts(prev => new Set(prev).add(post.id));
+                      // Refresh to show unlocked content
+                      window.location.reload();
+                    }}
+                  />
+                </div>
               </div>
+            ) : (
+              <>
+                {post.content_text && (
+                  <div className={`max-w-2xl mx-auto relative ${isTextOnly ? 'p-8' : ''}`}>
+                    {isTextOnly ? (
+                      <>
+                        {/* Cyberpunk Glass Panel */}
+                        <div className={`absolute inset-0 ${colors.glass} border-2 ${colors.circuit} ${colors.glow} rounded-2xl`}>
+                          {/* Circuit Lines - Horizontal */}
+                          <div className={`absolute top-1/4 left-0 right-0 h-[1px] ${colors.circuit} border-t opacity-30`} />
+                          <div className={`absolute top-1/2 left-0 right-0 h-[1px] ${colors.circuit} border-t opacity-20`} />
+                          <div className={`absolute top-3/4 left-0 right-0 h-[1px] ${colors.circuit} border-t opacity-30`} />
+                          
+                          {/* Circuit Lines - Vertical */}
+                          <div className={`absolute left-1/4 top-0 bottom-0 w-[1px] ${colors.circuit} border-l opacity-30`} />
+                          <div className={`absolute left-1/2 top-0 bottom-0 w-[1px] ${colors.circuit} border-l opacity-20`} />
+                          <div className={`absolute left-3/4 top-0 bottom-0 w-[1px] ${colors.circuit} border-l opacity-30`} />
+                          
+                          {/* Corner Accents */}
+                          <div className={`absolute top-2 left-2 w-4 h-4 border-t-2 border-l-2 ${colors.circuit}`} />
+                          <div className={`absolute top-2 right-2 w-4 h-4 border-t-2 border-r-2 ${colors.circuit}`} />
+                          <div className={`absolute bottom-2 left-2 w-4 h-4 border-b-2 border-l-2 ${colors.circuit}`} />
+                          <div className={`absolute bottom-2 right-2 w-4 h-4 border-b-2 border-r-2 ${colors.circuit}`} />
+                        </div>
+                        
+                        {/* Text Content */}
+                        <div className="relative z-10">
+                          <div className={`text-lg md:text-xl whitespace-pre-wrap leading-relaxed font-mono font-semibold ${colors.text} drop-shadow-[0_0_10px_currentColor]`}>
+                            <TaggedText text={post.content_text} />
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-white text-base md:text-lg whitespace-pre-wrap leading-relaxed">
+                        <TaggedText text={post.content_text} />
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
             )}
 
             {/* Comments Section */}

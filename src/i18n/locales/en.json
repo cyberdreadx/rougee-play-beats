@@ -106,6 +106,148 @@
     "today": "Today",
     "thisWeek": "This Week",
     "thisMonth": "This Month"
+  },
+  "howItWorks": {
+    "title": "How ROUGEE Works",
+    "subtitle": "Music + Blockchain = Magic ✨",
+    "description": "No crypto knowledge needed. We'll explain everything in simple terms!",
+    "badge": "Simple Guide for Everyone",
+    "step": "Step",
+    "steps": {
+      "connectWallet": {
+        "title": "Connect Your Wallet",
+        "subtitle": "Just like logging in!",
+        "description": "Your wallet is your account. No password needed - just connect and you're in!",
+        "detail1": "Click 'Connect Wallet' button",
+        "detail2": "Choose your wallet (we'll help you set one up if needed)",
+        "detail3": "Approve the connection - Done! 🎉",
+        "layman": "Think of it like using your fingerprint to unlock your phone, but for apps."
+      },
+      "discoverMusic": {
+        "title": "Discover Music",
+        "subtitle": "100% Free Listening",
+        "description": "Browse thousands of songs and play anything you want - completely free!",
+        "detail1": "Search for any genre or artist",
+        "detail2": "Play unlimited songs for free",
+        "detail3": "Create playlists and share with friends",
+        "layman": "Just like Spotify or Apple Music, but you actually own a piece of what you love."
+      },
+      "songTokens": {
+        "title": "Understand Song Tokens",
+        "subtitle": "Like Digital Trading Cards",
+        "description": "Every song has its own token. When you buy a token, you're investing in that song's success!",
+        "detail1": "Each song = unique token (like a collectible card)",
+        "detail2": "Artists get tokens when they upload",
+        "detail3": "Fans can buy/sell tokens as songs get popular",
+        "layman": "Remember Pokémon cards? Same idea, but for music. Rare songs = valuable tokens!"
+      },
+      "buyTrade": {
+        "title": "Buy & Trade Tokens",
+        "subtitle": "Simple as 1-2-3",
+        "description": "Swap your crypto (ETH, USDC, KTA) for XRGE or song tokens. Trade anytime!",
+        "detail1": "Go to Swap page or any song page",
+        "detail2": "Choose how much to invest",
+        "detail3": "Approve → Trade → Own tokens! 💎",
+        "layman": "Like exchanging dollars for euros, but with music tokens instead."
+      },
+      "supportArtists": {
+        "title": "Support Artists Directly",
+        "subtitle": "No Middlemen",
+        "description": "Artists keep 100% control. When their tokens trade, they earn money directly!",
+        "detail1": "Artists upload → get tokens instantly",
+        "detail2": "Fans buy tokens → artists earn immediately",
+        "detail3": "No record labels taking cuts",
+        "layman": "Like buying merch at a concert - money goes straight to the artist, not some company."
+      },
+      "growCollection": {
+        "title": "Grow Your Collection",
+        "subtitle": "Earn as Songs Blow Up",
+        "description": "The more a song gets played and shared, the more valuable its tokens become!",
+        "detail1": "Share songs you believe in",
+        "detail2": "Watch token values rise as songs trend",
+        "detail3": "Sell anytime to take profits or hold forever",
+        "layman": "Like owning a piece of a hit song. The bigger it gets, the more your tokens are worth!"
+      }
+    },
+    "comparison": {
+      "title": "Think of it like this...",
+      "subtitle": "ROUGEE combines the best of three worlds",
+      "listenFree": {
+        "title": "Listen Free",
+        "description": "Like Spotify - unlimited streaming, no subscription"
+      },
+      "collectTokens": {
+        "title": "Collect Tokens",
+        "description": "Like Trading Cards - own rare pieces of music"
+      },
+      "tradeEarn": {
+        "title": "Trade & Earn",
+        "description": "Like Crypto - invest in what you believe in"
+      }
+    },
+    "features": {
+      "title": "Why It's Awesome 🔥",
+      "copyright": {
+        "title": "Copyright Protected",
+        "description": "Every song is verified for copyright before upload",
+        "layman": "Artists' work is protected - no stealing or copying allowed!"
+      },
+      "storage": {
+        "title": "Decentralized Storage",
+        "description": "Music lives on IPFS - permanent, censorship-resistant storage",
+        "layman": "Your music can never be deleted or taken down by anyone. It's stored across thousands of computers worldwide!"
+      },
+      "trading": {
+        "title": "Token Trading",
+        "description": "Buy, sell, and collect music tokens like digital art",
+        "layman": "Imagine owning a piece of your favorite song - that's what tokens let you do!"
+      },
+      "free": {
+        "title": "Always Free",
+        "description": "Listen to unlimited music without paying a subscription",
+        "layman": "No monthly fees, no ads, no limits. Just pure music enjoyment!"
+      }
+    },
+    "faq": {
+      "title": "Quick Questions 🤔",
+      "subtitle": "Common questions answered in plain English",
+      "xrge": {
+        "question": "What is XRGE?",
+        "answer": "XRGE is the main token on our platform. Think of it like game coins or arcade tokens - you can buy them with real money, use them to support artists, and trade them back for cash anytime!"
+      },
+      "freeListening": {
+        "question": "Can I listen for free?",
+        "answer": "Absolutely! All music is 100% free to stream - no subscription, no ads, no limits. You only need tokens if you want to invest in artists and collect their music tokens."
+      },
+      "artistMoney": {
+        "question": "How do artists make money?",
+        "answer": "When an artist uploads a song, they receive tokens immediately. As fans buy and trade these tokens, the artist earns money directly - no record label taking 70% of their earnings!"
+      },
+      "musicSafe": {
+        "question": "Is my music safe?",
+        "answer": "Super safe! Your music is stored on IPFS (a decentralized network of computers worldwide). It's like having thousands of backup copies that nobody can delete, hack, or censor. Once it's uploaded, it's there forever!"
+      },
+      "cryptoExperience": {
+        "question": "Do I need crypto experience?",
+        "answer": "Not at all! If you can use Instagram or TikTok, you can use ROUGEE. We guide you through everything step-by-step. Just connect a wallet (we'll help you create one) and start exploring!"
+      },
+      "bondingCurve": {
+        "question": "What's a \"bonding curve\"?",
+        "answer": "It's a fancy way of saying \"the price goes up as more people buy.\" Early supporters pay less, and as a song gets popular, tokens become more valuable. It's like buying concert tickets - the earlier you buy, the cheaper they are!"
+      }
+    },
+    "cta": {
+      "badge": "Join 1000+ Music Lovers",
+      "title": "Ready to Start Your Journey? 🚀",
+      "description": "Join thousands of artists and fans building the future of music!",
+      "exploreMusic": "Explore Music",
+      "startTrading": "Start Trading",
+      "becomeArtist": "Become Artist",
+      "artistOwned": "Artist Owned",
+      "trading": "Trading",
+      "freeListening": "Free Listening",
+      "inSimpleTerms": "In simple terms:"
+    }
   }
 }
 

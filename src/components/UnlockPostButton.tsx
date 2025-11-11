@@ -162,23 +162,46 @@ export default function UnlockPostButton({
         }
 
         // Record unlock in database after transaction is confirmed
-        const authHeaders = await getAuthHeaders();
-        const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/unlock-post`, {
+        // No JWT needed - blockchain transaction is proof!
+        const functionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/unlock-post`;
+        console.log('📤 Calling unlock-post function:', functionUrl);
+        console.log('📤 Request payload:', { postId, transactionHash: txHash, walletAddress: fullAddress });
+        
+        const response = await fetch(functionUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            ...authHeaders,
+            // No auth headers needed - we verify on blockchain!
           },
           body: JSON.stringify({
             postId,
             transactionHash: txHash,
+            walletAddress: fullAddress, // Include wallet address for verification
           }),
         });
 
+        console.log('📬 Response status:', response.status, response.statusText);
+        console.log('📬 Response headers:', Object.fromEntries(response.headers.entries()));
+
         if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'Failed to record unlock');
+          let errorData;
+          try {
+            errorData = await response.json();
+            console.error('❌ Error response:', errorData);
+            console.error('❌ Error details:', errorData.details);
+            console.error('❌ Error type:', errorData.errorType);
+          } catch (e) {
+            const text = await response.text();
+            console.error('❌ Error response (text):', text);
+            errorData = { error: text || 'Failed to record unlock' };
+          }
+          const errorMessage = errorData.details || errorData.error || 'Failed to record unlock';
+          console.error('❌ Throwing error:', errorMessage);
+          throw new Error(errorMessage);
         }
+        
+        const responseData = await response.json();
+        console.log('✅ Unlock successful:', responseData);
 
         toast({
           title: "Post Unlocked! 🔓",

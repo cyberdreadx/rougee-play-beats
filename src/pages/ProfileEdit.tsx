@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +25,13 @@ import { XRGETierBadge } from "@/components/XRGETierBadge";
 import { LockCodeKeypad } from "@/components/LockCodeKeypad";
 import { useLockCode } from "@/hooks/useLockCode";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { AICoverPaymentModal } from "@/components/AICoverPaymentModal";
+import { Sparkles, ChevronDown, ChevronUp } from "lucide-react";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 const ProfileEdit = () => {
   const navigate = useNavigate();
@@ -59,6 +66,16 @@ const ProfileEdit = () => {
   const [tempAvatarUrl, setTempAvatarUrl] = useState<string | null>(null);
   const [showCoverCrop, setShowCoverCrop] = useState(false);
   const [tempCoverUrl, setTempCoverUrl] = useState<string | null>(null);
+  
+  // AI Generation state
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [selectedAIModel, setSelectedAIModel] = useState<'flux-schnell' | 'seedream-v4'>('flux-schnell');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generatedImages, setGeneratedImages] = useState<string[]>([]);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [generatingFor, setGeneratingFor] = useState<'avatar' | 'cover' | null>(null);
+  const [isAICardOpen, setIsAICardOpen] = useState(false);
+  const generationInProgress = useRef(false);
   
   // Lock code state
   const lockCodeHook = useLockCode();
@@ -292,6 +309,163 @@ const ProfileEdit = () => {
     }
   };
 
+  // AI Generation functions
+  const generateAIImage = async (type: 'avatar' | 'cover') => {
+    if (!aiPrompt.trim()) {
+      toast({
+        title: "Prompt required",
+        description: "Please enter a description for your image",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!isConnected) {
+      toast({
+        title: "Wallet not connected",
+        description: "Please connect your wallet to generate AI images",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (isGenerating) {
+      toast({
+        title: "Generation in progress",
+        description: "Please wait for the current generation to complete",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setGeneratingFor(type);
+    setShowPaymentModal(true);
+  };
+
+  const handlePaymentSuccess = async (paymentProof: string) => {
+    if (generationInProgress.current || !generatingFor) {
+      console.log('⚠️ Generation already in progress, skipping...');
+      return;
+    }
+
+    generationInProgress.current = true;
+    setIsGenerating(true);
+    console.log('🎨 Starting AI image generation with payment proof...');
+    
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        controller.abort();
+      }, 120000); // 2 minute timeout
+
+      // Determine style based on type
+      const style = generatingFor === 'avatar' 
+        ? 'profile picture, portrait, circular format, high quality, professional headshot'
+        : 'cover photo, landscape format, 1920x480, high quality, professional banner';
+
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-cover-x402`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          'x-payment': paymentProof,
+        },
+        body: JSON.stringify({
+          prompt: aiPrompt,
+          model: selectedAIModel,
+          genre: 'profile',
+          style: style
+        }),
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ AI generation successful:', data);
+        
+        setGeneratedImages(data.images || []);
+        
+        if (data.images && data.images.length > 0) {
+          const paymentAmount = selectedAIModel === 'flux-schnell' ? '0.01' : '0.05';
+          toast({
+            title: "Images Generated! 🎨",
+            description: `Generated ${data.images.length} ${generatingFor} options for $${paymentAmount}`,
+          });
+        } else {
+          toast({
+            title: "No images generated",
+            description: "Try a different prompt",
+            variant: "destructive",
+          });
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('❌ AI generation failed:', errorData);
+        toast({
+          title: "Generation failed",
+          description: errorData.message || `HTTP ${response.status}`,
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      console.error('❌ Error generating image:', error);
+      
+      if (error.name === 'AbortError') {
+        toast({
+          title: "Generation timed out",
+          description: "Please try again with a simpler prompt",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Generation failed",
+          description: "Please try again",
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setIsGenerating(false);
+      generationInProgress.current = false;
+    }
+  };
+
+  const selectGeneratedImage = async (imageUrl: string) => {
+    try {
+      // Fetch the image
+      const response = await fetch(imageUrl);
+      const blob = await response.blob();
+      
+      // Convert to file
+      const fileName = generatingFor === 'avatar' ? 'avatar.jpg' : 'cover.jpg';
+      const file = new File([blob], fileName, { type: 'image/jpeg' });
+      
+      if (generatingFor === 'avatar') {
+        // Show crop modal for avatar
+        const url = URL.createObjectURL(blob);
+        setTempAvatarUrl(url);
+        setShowAvatarCrop(true);
+        setGeneratedImages([]);
+        setAiPrompt("");
+      } else {
+        // Show crop modal for cover
+        const url = URL.createObjectURL(blob);
+        setTempCoverUrl(url);
+        setShowCoverCrop(true);
+        setGeneratedImages([]);
+        setAiPrompt("");
+      }
+    } catch (error) {
+      console.error('Error selecting generated image:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load selected image",
+        variant: "destructive",
+      });
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -445,6 +619,69 @@ const ProfileEdit = () => {
           />
         )}
 
+        {/* AI Payment Modal */}
+        {showPaymentModal && generatingFor && (
+          <AICoverPaymentModal
+            isOpen={showPaymentModal}
+            onClose={() => {
+              setShowPaymentModal(false);
+              setGeneratingFor(null);
+            }}
+            onPaymentSuccess={handlePaymentSuccess}
+            model={selectedAIModel}
+            prompt={aiPrompt}
+          />
+        )}
+
+        {/* Generated Images Selection Dialog */}
+        {generatedImages.length > 0 && generatingFor && (
+          <Dialog open={generatedImages.length > 0} onOpenChange={() => {
+            setGeneratedImages([]);
+            setGeneratingFor(null);
+          }}>
+            <DialogContent className="sm:max-w-5xl max-w-[95vw] bg-background/95 backdrop-blur-xl border-neon-green/20 max-h-[90vh] flex flex-col">
+              <DialogHeader className="flex-shrink-0 pb-4">
+                <DialogTitle className="font-mono text-neon-green flex items-center gap-2">
+                  <Sparkles className="w-5 h-5" />
+                  Select {generatingFor === 'avatar' ? 'Avatar' : 'Cover Photo'}
+                </DialogTitle>
+                <DialogDescription className="font-mono text-xs">
+                  Choose one of the generated images
+                </DialogDescription>
+              </DialogHeader>
+              <div className={`grid gap-4 overflow-y-auto flex-1 min-h-0 pr-2 ${
+                generatingFor === 'avatar' 
+                  ? 'grid-cols-2 md:grid-cols-3' 
+                  : 'grid-cols-1 md:grid-cols-2'
+              }`}>
+                {generatedImages.map((imageUrl, index) => (
+                  <div
+                    key={index}
+                    className="relative group cursor-pointer rounded-lg overflow-hidden border-2 border-transparent hover:border-neon-green transition-all bg-black/20"
+                    onClick={() => selectGeneratedImage(imageUrl)}
+                  >
+                    <img
+                      src={imageUrl}
+                      alt={`Generated ${generatingFor} ${index + 1}`}
+                      className={`w-full ${
+                        generatingFor === 'avatar' 
+                          ? 'aspect-square object-cover' 
+                          : 'aspect-[4/1] object-cover'
+                      }`}
+                      loading="lazy"
+                    />
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
+                      <div className="text-white font-mono text-sm bg-black/60 px-3 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
+                        Select
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
+
         <div className="space-y-4 mb-6">
           <div className="flex items-center justify-between">
             <h1 className="text-3xl font-mono font-bold neon-text">
@@ -542,38 +779,122 @@ const ProfileEdit = () => {
                     </>
                   )}
                 </div>
+                <div className="flex gap-2 mt-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => generateAIImage('cover')}
+                    disabled={isGenerating}
+                    className="font-mono text-xs"
+                  >
+                    <Sparkles className="h-3 w-3 mr-1" />
+                    {isGenerating && generatingFor === 'cover' ? 'Generating...' : 'Generate AI Cover'}
+                  </Button>
+                </div>
                 <p className="text-xs text-muted-foreground mt-1">
                   Recommended: 1920x480px. Will be cropped to fit if needed.
                 </p>
               </div>
             </div>
 
-            {/* Avatar */}
-            <div className="space-y-2">
-              <Label htmlFor="avatar" className="font-mono">Avatar (512x512, max 10MB)</Label>
-              <div className="flex items-center gap-4">
-                <Avatar className="h-24 w-24 border-2 border-neon-green cursor-pointer">
-                  <AvatarImage src={avatarPreview || undefined} className="object-cover" />
-                  <AvatarFallback className="bg-primary/20 text-neon-green font-mono text-xl">
-                    {((isArtist ? artistName : displayName) || "??").substring(0, 2).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-                <input
-                  id="avatar"
-                  type="file"
-                  accept="image/*"
-                  onChange={handleAvatarChange}
-                  className="hidden"
-                />
+            {/* AI Prompt Input (collapsible) */}
+            <Collapsible open={isAICardOpen} onOpenChange={setIsAICardOpen}>
+              <CollapsibleTrigger asChild>
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => document.getElementById("avatar")?.click()}
-                  className="font-mono"
+                  className="w-full justify-between font-mono bg-gradient-to-br from-purple-500/10 via-pink-500/10 to-purple-500/10 border-purple-500/30 hover:from-purple-500/20 hover:via-pink-500/20 hover:to-purple-500/20"
                 >
-                  <Upload className="h-4 w-4 mr-2" />
-                  Upload Avatar
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-purple-300" />
+                    <span className="text-purple-300">AI Image Generator</span>
+                  </div>
+                  {isAICardOpen ? (
+                    <ChevronUp className="h-4 w-4 text-purple-300" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4 text-purple-300" />
+                  )}
                 </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-2 p-4 rounded-lg bg-gradient-to-br from-purple-500/10 via-pink-500/10 to-purple-500/10 border border-purple-500/30 border-t-0 rounded-t-none mt-[-1px]">
+                <div className="space-y-2">
+                  <Label htmlFor="ai-prompt" className="font-mono text-purple-300 text-sm">
+                    Describe the image you want to generate
+                  </Label>
+                  <Textarea
+                    id="ai-prompt"
+                    value={aiPrompt}
+                    onChange={(e) => setAiPrompt(e.target.value)}
+                    placeholder="e.g., cyberpunk portrait with neon lights, futuristic album cover with space theme..."
+                    className="bg-black/60 border-purple-500/30 text-white font-mono min-h-[80px] resize-none"
+                    rows={3}
+                  />
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant={selectedAIModel === 'flux-schnell' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setSelectedAIModel('flux-schnell')}
+                      className="font-mono text-xs flex-shrink-0"
+                    >
+                      FLUX Schnell ($0.01)
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={selectedAIModel === 'seedream-v4' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setSelectedAIModel('seedream-v4')}
+                      className="font-mono text-xs flex-shrink-0"
+                    >
+                      Seedream 4.0 ($0.05)
+                    </Button>
+                  </div>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+
+            {/* Avatar */}
+            <div className="space-y-2">
+              <Label htmlFor="avatar" className="font-mono">Avatar (512x512, max 10MB)</Label>
+              <div className="space-y-2">
+                <div className="flex items-center gap-4">
+                  <Avatar className="h-24 w-24 border-2 border-neon-green cursor-pointer">
+                    <AvatarImage src={avatarPreview || undefined} className="object-cover" />
+                    <AvatarFallback className="bg-primary/20 text-neon-green font-mono text-xl">
+                      {((isArtist ? artistName : displayName) || "??").substring(0, 2).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex flex-col gap-2">
+                    <input
+                      id="avatar"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleAvatarChange}
+                      className="hidden"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => document.getElementById("avatar")?.click()}
+                      className="font-mono"
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      Upload Avatar
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => generateAIImage('avatar')}
+                      disabled={isGenerating}
+                      className="font-mono text-xs"
+                    >
+                      <Sparkles className="h-3 w-3 mr-1" />
+                      {isGenerating && generatingFor === 'avatar' ? 'Generating...' : 'Generate AI Avatar'}
+                    </Button>
+                  </div>
+                </div>
               </div>
             </div>
 

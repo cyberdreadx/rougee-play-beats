@@ -30,6 +30,8 @@ import { useAudioStateForSong } from "@/hooks/useAudioState";
 import { TipButton } from "@/components/TipButton";
 import TaggedText from "@/components/TaggedText";
 import TwinklingStars from "@/components/TwinklingStars";
+import UnlockPostButton from "@/components/UnlockPostButton";
+import { Lock } from "lucide-react";
 
 interface Song {
   id: string;
@@ -56,6 +58,10 @@ interface FeedPost {
   like_count: number;
   comment_count: number;
   repost_count?: number;
+  is_locked?: boolean;
+  unlock_price?: string | null;
+  unlock_token_type?: string | null;
+  unlock_token_address?: string | null;
   profiles?: {
     artist_name: string | null;
     display_name: string | null;
@@ -411,6 +417,7 @@ const Artist = ({ playSong, currentSong, isPlaying }: ArtistProps) => {
   const [copiedPostId, setCopiedPostId] = useState<string | null>(null);
   const [showHoldersModal, setShowHoldersModal] = useState(false);
   const [showHoldingsModal, setShowHoldingsModal] = useState(false);
+  const [unlockedPosts, setUnlockedPosts] = useState<Set<string>>(new Set()); // Track which posts user has unlocked
 
   const isOwnProfile = fullAddress?.toLowerCase() === walletAddress?.toLowerCase();
   const shortWallet = walletAddress ? `0x...${walletAddress.slice(-4)}` : '';
@@ -544,6 +551,21 @@ const Artist = ({ playSong, currentSong, isPlaying }: ArtistProps) => {
           .ilike('wallet_address', walletAddress)
           .maybeSingle();
 
+        // Check unlock status for locked posts if user is connected
+        let unlockedPostIds = new Set<string>();
+        if (fullAddress) {
+          const lockedPostIds = postsData?.filter(p => p.is_locked === true).map(p => p.id) || [];
+          if (lockedPostIds.length > 0) {
+            const { data: unlockData } = await supabase
+              .from('feed_post_unlocks')
+              .select('post_id')
+              .eq('wallet_address', fullAddress.toLowerCase())
+              .in('post_id', lockedPostIds);
+            
+            unlockedPostIds = new Set(unlockData?.map(u => u.post_id) || []);
+          }
+        }
+
         // Merge data (same as Feed page)
         const postsWithProfiles = postsData?.map(post => ({
           ...post,
@@ -551,6 +573,13 @@ const Artist = ({ playSong, currentSong, isPlaying }: ArtistProps) => {
         })) || [];
 
         setPosts(postsWithProfiles);
+        
+        // Update unlocked posts state
+        setUnlockedPosts(prev => {
+          const next = new Set(prev);
+          unlockedPostIds.forEach(id => next.add(id));
+          return next;
+        });
       } catch (err) {
         console.error("Error fetching artist posts:", err);
       } finally {
@@ -1251,92 +1280,163 @@ const Artist = ({ playSong, currentSong, isPlaying }: ArtistProps) => {
                       {/* Post Media with Song Player Overlay */}
                       {post.media_cid && post.songs && (
                         <div className="mb-4 rounded-xl overflow-hidden relative group/media">
-                          <div className="relative">
-                            <img 
-                              src={getIPFSGatewayUrl(post.media_cid)} 
-                              alt="Post media" 
-                              loading="lazy" 
-                              decoding="async" 
-                              className="w-full max-h-[600px] object-contain bg-gradient-to-br from-black/10 to-black/5 rounded-xl group-hover/media:scale-[1.02] transition-transform duration-500" 
-                            />
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover/media:opacity-100 transition-opacity duration-300" />
-                          </div>
-
-                          {/* Play/Pause Button Overlay */}
-                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                            <button
-                              onClick={() => {
-                                if (playSong) {
-                                  playSong({
-                                    id: post.songs.id,
-                                    title: post.songs.title,
-                                    artist: post.songs.artist,
-                                    audio_cid: post.songs.audio_cid,
-                                    cover_cid: post.songs.cover_cid,
-                                    wallet_address: post.wallet_address,
-                                  } as any);
-                                }
-                              }}
-                              className="pointer-events-auto bg-black/70 backdrop-blur-md hover:bg-black/90 transition-all duration-300 p-6 md:p-8 rounded-full opacity-0 group-hover/media:opacity-100 hover:scale-110 active:scale-95 border-2 border-white/20 hover:border-neon-green/50 shadow-[0_0_30px_rgba(0,255,159,0.5)]"
-                            >
-                              {currentSong?.id === post.songs.id && isPlaying ? (
-                                <Pause className="w-12 h-12 md:w-16 md:h-16 text-white" />
-                              ) : (
-                                <Play className="w-12 h-12 md:w-16 md:h-16 text-white ml-1" />
-                              )}
-                            </button>
-                          </div>
-
-                          {/* Bottom Song Scroller */}
-                          <div 
-                            onClick={() => navigate(`/song/${post.songs.id}`)}
-                            className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/95 via-black/80 to-transparent p-4 cursor-pointer hover:bg-black/98 transition-all duration-300 backdrop-blur-sm"
-                          >
-                            <div className="flex items-center gap-2">
-                              {post.songs.cover_cid && (
+                          {post.is_locked === true && !unlockedPosts.has(post.id) && post.wallet_address !== fullAddress ? (
+                            <>
+                              {/* Blurred Media Preview */}
+                              <div className="blur-md pointer-events-none">
                                 <img 
-                                  src={getIPFSGatewayUrl(post.songs.cover_cid)} 
-                                  alt={post.songs.title}
-                                  className="w-10 h-10 rounded object-cover flex-shrink-0"
+                                  src={getIPFSGatewayUrl(post.media_cid)} 
+                                  alt="Post media" 
+                                  loading="lazy" 
+                                  decoding="async" 
+                                  className="w-full max-h-[600px] object-contain bg-gradient-to-br from-black/10 to-black/5 rounded-xl" 
                                 />
-                              )}
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2">
-                                  <Music className="w-3 h-3 text-neon-green flex-shrink-0" />
-                                  <p className="font-semibold text-white text-sm truncate">
-                                    {post.songs.title}
-                                  </p>
-                                </div>
-                                <p className="text-xs text-gray-300 truncate">
-                                  {post.songs.artist}
-                                </p>
                               </div>
-                            </div>
-                          </div>
+                              
+                              {/* Lock Overlay */}
+                              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 backdrop-blur-md rounded-xl p-6 gap-4 z-20">
+                                <Lock className="w-16 h-16 text-purple-400" />
+                                <p className="text-white font-mono font-bold text-xl">Premium Content</p>
+                                <p className="text-white/80 font-mono text-sm text-center">
+                                  Unlock for {post.unlock_price} {post.unlock_token_type}
+                                </p>
+                                <UnlockPostButton
+                                  postId={post.id}
+                                  unlockPrice={post.unlock_price || '0'}
+                                  unlockTokenType={post.unlock_token_type || 'XRGE'}
+                                  unlockTokenAddress={post.unlock_token_address}
+                                  onUnlocked={() => {
+                                    setUnlockedPosts(prev => new Set(prev).add(post.id));
+                                    setRefreshKey(prev => prev + 1); // Refresh posts
+                                  }}
+                                />
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <div className="relative">
+                                <img 
+                                  src={getIPFSGatewayUrl(post.media_cid)} 
+                                  alt="Post media" 
+                                  loading="lazy" 
+                                  decoding="async" 
+                                  className="w-full max-h-[600px] object-contain bg-gradient-to-br from-black/10 to-black/5 rounded-xl group-hover/media:scale-[1.02] transition-transform duration-500" 
+                                />
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover/media:opacity-100 transition-opacity duration-300" />
+                              </div>
+
+                              {/* Play/Pause Button Overlay */}
+                              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                <button
+                                  onClick={() => {
+                                    if (playSong) {
+                                      playSong({
+                                        id: post.songs.id,
+                                        title: post.songs.title,
+                                        artist: post.songs.artist,
+                                        audio_cid: post.songs.audio_cid,
+                                        cover_cid: post.songs.cover_cid,
+                                        wallet_address: post.wallet_address,
+                                      } as any);
+                                    }
+                                  }}
+                                  className="pointer-events-auto bg-black/70 backdrop-blur-md hover:bg-black/90 transition-all duration-300 p-6 md:p-8 rounded-full opacity-0 group-hover/media:opacity-100 hover:scale-110 active:scale-95 border-2 border-white/20 hover:border-neon-green/50 shadow-[0_0_30px_rgba(0,255,159,0.5)]"
+                                >
+                                  {currentSong?.id === post.songs.id && isPlaying ? (
+                                    <Pause className="w-12 h-12 md:w-16 md:h-16 text-white" />
+                                  ) : (
+                                    <Play className="w-12 h-12 md:w-16 md:h-16 text-white ml-1" />
+                                  )}
+                                </button>
+                              </div>
+
+                              {/* Bottom Song Scroller */}
+                              <div 
+                                onClick={() => navigate(`/song/${post.songs.id}`)}
+                                className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/95 via-black/80 to-transparent p-4 cursor-pointer hover:bg-black/98 transition-all duration-300 backdrop-blur-sm"
+                              >
+                                <div className="flex items-center gap-2">
+                                  {post.songs.cover_cid && (
+                                    <img 
+                                      src={getIPFSGatewayUrl(post.songs.cover_cid)} 
+                                      alt={post.songs.title}
+                                      className="w-10 h-10 rounded object-cover flex-shrink-0"
+                                    />
+                                  )}
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2">
+                                      <Music className="w-3 h-3 text-neon-green flex-shrink-0" />
+                                      <p className="font-semibold text-white text-sm truncate">
+                                        {post.songs.title}
+                                      </p>
+                                    </div>
+                                    <p className="text-xs text-gray-300 truncate">
+                                      {post.songs.artist}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            </>
+                          )}
                         </div>
                       )}
 
                       {/* Post Media without Song */}
                       {post.media_cid && !post.songs && (
                         <div className="mb-4 rounded-xl overflow-hidden relative">
-                          <img 
-                            src={getIPFSGatewayUrl(post.media_cid)} 
-                            alt="Post media" 
-                            loading="lazy" 
-                            decoding="async" 
-                            className="w-full max-h-[600px] object-contain bg-gradient-to-br from-black/10 to-black/5 rounded-xl" 
-                          />
+                          {post.is_locked === true && !unlockedPosts.has(post.id) && post.wallet_address !== fullAddress ? (
+                            <>
+                              {/* Blurred Media Preview */}
+                              <div className="blur-md pointer-events-none">
+                                <img 
+                                  src={getIPFSGatewayUrl(post.media_cid)} 
+                                  alt="Post media" 
+                                  loading="lazy" 
+                                  decoding="async" 
+                                  className="w-full max-h-[600px] object-contain bg-gradient-to-br from-black/10 to-black/5 rounded-xl" 
+                                />
+                              </div>
+                              
+                              {/* Lock Overlay */}
+                              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 backdrop-blur-md rounded-xl p-6 gap-4 z-20">
+                                <Lock className="w-16 h-16 text-purple-400" />
+                                <p className="text-white font-mono font-bold text-xl">Premium Content</p>
+                                <p className="text-white/80 font-mono text-sm text-center">
+                                  Unlock for {post.unlock_price} {post.unlock_token_type}
+                                </p>
+                                <UnlockPostButton
+                                  postId={post.id}
+                                  unlockPrice={post.unlock_price || '0'}
+                                  unlockTokenType={post.unlock_token_type || 'XRGE'}
+                                  unlockTokenAddress={post.unlock_token_address}
+                                  onUnlocked={() => {
+                                    setUnlockedPosts(prev => new Set(prev).add(post.id));
+                                    setRefreshKey(prev => prev + 1); // Refresh posts
+                                  }}
+                                />
+                              </div>
+                            </>
+                          ) : (
+                            <img 
+                              src={getIPFSGatewayUrl(post.media_cid)} 
+                              alt="Post media" 
+                              loading="lazy" 
+                              decoding="async" 
+                              className="w-full max-h-[600px] object-contain bg-gradient-to-br from-black/10 to-black/5 rounded-xl" 
+                            />
+                          )}
                         </div>
                       )}
 
                       {/* Text Post with Song - Styled like Post-It Note */}
                       {!post.media_cid && post.content_text && post.songs && (() => {
                         const colors = getPostItColors(post.id);
+                        const isLocked = post.is_locked === true && !unlockedPosts.has(post.id) && post.wallet_address !== fullAddress;
                         return (
                           <div 
-                            className={`mb-4 rounded-xl overflow-hidden relative group/media min-h-[300px] flex items-center justify-center bg-gradient-to-br ${colors.bg} cursor-pointer`}
+                            className={`mb-4 rounded-xl overflow-hidden relative group/media min-h-[300px] flex items-center justify-center bg-gradient-to-br ${colors.bg} ${isLocked ? '' : 'cursor-pointer'}`}
                             onClick={() => {
-                              if (playSong) {
+                              if (!isLocked && playSong) {
                                 playSong({
                                   id: post.songs!.id,
                                   title: post.songs!.title,
@@ -1348,42 +1448,80 @@ const Artist = ({ playSong, currentSong, isPlaying }: ArtistProps) => {
                               }
                             }}
                           >
-                            {/* Cyberpunk Glass Panel */}
-                            <div className={`absolute inset-0 ${colors.glass} border-2 ${colors.circuit} ${colors.glow}`}>
-                              {/* Circuit Lines - Horizontal */}
-                              <div className={`absolute top-1/4 left-0 right-0 h-[1px] ${colors.circuit} border-t opacity-30`} />
-                              <div className={`absolute top-1/2 left-0 right-0 h-[1px] ${colors.circuit} border-t opacity-20`} />
-                              <div className={`absolute top-3/4 left-0 right-0 h-[1px] ${colors.circuit} border-t opacity-30`} />
+                            {isLocked && (
+                              <>
+                                {/* Blurred Content */}
+                                <div className="absolute inset-0 blur-md pointer-events-none">
+                                  <div className={`min-h-[300px] flex items-center justify-center bg-gradient-to-br ${colors.bg}`}>
+                                    <div className="relative z-10 p-6 md:p-8 w-full">
+                                      <div className={`text-base md:text-lg whitespace-pre-wrap leading-relaxed font-mono font-semibold ${colors.text} drop-shadow-[0_0_10px_currentColor]`}>
+                                        <TaggedText text={post.content_text!} />
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                                
+                                {/* Lock Overlay */}
+                                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 backdrop-blur-md rounded-xl p-6 gap-4 z-20">
+                                  <Lock className="w-16 h-16 text-purple-400" />
+                                  <p className="text-white font-mono font-bold text-xl">Premium Content</p>
+                                  <p className="text-white/80 font-mono text-sm text-center">
+                                    Unlock for {post.unlock_price} {post.unlock_token_type}
+                                  </p>
+                                  <UnlockPostButton
+                                    postId={post.id}
+                                    unlockPrice={post.unlock_price || '0'}
+                                    unlockTokenType={post.unlock_token_type || 'XRGE'}
+                                    unlockTokenAddress={post.unlock_token_address}
+                                    onUnlocked={() => {
+                                      setUnlockedPosts(prev => new Set(prev).add(post.id));
+                                      setRefreshKey(prev => prev + 1); // Refresh posts
+                                    }}
+                                  />
+                                </div>
+                              </>
+                            )}
+                            
+                            {!isLocked && (
+                              <>
+                                {/* Cyberpunk Glass Panel */}
+                                <div className={`absolute inset-0 ${colors.glass} border-2 ${colors.circuit} ${colors.glow}`}>
+                                  {/* Circuit Lines - Horizontal */}
+                                  <div className={`absolute top-1/4 left-0 right-0 h-[1px] ${colors.circuit} border-t opacity-30`} />
+                                  <div className={`absolute top-1/2 left-0 right-0 h-[1px] ${colors.circuit} border-t opacity-20`} />
+                                  <div className={`absolute top-3/4 left-0 right-0 h-[1px] ${colors.circuit} border-t opacity-30`} />
+                                  
+                                  {/* Circuit Lines - Vertical */}
+                                  <div className={`absolute left-1/4 top-0 bottom-0 w-[1px] ${colors.circuit} border-l opacity-30`} />
+                                  <div className={`absolute left-1/2 top-0 bottom-0 w-[1px] ${colors.circuit} border-l opacity-20`} />
+                                  <div className={`absolute left-3/4 top-0 bottom-0 w-[1px] ${colors.circuit} border-l opacity-30`} />
+                                  
+                                  {/* Corner Accents */}
+                                  <div className={`absolute top-2 left-2 w-4 h-4 border-t-2 border-l-2 ${colors.circuit}`} />
+                                  <div className={`absolute top-2 right-2 w-4 h-4 border-t-2 border-r-2 ${colors.circuit}`} />
+                                  <div className={`absolute bottom-2 left-2 w-4 h-4 border-b-2 border-l-2 ${colors.circuit}`} />
+                                  <div className={`absolute bottom-2 right-2 w-4 h-4 border-b-2 border-r-2 ${colors.circuit}`} />
+                                </div>
                               
-                              {/* Circuit Lines - Vertical */}
-                              <div className={`absolute left-1/4 top-0 bottom-0 w-[1px] ${colors.circuit} border-l opacity-30`} />
-                              <div className={`absolute left-1/2 top-0 bottom-0 w-[1px] ${colors.circuit} border-l opacity-20`} />
-                              <div className={`absolute left-3/4 top-0 bottom-0 w-[1px] ${colors.circuit} border-l opacity-30`} />
-                              
-                              {/* Corner Accents */}
-                              <div className={`absolute top-2 left-2 w-4 h-4 border-t-2 border-l-2 ${colors.circuit}`} />
-                              <div className={`absolute top-2 right-2 w-4 h-4 border-t-2 border-r-2 ${colors.circuit}`} />
-                              <div className={`absolute bottom-2 left-2 w-4 h-4 border-b-2 border-l-2 ${colors.circuit}`} />
-                              <div className={`absolute bottom-2 right-2 w-4 h-4 border-b-2 border-r-2 ${colors.circuit}`} />
-                            </div>
-                          
-                          {/* Text Content */}
-                          <div className="relative z-10 p-6 md:p-8 w-full">
-                            <div className={`text-base md:text-lg whitespace-pre-wrap leading-relaxed font-mono font-semibold ${colors.text} drop-shadow-[0_0_10px_currentColor]`}>
-                              <TaggedText text={post.content_text!} />
-                            </div>
-                          </div>
+                                {/* Text Content */}
+                                <div className="relative z-10 p-6 md:p-8 w-full">
+                                  <div className={`text-base md:text-lg whitespace-pre-wrap leading-relaxed font-mono font-semibold ${colors.text} drop-shadow-[0_0_10px_currentColor]`}>
+                                    <TaggedText text={post.content_text!} />
+                                  </div>
+                                </div>
 
-                          {/* Small Play/Pause Indicator - Top Right */}
-                          <div className="absolute top-3 right-3 z-20">
-                            <div className="bg-black/70 backdrop-blur-md transition-all duration-300 p-2 rounded-full opacity-60 group-hover/media:opacity-100 border border-white/20 group-hover/media:border-neon-green/50 shadow-[0_0_15px_rgba(0,255,159,0.3)]">
-                              {currentSong?.id === post.songs!.id && isPlaying ? (
-                                <Pause className="w-4 h-4 text-white" />
-                              ) : (
-                                <Play className="w-4 h-4 text-white ml-0.5" />
-                              )}
-                            </div>
-                          </div>
+                                {/* Small Play/Pause Indicator - Top Right */}
+                                <div className="absolute top-3 right-3 z-20">
+                                  <div className="bg-black/70 backdrop-blur-md transition-all duration-300 p-2 rounded-full opacity-60 group-hover/media:opacity-100 border border-white/20 group-hover/media:border-neon-green/50 shadow-[0_0_15px_rgba(0,255,159,0.3)]">
+                                    {currentSong?.id === post.songs!.id && isPlaying ? (
+                                      <Pause className="w-4 h-4 text-white" />
+                                    ) : (
+                                      <Play className="w-4 h-4 text-white ml-0.5" />
+                                    )}
+                                  </div>
+                                </div>
+                              </>
+                            )}
                             <div 
                               onClick={() => navigate(`/song/${post.songs!.id}`)}
                               className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/95 via-black/80 to-transparent p-4 cursor-pointer hover:bg-black/98 transition-all duration-300 backdrop-blur-sm z-20"

@@ -7,7 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { usePrivyToken } from '@/hooks/usePrivyToken';
 import { parseEther, parseUnits, formatEther, Address } from 'viem';
-import { useWriteContract, useWaitForTransactionReceipt, useReadContract } from 'wagmi';
+import { useWriteContract, useWaitForTransactionReceipt, useReadContract, usePublicClient } from 'wagmi';
 import { base } from 'wagmi/chains';
 import { useSwitchChain } from 'wagmi';
 import { XRGE_TOKEN_ADDRESS, KTA_TOKEN_ADDRESS, USDC_TOKEN_ADDRESS } from '@/hooks/useXRGESwap';
@@ -36,6 +36,7 @@ export default function UnlockPostButton({
   const { authenticated } = usePrivy();
   const { getAuthHeaders } = usePrivyToken();
   const { switchChain } = useSwitchChain();
+  const publicClient = usePublicClient();
   const [isUnlocking, setIsUnlocking] = useState(false);
   
   // Get user balance for the unlock token
@@ -67,7 +68,10 @@ export default function UnlockPostButton({
       return;
     }
 
-    if (!unlockPrice || parseFloat(unlockPrice) <= 0) {
+    // Ensure unlockPrice is a string for parsing
+    const priceString = typeof unlockPrice === 'string' ? unlockPrice : String(unlockPrice || '0');
+    
+    if (!priceString || parseFloat(priceString) <= 0) {
       toast({
         title: "Invalid Price",
         description: "This post has an invalid unlock price",
@@ -79,14 +83,14 @@ export default function UnlockPostButton({
     setIsUnlocking(true);
 
     try {
-      // Check if user has enough balance
-      const price = parseFloat(unlockPrice);
+      // Check if user has enough balance (reuse priceString from above)
+      const price = parseFloat(priceString);
       const balance = parseFloat(tokenBalance || '0');
       
       if (balance < price) {
         toast({
           title: "Insufficient Balance",
-          description: `You need ${unlockPrice} ${unlockTokenType} to unlock this post`,
+          description: `You need ${priceString} ${unlockTokenType} to unlock this post`,
           variant: "destructive",
         });
         setIsUnlocking(false);
@@ -131,7 +135,8 @@ export default function UnlockPostButton({
 
         // Determine token decimals (USDC uses 6, others use 18)
         const decimals = unlockTokenType === 'USDC' ? 6 : 18;
-        const amount = parseUnits(unlockPrice, decimals);
+        // Ensure unlockPrice is a string for parseUnits (reuse priceString from above)
+        const amount = parseUnits(priceString, decimals);
 
         // Transfer tokens to creator
         txHash = await writeContractAsync({
@@ -145,9 +150,18 @@ export default function UnlockPostButton({
         throw new Error(`Unsupported token type: ${unlockTokenType}`);
       }
 
-      // Wait for transaction confirmation
+      // Wait for transaction confirmation before recording unlock
       if (txHash) {
-        // Record unlock in database
+        // Wait for transaction to be confirmed
+        const receipt = await publicClient.waitForTransactionReceipt({
+          hash: txHash as `0x${string}`,
+        });
+
+        if (!receipt || receipt.status !== 'success') {
+          throw new Error('Transaction failed');
+        }
+
+        // Record unlock in database after transaction is confirmed
         const authHeaders = await getAuthHeaders();
         const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/unlock-post`, {
           method: 'POST',
@@ -187,7 +201,9 @@ export default function UnlockPostButton({
     }
   };
 
-  const price = parseFloat(unlockPrice || '0');
+  // Ensure unlockPrice is a string for parsing (for render section)
+  const priceString = typeof unlockPrice === 'string' ? unlockPrice : String(unlockPrice || '0');
+  const price = parseFloat(priceString);
   const balance = parseFloat(tokenBalance || '0');
   const hasEnoughBalance = balance >= price;
 
@@ -229,7 +245,7 @@ export default function UnlockPostButton({
         ) : (
           <>
             <Lock className="w-4 h-4 mr-2" />
-            UNLOCK FOR {unlockPrice} {unlockTokenType}
+            UNLOCK FOR {priceString} {unlockTokenType}
           </>
         )}
       </Button>

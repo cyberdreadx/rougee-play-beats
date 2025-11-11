@@ -157,10 +157,23 @@ export default function CreatePostModal({
         throw new Error(errorData.error || 'Failed to create post');
       }
 
-      toast({
-        title: "Success!",
-        description: "Your post has been created",
-      });
+      const responseData = await response.json();
+      
+      // Check if post was created but media upload failed
+      const mediaUploadFailed = mediaFile && !responseData.post?.media_cid;
+      
+      if (mediaUploadFailed) {
+        toast({
+          title: "Post Created (Media Upload Failed)",
+          description: "Your post was created, but the media couldn't be uploaded. Lighthouse service may be experiencing issues. You can try adding media later.",
+          variant: "default",
+        });
+      } else {
+        toast({
+          title: "Success!",
+          description: "Your post has been created",
+        });
+      }
 
       // Reset form
       setContentText("");

@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 import { requireWalletAddress } from '../_shared/privy.ts';
+import { uploadToIPFS } from '../_shared/ipfs-upload.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -49,11 +50,10 @@ Deno.serve(async (req) => {
       throw new Error('No wallet address provided');
     }
     console.log('✅ Token validated, wallet:', walletAddress);
-    const LIGHTHOUSE_API_KEY = Deno.env.get('LIGHTHOUSE_API_KEY');
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
-    if (!LIGHTHOUSE_API_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
       throw new Error('Missing required environment variables');
     }
 
@@ -177,95 +177,21 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Helper function to upload file to Lighthouse
-    const uploadToLighthouse = async (file: File, name: string) => {
-      console.log(`🔄 Uploading ${name} to Lighthouse (${file.size} bytes)...`);
-      
-      if (!LIGHTHOUSE_API_KEY) {
-        throw new Error('LIGHTHOUSE_API_KEY environment variable is missing');
-      }
-      
-      const uploadFormData = new FormData();
-      uploadFormData.append('file', file, name);
+    // Using shared uploadToIPFS function (Pinata primary, Lighthouse fallback)
 
-      // Add timeout to prevent hanging
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
-
-      try {
-        const uploadResponse = await fetch('https://upload.lighthouse.storage/api/v0/add', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${LIGHTHOUSE_API_KEY}`,
-          },
-          body: uploadFormData,
-          signal: controller.signal,
-        });
-
-        clearTimeout(timeoutId);
-
-        if (!uploadResponse.ok) {
-          const errorText = await uploadResponse.text();
-          console.error(`❌ Lighthouse upload failed: ${uploadResponse.status} ${uploadResponse.statusText}`);
-          console.error(`Error details: ${errorText}`);
-          throw new Error(`Lighthouse upload failed: ${uploadResponse.status} ${uploadResponse.statusText} - ${errorText}`);
-        }
-
-        const uploadResult = await uploadResponse.json();
-        console.log(`✅ Uploaded ${name} to Lighthouse:`, uploadResult.Hash);
-        return uploadResult.Hash;
-      } catch (error) {
-        clearTimeout(timeoutId);
-        if (error.name === 'AbortError') {
-          throw new Error(`Lighthouse upload timed out after 30 seconds for ${name}`);
-        }
-        throw error;
-      }
-    };
-
-    // Helper function to upload buffer to Lighthouse
-    const uploadBufferToLighthouse = async (jsonString: string, fileName: string) => {
-      console.log(`🔄 Uploading JSON metadata to Lighthouse (${jsonString.length} chars)...`);
-      
-      if (!LIGHTHOUSE_API_KEY) {
-        throw new Error('LIGHTHOUSE_API_KEY environment variable is missing');
-      }
+    // Helper function to upload JSON metadata to IPFS (Pinata primary, Lighthouse fallback)
+    const uploadBufferToIPFS = async (jsonString: string, fileName: string) => {
+      console.log(`🔄 Uploading JSON metadata to IPFS (${jsonString.length} chars)...`);
       
       const blob = new Blob([jsonString], { type: 'application/json' });
-      const formData = new FormData();
-      formData.append('file', blob, fileName);
-
-      // Add timeout to prevent hanging
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
-
+      const file = new File([blob], fileName, { type: 'application/json' });
+      
       try {
-        const uploadResponse = await fetch('https://upload.lighthouse.storage/api/v0/add', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${LIGHTHOUSE_API_KEY}`,
-          },
-          body: formData,
-          signal: controller.signal,
-        });
-
-        clearTimeout(timeoutId);
-
-        if (!uploadResponse.ok) {
-          const errorText = await uploadResponse.text();
-          console.error(`❌ Lighthouse JSON upload failed: ${uploadResponse.status} ${uploadResponse.statusText}`);
-          console.error(`Error details: ${errorText}`);
-          throw new Error(`Lighthouse JSON upload failed: ${uploadResponse.status} ${uploadResponse.statusText} - ${errorText}`);
-        }
-
-        const uploadResult = await uploadResponse.json();
-        console.log(`✅ Uploaded JSON metadata to Lighthouse:`, uploadResult.Hash);
-        return uploadResult.Hash;
-      } catch (error) {
-        clearTimeout(timeoutId);
-        if (error.name === 'AbortError') {
-          throw new Error(`Lighthouse JSON upload timed out after 30 seconds for ${fileName}`);
-        }
+        const cid = await uploadToIPFS(file, fileName);
+        console.log(`✅ Uploaded JSON metadata to IPFS:`, cid);
+        return cid;
+      } catch (error: any) {
+        console.error(`❌ JSON metadata upload failed:`, error.message);
         throw error;
       }
     };
@@ -276,23 +202,19 @@ Deno.serve(async (req) => {
 
     // Upload avatar if provided
     if (avatarFile) {
-      try {
-        console.log('🔄 Uploading avatar...');
-        avatarCid = await uploadToLighthouse(avatarFile, `avatar-${walletAddress}.${avatarFile.name.split('.').pop()}`);
-      } catch (error) {
-        console.error('❌ Avatar upload failed, continuing without avatar:', error);
-        // Continue without avatar - don't fail the entire operation
+      console.log('🔄 Uploading avatar...');
+      avatarCid = await uploadToIPFS(avatarFile, `avatar-${walletAddress}.${avatarFile.name.split('.').pop()}`);
+      if (!avatarCid) {
+        throw new Error('Failed to upload avatar image to IPFS');
       }
     }
 
     // Upload cover if provided
     if (coverFile) {
-      try {
-        console.log('🔄 Uploading cover photo...');
-        coverCid = await uploadToLighthouse(coverFile, `cover-${walletAddress}.${coverFile.name.split('.').pop()}`);
-      } catch (error) {
-        console.error('❌ Cover upload failed, continuing without cover:', error);
-        // Continue without cover - don't fail the entire operation
+      console.log('🔄 Uploading cover photo...');
+      coverCid = await uploadToIPFS(coverFile, `cover-${walletAddress}.${coverFile.name.split('.').pop()}`);
+      if (!coverCid) {
+        throw new Error('Failed to upload cover image to IPFS');
       }
     }
 
@@ -314,7 +236,7 @@ Deno.serve(async (req) => {
     let metadataCid = null;
     try {
       console.log('🔄 Uploading metadata JSON...');
-      metadataCid = await uploadBufferToLighthouse(JSON.stringify(metadata), `profile-${walletAddress}.json`);
+      metadataCid = await uploadBufferToIPFS(JSON.stringify(metadata), `profile-${walletAddress}.json`);
     } catch (error) {
       console.error('❌ Metadata upload failed, continuing without IPFS metadata:', error);
       // Continue without IPFS metadata - don't fail the entire operation

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { X, ChevronLeft, ChevronRight, Heart, Eye, MessageCircle, Send, Trash2 } from "lucide-react";
@@ -74,20 +74,21 @@ const StoryViewer = ({
   const [showViewers, setShowViewers] = useState(false);
   const [viewers, setViewers] = useState<Array<{ wallet_address: string; profiles?: { artist_name: string | null; avatar_cid: string | null } | null }>>([]);
 
-  const walletAddresses = Object.keys(allStories);
+  const walletAddresses = useMemo(() => Object.keys(allStories), [allStories]);
   const currentWalletIndex = walletAddresses.indexOf(currentWalletAddress);
-  const currentStories = allStories[currentWalletAddress];
+  const currentStories = allStories[currentWalletAddress] || [];
   const currentStory = currentStories[currentStoryIndex];
   const currentProfile = profiles[currentWalletAddress];
+  
   // Defer close to avoid cross-tree setState warning
-  const deferClose = () => {
+  const deferClose = useCallback(() => {
     try {
       // Defer to next animation frame so StoriesBar updates outside this render phase
       requestAnimationFrame(() => onClose());
     } catch {
       onClose();
     }
-  };
+  }, [onClose]);
 
   // Load counts and comments when story changes
   useEffect(() => {
@@ -161,7 +162,16 @@ const StoryViewer = ({
     checkLikeStatus();
   }, [currentStory?.id, fullAddress]);
 
+  // Guard: if no stories or invalid index, close viewer
   useEffect(() => {
+    if (!currentStories || currentStories.length === 0 || !currentStory) {
+      deferClose();
+    }
+  }, [currentStories, currentStory, deferClose]);
+
+  useEffect(() => {
+    if (!currentStory) return;
+    
     setProgress(0);
     setVideoDuration(null);
     
@@ -180,9 +190,14 @@ const StoryViewer = ({
     }, 100);
 
     return () => clearInterval(interval);
-  }, [currentStoryIndex, currentWalletAddress, videoDuration]);
+  }, [currentStoryIndex, currentWalletAddress, videoDuration, currentStory]);
 
   const handleNext = () => {
+    if (!currentStories || currentStories.length === 0) {
+      onClose();
+      return;
+    }
+    
     if (currentStoryIndex < currentStories.length - 1) {
       setCurrentStoryIndex(currentStoryIndex + 1);
     } else if (currentWalletIndex < walletAddresses.length - 1) {
@@ -254,7 +269,7 @@ const StoryViewer = ({
 
   // Auto-pause video when comments drawer is open; resume when closed
   useEffect(() => {
-    if (!videoRef.current || currentStory.media_type !== 'video') return;
+    if (!currentStory || !videoRef.current || currentStory.media_type !== 'video') return;
     try {
       if (showComments) {
         videoRef.current.pause();
@@ -265,7 +280,7 @@ const StoryViewer = ({
         }
       }
     } catch {}
-  }, [showComments, currentStory?.id]);
+  }, [showComments, currentStory]);
 
   const loadViewers = async (storyId: string) => {
     const { data: viewRows } = await supabase
@@ -295,12 +310,22 @@ const StoryViewer = ({
   };
 
   const handlePrevious = () => {
+    if (!currentStories || currentStories.length === 0) {
+      onClose();
+      return;
+    }
+    
     if (currentStoryIndex > 0) {
       setCurrentStoryIndex(currentStoryIndex - 1);
     } else if (currentWalletIndex > 0) {
       const prevWallet = walletAddresses[currentWalletIndex - 1];
-      setCurrentWalletAddress(prevWallet);
-      setCurrentStoryIndex(allStories[prevWallet].length - 1);
+      const prevStories = allStories[prevWallet];
+      if (prevStories && prevStories.length > 0) {
+        setCurrentWalletAddress(prevWallet);
+        setCurrentStoryIndex(prevStories.length - 1);
+      } else {
+        onClose();
+      }
     }
   };
 
@@ -355,6 +380,11 @@ const StoryViewer = ({
       });
     }
   };
+
+  // Early return if no valid story
+  if (!currentStories || currentStories.length === 0 || !currentStory) {
+    return null;
+  }
 
   return (
     <div className="fixed inset-0 z-[200] bg-black flex items-center justify-center" style={{

@@ -5,9 +5,8 @@ import { useWallet } from '@/hooks/useWallet';
 import { usePrivy } from '@privy-io/react-auth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { usePrivyToken } from '@/hooks/usePrivyToken';
-import { parseEther, parseUnits, formatEther, Address } from 'viem';
-import { useWriteContract, useWaitForTransactionReceipt, useReadContract, usePublicClient } from 'wagmi';
+import { parseUnits, Address } from 'viem';
+import { useWriteContract, useWaitForTransactionReceipt, usePublicClient } from 'wagmi';
 import { base } from 'wagmi/chains';
 import { useSwitchChain } from 'wagmi';
 import { XRGE_TOKEN_ADDRESS, KTA_TOKEN_ADDRESS, USDC_TOKEN_ADDRESS } from '@/hooks/useXRGESwap';
@@ -25,6 +24,13 @@ const XRGE_TOKEN = XRGE_TOKEN_ADDRESS as Address;
 const KTA_TOKEN = KTA_TOKEN_ADDRESS as Address;
 const USDC_TOKEN = USDC_TOKEN_ADDRESS as Address;
 
+// Platform treasury wallet - receives 20% of unlock payments
+const TREASURY_ADDRESS = '0xDa31C963E979495f4374979127c34E980eF3184e' as Address;
+
+// Platform fee percentage (20%)
+const PLATFORM_FEE_PERCENTAGE = 0.20;
+const CREATOR_SHARE_PERCENTAGE = 0.80;
+
 export default function UnlockPostButton({
   postId,
   unlockPrice,
@@ -34,7 +40,6 @@ export default function UnlockPostButton({
 }: UnlockPostButtonProps) {
   const { fullAddress, isConnected } = useWallet();
   const { authenticated } = usePrivy();
-  const { getAuthHeaders } = usePrivyToken();
   const { switchChain } = useSwitchChain();
   const publicClient = usePublicClient();
   const [isUnlocking, setIsUnlocking] = useState(false);
@@ -136,29 +141,69 @@ export default function UnlockPostButton({
         // Determine token decimals (USDC uses 6, others use 18)
         const decimals = unlockTokenType === 'USDC' ? 6 : 18;
         // Ensure unlockPrice is a string for parseUnits (reuse priceString from above)
-        const amount = parseUnits(priceString, decimals);
+        const totalAmount = parseUnits(priceString, decimals);
 
-        // Transfer tokens to creator
-        txHash = await writeContractAsync({
+        // Calculate split: 80% to creator, 20% to treasury
+        const creatorAmount = (totalAmount * BigInt(Math.floor(CREATOR_SHARE_PERCENTAGE * 10000))) / BigInt(10000);
+        const treasuryAmount = totalAmount - creatorAmount; // Remaining goes to treasury (ensures exact split)
+
+        console.log('💰 Payment split:', {
+          total: priceString,
+          creator: `${(parseFloat(priceString) * CREATOR_SHARE_PERCENTAGE).toFixed(6)} ${unlockTokenType}`,
+          treasury: `${(parseFloat(priceString) * PLATFORM_FEE_PERCENTAGE).toFixed(6)} ${unlockTokenType}`,
+        });
+
+        // Transfer 80% to creator
+        const creatorTxHash = await writeContractAsync({
           address: tokenAddr,
           abi: ERC20_ABI,
           functionName: 'transfer',
-          args: [creatorAddress, amount],
+          args: [creatorAddress, creatorAmount],
           chainId: base.id,
         } as any);
+
+        console.log('✅ Creator transfer sent:', creatorTxHash);
+
+        // Wait for creator transfer to confirm before sending treasury transfer
+        await publicClient.waitForTransactionReceipt({
+          hash: creatorTxHash as `0x${string}`,
+        });
+
+        // Transfer 20% to treasury
+        const treasuryTxHash = await writeContractAsync({
+          address: tokenAddr,
+          abi: ERC20_ABI,
+          functionName: 'transfer',
+          args: [TREASURY_ADDRESS, treasuryAmount],
+          chainId: base.id,
+        } as any);
+
+        console.log('✅ Treasury transfer sent:', treasuryTxHash);
+
+        // Use creator transaction hash as primary (backend will verify both)
+        txHash = creatorTxHash;
+
+        // Wait for treasury transaction to confirm as well
+        const treasuryReceipt = await publicClient.waitForTransactionReceipt({
+          hash: treasuryTxHash as `0x${string}`,
+        });
+
+        if (!treasuryReceipt || treasuryReceipt.status !== 'success') {
+          throw new Error('Treasury transfer failed');
+        }
       } else {
         throw new Error(`Unsupported token type: ${unlockTokenType}`);
       }
 
       // Wait for transaction confirmation before recording unlock
       if (txHash) {
-        // Wait for transaction to be confirmed
+        // Wait for creator transaction to be confirmed (already done above, but double-check)
         const receipt = await publicClient.waitForTransactionReceipt({
           hash: txHash as `0x${string}`,
         });
 
         if (!receipt || receipt.status !== 'success') {
-          throw new Error('Transaction failed');
+          throw new Error('Creator transfer failed');
         }
 
         // Record unlock in database after transaction is confirmed
@@ -177,6 +222,8 @@ export default function UnlockPostButton({
             postId,
             transactionHash: txHash,
             walletAddress: fullAddress, // Include wallet address for verification
+            treasuryAddress: TREASURY_ADDRESS, // Include treasury address for verification
+            platformFeePercentage: PLATFORM_FEE_PERCENTAGE, // Include fee percentage
           }),
         });
 
@@ -245,6 +292,9 @@ export default function UnlockPostButton({
     );
   }
 
+  const creatorAmount = price * CREATOR_SHARE_PERCENTAGE;
+  const treasuryAmount = price * PLATFORM_FEE_PERCENTAGE;
+
   return (
     <div className="text-center space-y-2">
       <div className="text-xs font-mono text-white/60">
@@ -276,6 +326,18 @@ export default function UnlockPostButton({
         <p className="text-xs font-mono text-yellow-400">
           You need {price.toFixed(4)} {unlockTokenType}, but you have {balance.toFixed(4)}
         </p>
+      )}
+      {hasEnoughBalance && (
+        <div className="text-xs font-mono text-white/50 space-y-1 pt-1">
+          <div className="flex justify-between">
+            <span>Creator receives:</span>
+            <span className="text-neon-green">{creatorAmount.toFixed(6)} {unlockTokenType} (80%)</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Platform fee:</span>
+            <span className="text-purple-400">{treasuryAmount.toFixed(6)} {unlockTokenType} (20%)</span>
+          </div>
+        </div>
       )}
     </div>
   );

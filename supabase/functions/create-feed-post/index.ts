@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 import { requireWalletAddress } from '../_shared/privy.ts';
+import { uploadToIPFS } from '../_shared/ipfs-upload.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -16,7 +17,6 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const lighthouseApiKey = Deno.env.get('LIGHTHOUSE_API_KEY')!;
 
     const supabase = createClient(supabaseUrl, supabaseKey);
     
@@ -110,74 +110,17 @@ serve(async (req) => {
     let mediaCid: string | null = null;
     let mediaType: string | null = null;
 
-    // Upload media to Lighthouse if provided
+    // Upload media to IPFS (Pinata primary, Lighthouse fallback) if provided
     if (mediaFile) {
-      console.log('Uploading media to Lighthouse:', mediaFile.name, 'Size:', mediaFile.size);
-
-      const attemptUpload = async (attempt: number) => {
-        const uploadFormData = new FormData();
-        uploadFormData.append('file', mediaFile);
-
-        const timeoutMs = 90000; // 90 seconds
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), timeoutMs);
-
-        try {
-          const uploadResponse = await fetch(
-            'https://upload.lighthouse.storage/api/v0/add',
-            {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${lighthouseApiKey}`,
-              },
-              body: uploadFormData,
-              signal: controller.signal,
-            }
-          );
-
-          clearTimeout(timer);
-
-          if (!uploadResponse.ok) {
-            const errorText = await uploadResponse.text().catch(() => '');
-            console.error(`Lighthouse upload failed (attempt ${attempt}):`, uploadResponse.status, errorText);
-            throw new Error(`Lighthouse upload failed: ${uploadResponse.status} ${uploadResponse.statusText}`);
-          }
-
-          const uploadData = await uploadResponse.json();
-          return uploadData;
-        } catch (uploadError: any) {
-          clearTimeout(timer);
-          console.error(`Upload error (attempt ${attempt}):`, uploadError);
-          throw uploadError;
-        }
-      };
-
-      let lastError: any = null;
-      for (let attempt = 1; attempt <= 2; attempt++) {
-        try {
-          const uploadData = await attemptUpload(attempt);
-          mediaCid = uploadData.Hash;
-          mediaType = 'image';
-
-          console.log('Media uploaded to IPFS:', mediaCid);
-          break;
-        } catch (e: any) {
-          lastError = e;
-          if (e?.name === 'AbortError') {
-            console.warn(`Upload attempt ${attempt} timed out after 90s`);
-          }
-          // Small backoff before retrying
-          if (attempt < 2) {
-            await new Promise((r) => setTimeout(r, 1500));
-          }
-        }
-      }
-
-      if (!mediaCid) {
-        const reason = lastError?.name === 'AbortError'
-          ? 'Media upload timed out. Please try again shortly.'
-          : `Failed to upload media: ${lastError?.message || 'Unknown error'}`;
-        throw new Error(reason);
+      console.log('Uploading media to IPFS:', mediaFile.name, 'Size:', mediaFile.size);
+      
+      try {
+        mediaCid = await uploadToIPFS(mediaFile, mediaFile.name);
+        mediaType = 'image';
+        console.log('✅ Media uploaded to IPFS:', mediaCid);
+      } catch (error: any) {
+        console.error('❌ IPFS upload failed:', error.message);
+        throw new Error(`Failed to upload media: ${error.message}`);
       }
     }
 

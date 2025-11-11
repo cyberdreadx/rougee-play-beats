@@ -165,9 +165,11 @@ export default function UnlockPostButton({
         console.log('✅ Creator transfer sent:', creatorTxHash);
 
         // Wait for creator transfer to confirm before sending treasury transfer
-        await publicClient.waitForTransactionReceipt({
+        console.log('⏳ Waiting for creator transfer to confirm...');
+        const creatorReceipt = await publicClient.waitForTransactionReceipt({
           hash: creatorTxHash as `0x${string}`,
         });
+        console.log('✅ Creator transfer confirmed:', creatorReceipt.status);
 
         // Transfer 20% to treasury
         const treasuryTxHash = await writeContractAsync({
@@ -184,9 +186,11 @@ export default function UnlockPostButton({
         txHash = creatorTxHash;
 
         // Wait for treasury transaction to confirm as well
+        console.log('⏳ Waiting for treasury transfer to confirm...');
         const treasuryReceipt = await publicClient.waitForTransactionReceipt({
           hash: treasuryTxHash as `0x${string}`,
         });
+        console.log('✅ Treasury transfer confirmed:', treasuryReceipt.status);
 
         if (!treasuryReceipt || treasuryReceipt.status !== 'success') {
           throw new Error('Treasury transfer failed');
@@ -195,16 +199,9 @@ export default function UnlockPostButton({
         throw new Error(`Unsupported token type: ${unlockTokenType}`);
       }
 
-      // Wait for transaction confirmation before recording unlock
+      // Record unlock in database after both transactions are confirmed
       if (txHash) {
-        // Wait for creator transaction to be confirmed (already done above, but double-check)
-        const receipt = await publicClient.waitForTransactionReceipt({
-          hash: txHash as `0x${string}`,
-        });
-
-        if (!receipt || receipt.status !== 'success') {
-          throw new Error('Creator transfer failed');
-        }
+        console.log('✅ Both transfers confirmed, calling unlock-post function...');
 
         // Record unlock in database after transaction is confirmed
         // No JWT needed - blockchain transaction is proof!
@@ -212,51 +209,92 @@ export default function UnlockPostButton({
         console.log('📤 Calling unlock-post function:', functionUrl);
         console.log('📤 Request payload:', { postId, transactionHash: txHash, walletAddress: fullAddress });
         
-        const response = await fetch(functionUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            // No auth headers needed - we verify on blockchain!
-          },
-          body: JSON.stringify({
-            postId,
-            transactionHash: txHash,
-            walletAddress: fullAddress, // Include wallet address for verification
-            treasuryAddress: TREASURY_ADDRESS, // Include treasury address for verification
-            platformFeePercentage: PLATFORM_FEE_PERCENTAGE, // Include fee percentage
-          }),
-        });
-
-        console.log('📬 Response status:', response.status, response.statusText);
-        console.log('📬 Response headers:', Object.fromEntries(response.headers.entries()));
-
-        if (!response.ok) {
-          let errorData;
-          try {
-            errorData = await response.json();
-            console.error('❌ Error response:', errorData);
-            console.error('❌ Error details:', errorData.details);
-            console.error('❌ Error type:', errorData.errorType);
-          } catch (e) {
-            const text = await response.text();
-            console.error('❌ Error response (text):', text);
-            errorData = { error: text || 'Failed to record unlock' };
-          }
-          const errorMessage = errorData.details || errorData.error || 'Failed to record unlock';
-          console.error('❌ Throwing error:', errorMessage);
-          throw new Error(errorMessage);
-        }
+        // Add timeout to prevent hanging (60 seconds should be enough for retries)
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 60000);
         
-        const responseData = await response.json();
-        console.log('✅ Unlock successful:', responseData);
+        try {
+          const response = await fetch(functionUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              // No auth headers needed - we verify on blockchain!
+            },
+            body: JSON.stringify({
+              postId,
+              transactionHash: txHash,
+              walletAddress: fullAddress, // Include wallet address for verification
+              treasuryAddress: TREASURY_ADDRESS, // Include treasury address for verification
+              platformFeePercentage: PLATFORM_FEE_PERCENTAGE, // Include fee percentage
+            }),
+            signal: controller.signal,
+          });
 
-        toast({
-          title: "Post Unlocked! 🔓",
-          description: "You can now view this premium content",
-        });
+          clearTimeout(timeoutId);
 
-        if (onUnlocked) {
-          onUnlocked();
+          console.log('📬 Response status:', response.status, response.statusText);
+          console.log('📬 Response headers:', Object.fromEntries(response.headers.entries()));
+
+          if (!response.ok) {
+            let errorData;
+            try {
+              errorData = await response.json();
+              console.error('❌ Error response:', errorData);
+              console.error('❌ Error details:', errorData.details);
+              console.error('❌ Error type:', errorData.errorType);
+            } catch (e) {
+              const text = await response.text();
+              console.error('❌ Error response (text):', text);
+              errorData = { error: text || 'Failed to record unlock' };
+            }
+            const errorMessage = errorData.details || errorData.error || 'Failed to record unlock';
+            console.error('❌ Throwing error:', errorMessage);
+            throw new Error(errorMessage);
+          }
+          
+          const responseData = await response.json();
+          console.log('✅ Unlock successful:', responseData);
+
+          // Verify unlock was recorded in database
+          console.log('🔍 Verifying unlock in database...');
+          const { data: verifyUnlock, error: verifyError } = await supabase
+            .from('feed_post_unlocks')
+            .select('id')
+            .eq('post_id', postId)
+            .eq('wallet_address', fullAddress.toLowerCase())
+            .maybeSingle();
+          
+          if (verifyError) {
+            console.error('❌ Error verifying unlock:', verifyError);
+          } else if (verifyUnlock) {
+            console.log('✅ Unlock verified in database:', verifyUnlock.id);
+          } else {
+            console.warn('⚠️ Unlock not found in database yet, but function returned success');
+          }
+
+          // Small delay to ensure database is updated
+          await new Promise(resolve => setTimeout(resolve, 500));
+
+          toast({
+            title: "Post Unlocked! 🔓",
+            description: "You can now view this premium content",
+          });
+
+          if (onUnlocked) {
+            console.log('🔄 Calling onUnlocked callback...');
+            onUnlocked();
+          } else {
+            // Fallback: refresh the page if no callback provided
+            console.log('🔄 No callback provided, reloading page...');
+            window.location.reload();
+          }
+        } catch (fetchError: any) {
+          clearTimeout(timeoutId);
+          if (fetchError.name === 'AbortError') {
+            console.error('❌ Unlock request timed out after 60 seconds');
+            throw new Error('Unlock request timed out. The transaction may still be processing. Please refresh the page in a moment.');
+          }
+          throw fetchError;
         }
       }
     } catch (error: any) {

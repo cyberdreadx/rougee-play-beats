@@ -436,10 +436,10 @@ export default function UploadMusic() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Check file size (50MB = 50 * 1024 * 1024 bytes)
-    const maxSize = 50 * 1024 * 1024; // 50MB
+    // Check file size (75MB = 75 * 1024 * 1024 bytes)
+    const maxSize = 75 * 1024 * 1024; // 75MB
     if (file.size > maxSize) {
-      toast.error(`Audio file too large. Must be less than 50MB. Your file is ${(file.size / (1024 * 1024)).toFixed(1)}MB`);
+      toast.error(`Audio file too large. Must be less than 75MB. Your file is ${(file.size / (1024 * 1024)).toFixed(1)}MB`);
       // Clear the input
       e.target.value = '';
       return;

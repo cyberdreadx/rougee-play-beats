@@ -123,9 +123,9 @@ serve(async (req) => {
     }
 
     // Validate audio file
-    if (file.size > 50 * 1024 * 1024) {
+    if (file.size > 75 * 1024 * 1024) {
       console.error('Audio file too large:', file.size);
-      return new Response(JSON.stringify({ error: 'Audio too large (max 50MB)' }), 
+      return new Response(JSON.stringify({ error: 'Audio too large (max 75MB)' }), 
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 });
     }
     // More comprehensive audio type validation

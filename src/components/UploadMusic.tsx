@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Music, Upload, AlertTriangle, Loader2, Shield } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useWallet } from "@/hooks/useWallet";
@@ -230,6 +231,7 @@ export default function UploadMusic() {
   const { getAuthHeaders } = usePrivyToken();
   const { slotsRemaining, xrgeBalance, xrgeNeeded, refetch: refetchSlots } = useUploadSlots();
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [scanning, setScanning] = useState(false);
   const [title, setTitle] = useState("");
   const [artist, setArtist] = useState("");
@@ -514,6 +516,7 @@ export default function UploadMusic() {
     }
 
     setUploading(true);
+    setUploadProgress(0);
     try {
       const headers = await getAuthHeaders();
       
@@ -538,17 +541,58 @@ export default function UploadMusic() {
         aiCoverPrompt: selectedGeneratedCover ? aiCoverPrompt : null
       }));
 
-      // Upload to IPFS
+      // Upload to IPFS with progress tracking
       toast.success('Uploading to IPFS...');
-      const { data: uploadData, error: uploadError } = await supabase.functions.invoke('upload-to-lighthouse', {
-        headers: {
-          ...headers,
-          'x-wallet-address': address, // Send wallet address in header
-        },
-        body: formData
+      
+      // Use XMLHttpRequest for progress tracking
+      const uploadData = await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const functionUrl = `${supabaseUrl}/functions/v1/upload-to-lighthouse`;
+        
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) {
+            const percentComplete = Math.round((e.loaded / e.total) * 100);
+            setUploadProgress(percentComplete);
+          }
+        });
+        
+        xhr.addEventListener('load', () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              const response = JSON.parse(xhr.responseText);
+              resolve(response);
+            } catch (error) {
+              reject(new Error('Failed to parse response'));
+            }
+          } else {
+            try {
+              const errorResponse = JSON.parse(xhr.responseText);
+              reject(new Error(errorResponse.error || `Upload failed with status ${xhr.status}`));
+            } catch {
+              reject(new Error(`Upload failed with status ${xhr.status}`));
+            }
+          }
+        });
+        
+        xhr.addEventListener('error', () => {
+          reject(new Error('Network error during upload'));
+        });
+        
+        xhr.addEventListener('abort', () => {
+          reject(new Error('Upload was cancelled'));
+        });
+        
+        xhr.open('POST', functionUrl);
+        
+        // Set headers
+        if (headers.Authorization) {
+          xhr.setRequestHeader('Authorization', headers.Authorization);
+        }
+        xhr.setRequestHeader('x-wallet-address', address);
+        
+        xhr.send(formData);
       });
-
-      if (uploadError) throw uploadError;
 
       // Refresh upload slots count
       refetchSlots();
@@ -582,6 +626,7 @@ export default function UploadMusic() {
     } catch (error) {
       console.error('Upload error:', error);
       toast.error(error instanceof Error ? error.message : 'Upload failed');
+      setUploadProgress(0);
     } finally {
       setUploading(false);
     }
@@ -1041,6 +1086,16 @@ export default function UploadMusic() {
               .
             </label>
           </div>
+
+          {uploading && (
+            <div className="w-full mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm text-muted-foreground">Uploading to IPFS...</span>
+                <span className="text-sm font-mono text-neon-green">{uploadProgress}%</span>
+              </div>
+              <Progress value={uploadProgress} className="h-2" indicatorClassName="bg-neon-green" />
+            </div>
+          )}
 
           <Button
             onClick={handleUpload}

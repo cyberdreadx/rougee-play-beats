@@ -11,12 +11,6 @@ export const useWallet = () => {
   // PRIORITY 1: Try to get address from Privy's useWallets hook (most reliable)
   let address: string | undefined = undefined;
   
-  
-  // CRITICAL: Log if wallets array is empty
-  if (wallets.length === 0) {
-    console.warn('⚠️ WALLETS ARRAY IS EMPTY! Embedded wallet may not be created yet.');
-  }
-  
   // Try useWallets first (this is the proper way)
   if (wallets.length > 0) {
     // For smart wallets, prioritize the smart wallet

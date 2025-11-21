@@ -127,6 +127,23 @@ const LoginModal = ({ open, onOpenChange }: LoginModalProps) => {
               </>
             )}
           </Button>
+
+          {/* RouGee Wallet Option - Coming Soon */}
+          <div className="relative">
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              disabled={true}
+              className="w-full font-mono flex items-center justify-center gap-2 border-gray-500/30 bg-gray-500/10 text-gray-500/50 cursor-not-allowed opacity-50"
+            >
+              <Wallet className="h-5 w-5" />
+              ROUGEE WALLET - COMING SOON
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
@@ -134,3 +151,4 @@ const LoginModal = ({ open, onOpenChange }: LoginModalProps) => {
 };
 
 export default LoginModal;
+

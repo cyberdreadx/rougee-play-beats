@@ -209,12 +209,6 @@ const Trending = ({ playSong, currentSong, isPlaying }: TrendingProps = {}) => {
       return change > max ? change : max;
     }, 0);
     
-    console.log('📈 Top gainer calculation:', {
-      totalSongs: songStats.size,
-      maxChange,
-      allChanges: Array.from(songStats.values()).map(s => s.change)
-    });
-    
     return maxChange;
   }, [songStats]);
   
